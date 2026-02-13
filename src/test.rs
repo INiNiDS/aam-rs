@@ -40,4 +40,49 @@ mod tests {
         let formatted = format!("{}", res);
         assert_eq!(formatted, "hello");
     }
+
+    #[test]
+    fn test_find_deep() {
+        let parser = AAML::parse(TEST_CONFIG);
+        let res = parser.find_deep("c").expect("Должен найти 'c'");
+        assert_eq!(res, "g");
+    }
+
+    #[test]
+    fn test_find_deep_direct_loop() {
+        let content = "key1=key1";
+        let aaml = AAML::parse(content);
+
+        let result = aaml.find_deep("key1");
+        println!("{:?}", result);
+        assert_eq!(result.unwrap().as_str(), "key1");
+    }
+
+    #[test]
+    fn test_find_deep_indirect_loop() {
+        let content = "a=b\nb=a";
+        let aaml = AAML::parse(content);
+
+        let result = aaml.find_deep("a");
+        println!("{:?}", result);
+        assert_eq!(result.unwrap().as_str(), "b");
+    }
+
+    #[test]
+    fn test_find_deep_long_chain_with_loop() {
+        let content = "start=mid\nmid=end\nend=mid";
+        let aaml = AAML::parse(content);
+
+        let result = aaml.find_deep("start");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_find_deep_no_loop() {
+        let content = "a=b\nb=c\nc=final";
+        let aaml = AAML::parse(content);
+
+        let result = aaml.find_deep("a");
+        assert!(result.is_some());
+    }
 }
