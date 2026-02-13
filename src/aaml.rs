@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use crate::found_value::FoundValue;
 
@@ -7,14 +8,13 @@ pub struct AAML {
 }
 
 impl AAML {
-    pub fn load<P: AsRef<Path>>(file_path: &str) -> Result<Self, String> {
-        let content = std::fs::read_to_string(file_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+    pub fn parse(content: &str) -> Self {
         let mut map = HashMap::new();
 
         for line in content.lines() {
-            if line.trim().is_empty() || line.starts_with("#") {
-                continue; // Skip empty lines and comments
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("#") {
+                continue;
             }
 
             if let Some((name, value)) = line.split_once('=') {
@@ -22,7 +22,14 @@ impl AAML {
             }
         }
 
-        Ok(AAML { map })
+        AAML { map }
+    }
+    
+    pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, String> {
+        let content = fs::read_to_string(file_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+
+        Ok(Self::parse(&content))
     }
 
     pub fn find_obj(&self, key: &str) -> Option<FoundValue> {
