@@ -1,7 +1,11 @@
 use aam_rs::aaml::AAML;
 
 fn main() {
-    let parser = AAML::parse(include_str!("standard.aam"));
+    let parser = match AAML::parse(include_str!("standard.aam")) {
+        Ok(aaml) => aaml,
+        Err(e) => {eprint!("{}", e); return;}
+    };
+
     if let Some(a) = parser.find_obj("a") {
         println!("{}", a);
     } else {

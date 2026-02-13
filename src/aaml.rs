@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
+use crate::error::AamlError;
 use crate::found_value::FoundValue;
 
 #[derive(Debug, Clone)]
@@ -9,35 +10,51 @@ pub struct AAML {
 }
 
 impl AAML {
-    pub fn parse(content: &str) -> Self {
+    pub fn parse(content: &str) -> Result<Self, AamlError> {
         let mut map = HashMap::with_capacity(content.lines().count());
 
-        for line in content.lines() {
+        for (index, line) in content.lines().enumerate() {
             let clean_line = line.split_once('#')
                 .map(|(content, _)| content)
-                .unwrap_or(line);
-
-            let clean_line = clean_line.trim();
+                .unwrap_or(line)
+                .trim();
 
             if clean_line.is_empty() {
                 continue;
             }
 
-            if let Some((name, value)) = line.split_once('=') {
-                map.insert(name.trim().to_string(), value.trim().to_string());
+            if let Some((name, value)) = clean_line.split_once('=') {
+                let key = name.trim();
+                let val = value.trim();
+
+                if key.is_empty() {
+                    return Err(AamlError::ParseError {
+                        line: index + 1,
+                        content: line.to_string(),
+                        details: "Key cannot be empty".to_string(),
+                    });
+                }
+
+                map.insert(key.to_string(), val.to_string());
+            } else {
+                return Err(AamlError::ParseError {
+                    line: index + 1,
+                    content: line.to_string(),
+                    details: "Missing assignment operator '='".to_string(),
+                });
             }
         }
 
         map.shrink_to_fit();
 
-        AAML { map }
+        Ok(AAML { map })
     }
 
-    pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, String> {
-        let content = fs::read_to_string(file_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+    // Load теперь использует AamlError
+    pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError> {
+        let content = fs::read_to_string(file_path)?;
 
-        Ok(Self::parse(&content))
+        Self::parse(&content)
     }
 
     pub fn find_obj(&self, key: &str) -> Option<FoundValue> {
