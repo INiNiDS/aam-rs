@@ -13,8 +13,13 @@ impl AAML {
         let mut map = HashMap::with_capacity(content.lines().count());
 
         for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with("#") {
+            let clean_line = line.split_once('#')
+                .map(|(content, _)| content)
+                .unwrap_or(line);
+
+            let clean_line = clean_line.trim();
+
+            if clean_line.is_empty() {
                 continue;
             }
 
