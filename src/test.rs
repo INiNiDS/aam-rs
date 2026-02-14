@@ -64,7 +64,7 @@ mod tests {
         let aaml = AAML::parse(content).expect("Ошибка парсинга");
 
         let result = aaml.find_deep("a");
-        println!("{:?}", result);
+        
         assert_eq!(result.unwrap().as_str(), "b");
     }
 
@@ -110,6 +110,7 @@ mod tests {
             key1 = "value1"
             key2 = 'value2'
             key3 = value3
+            key4 =
         "#;
         let parser = AAML::parse(content).expect("Parsing failed");
 
