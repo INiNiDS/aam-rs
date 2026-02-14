@@ -14,10 +14,8 @@ impl AAML {
         let mut map = HashMap::with_capacity(content.lines().count());
 
         for (index, line) in content.lines().enumerate() {
-            let clean_line = line.split_once('#')
-                .map(|(content, _)| content)
-                .unwrap_or(line)
-                .trim();
+            let clean_line = Self::strip_comment(line);
+            let clean_line = clean_line.trim();
 
             if clean_line.is_empty() {
                 continue;
@@ -25,7 +23,7 @@ impl AAML {
 
             if let Some((name, value)) = clean_line.split_once('=') {
                 let key = name.trim();
-                let val = value.trim();
+                let mut val = value.trim();
 
                 if key.is_empty() {
                     return Err(AamlError::ParseError {
@@ -33,6 +31,12 @@ impl AAML {
                         content: line.to_string(),
                         details: "Key cannot be empty".to_string(),
                     });
+                }
+
+                if (val.starts_with('"') && val.ends_with('"')) || (val.starts_with('\'') && val.ends_with('\'')) {
+                    if val.len() >= 2 {
+                        val = &val[1..val.len()-1];
+                    }
                 }
 
                 map.insert(key.to_string(), val.to_string());
@@ -50,7 +54,6 @@ impl AAML {
         Ok(AAML { map })
     }
 
-    // Load теперь использует AamlError
     pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError> {
         let content = fs::read_to_string(file_path)?;
 
@@ -97,5 +100,32 @@ impl AAML {
                     None
                 }
             })
+    }
+
+    fn strip_comment(line: &str) -> String {
+        let mut result = String::with_capacity(line.len());
+        let mut in_quote = false;
+        let mut quote_char = '\0';
+
+        for c in line.chars() {
+            if c == '"' || c == '\'' {
+                if in_quote {
+                    if c == quote_char {
+                        in_quote = false;
+                    }
+                } else {
+                    in_quote = true;
+                    quote_char = c;
+                }
+
+                if c == '#' && !in_quote {
+                    break;
+                }
+
+                result.push(c);
+            }
+        }
+
+        result
     }
 }

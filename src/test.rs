@@ -103,4 +103,26 @@ mod tests {
         let res = AAML::parse(content);
         assert!(res.is_err());
     }
+
+    #[test]
+    fn test_quotes_stripping() {
+        let content = r#"
+            key1 = "value1"
+            key2 = 'value2'
+            key3 = value3
+        "#;
+        let parser = AAML::parse(content).expect("Parsing failed");
+
+        assert_eq!(parser.find_obj("key1").unwrap().as_str(), "value1");
+        assert_eq!(parser.find_obj("key2").unwrap().as_str(), "value2");
+        assert_eq!(parser.find_obj("key3").unwrap().as_str(), "value3");
+    }
+
+    #[test]
+    fn test_nested_quotes_behavior() {
+        let content = r#"key = "'inner quotes'""#;
+        let parser = AAML::parse(content).expect("Parsing failed");
+
+        assert_eq!(parser.find_obj("key").unwrap().as_str(), "'inner quotes'");
+    }
 }
