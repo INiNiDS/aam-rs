@@ -14,20 +14,20 @@ mod tests {
 
     #[test]
     fn test_simple_find() {
-        let parser = AAML::parse(TEST_CONFIG).expect("Ошибка парсинга конфига");
-        let res = parser.find_obj("a").expect("Должен найти 'a'");
+        let parser = AAML::parse(TEST_CONFIG).expect("Error parsing config");
+        let res = parser.find_obj("a").expect("Should find 'a'");
         assert_eq!(res, "b");
     }
 
     #[test]
     fn test_not_found() {
-        let parser = AAML::parse(TEST_CONFIG).expect("Ошибка парсинга конфига");
+        let parser = AAML::parse(TEST_CONFIG).expect("Error parsing config");
         assert!(parser.find_obj("unknown").is_none());
     }
 
     #[test]
     fn test_deref_behavior() {
-        let parser = AAML::parse(TEST_CONFIG).expect("Ошибка парсинга конфига");
+        let parser = AAML::parse(TEST_CONFIG).expect("Error parsing config");
         let res = parser.find_obj("a").unwrap();
 
         assert_eq!(res.len(), 1);
@@ -43,15 +43,15 @@ mod tests {
 
     #[test]
     fn test_find_deep() {
-        let parser = AAML::parse(TEST_CONFIG).expect("Ошибка парсинга конфига");
-        let res = parser.find_deep("c").expect("Должен найти 'c'");
+        let parser = AAML::parse(TEST_CONFIG).expect("Error parsing config");
+        let res = parser.find_deep("c").expect("Should find 'c'");
         assert_eq!(res, "g");
     }
 
     #[test]
     fn test_find_deep_direct_loop() {
         let content = "key1=key1";
-        let aaml = AAML::parse(content).expect("Ошибка парсинга");
+        let aaml = AAML::parse(content).expect("Error parsing config");
 
         let result = aaml.find_deep("key1");
         println!("{:?}", result);
@@ -61,29 +61,31 @@ mod tests {
     #[test]
     fn test_find_deep_indirect_loop() {
         let content = "a=b\nb=a";
-        let aaml = AAML::parse(content).expect("Ошибка парсинга");
+        let aaml = AAML::parse(content).expect("Error parsing config");
 
         let result = aaml.find_deep("a");
-        
+
         assert_eq!(result.unwrap().as_str(), "b");
     }
 
     #[test]
     fn test_find_deep_long_chain_with_loop() {
         let content = "start=mid\nmid=end\nend=mid";
-        let aaml = AAML::parse(content).expect("Ошибка парсинга");
+        let aaml = AAML::parse(content).expect("Error parsing config");
 
         let result = aaml.find_deep("start");
         assert!(result.is_some());
+        assert_eq!(result.unwrap().as_str(), "end");
     }
 
     #[test]
     fn test_find_deep_no_loop() {
         let content = "a=b\nb=c\nc=final";
-        let aaml = AAML::parse(content).expect("Ошибка парсинга");
+        let aaml = AAML::parse(content).expect("Error parsing config");
 
         let result = aaml.find_deep("a");
         assert!(result.is_some());
+        assert_eq!(result.unwrap().as_str(), "final");
     }
 
     #[test]
@@ -112,7 +114,7 @@ mod tests {
             key3 = value3
             key4 =
         "#;
-        let parser = AAML::parse(content).expect("Parsing failed");
+        let parser = AAML::parse(content).expect("Error parsing config");
 
         assert_eq!(parser.find_obj("key1").unwrap().as_str(), "value1");
         assert_eq!(parser.find_obj("key2").unwrap().as_str(), "value2");
@@ -122,7 +124,7 @@ mod tests {
     #[test]
     fn test_nested_quotes_behavior() {
         let content = r#"key = "'inner quotes'""#;
-        let parser = AAML::parse(content).expect("Parsing failed");
+        let parser = AAML::parse(content).expect("Error parsing config");
 
         assert_eq!(parser.find_obj("key").unwrap().as_str(), "'inner quotes'");
     }
