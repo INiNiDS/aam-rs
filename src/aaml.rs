@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::ops::{Add, AddAssign};
 use std::path::Path;
 use crate::error::AamlError;
 use crate::found_value::FoundValue;
@@ -21,6 +22,25 @@ impl AAML {
             let clean_line = Self::strip_comment(line).trim();
 
             if clean_line.is_empty() {
+                continue;
+            }
+
+            if clean_line.starts_with("@import") {
+                let raw_path = clean_line["@import".len()..].trim();
+
+                let path = raw_path.trim_matches(|c| c == '"' || c == '\'');
+
+                if path.is_empty() {
+                    continue;
+                }
+                
+                let sub_content = fs::read_to_string(path).map_err(|_| AamlError::ParseError {
+                    line: index + 1,
+                    content: line.to_string(),
+                    details: format!("Failed to read import file: {}", path),
+                })?;
+                self.merge_content(&sub_content)?;
+
                 continue;
             }
 
@@ -61,6 +81,8 @@ impl AAML {
 
     pub fn parse(content: &str) -> Result<Self, AamlError> {
         let mut aaml = AAML::new();
+        aaml.merge_content(content)?;
+        Ok(aaml)
     }
 
     pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError> {
@@ -130,5 +152,20 @@ impl AAML {
             }
         }
         line
+    }
+}
+
+impl Add for AAML {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self {
+        self.map.extend(rhs.map);
+        self
+    }
+}
+
+impl AddAssign for AAML {
+    fn add_assign(&mut self, rhs: Self) {
+        self.map.extend(rhs.map);
     }
 }

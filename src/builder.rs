@@ -1,6 +1,6 @@
-use std::ops::Deref;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::ops::Deref;
+use std::path::Path;
 
 pub struct AAMBuilder {
     buffer: String,
@@ -13,11 +13,19 @@ impl AAMBuilder {
         }
     }
 
-    pub fn add_line(&mut self, line: &str) {
+    pub fn add_line(&mut self, key: &str, value: &str) {
+        let line = format!("{} = {}", key, value);
         if !self.buffer.is_empty() {
             self.buffer.push('\n');
         }
-        self.buffer.push_str(line);
+        self.buffer.push_str(&*line);
+    }
+
+    pub fn add_raw(&mut self, raw_line: &str) {
+        if !self.buffer.is_empty() {
+            self.buffer.push('\n');
+        }
+        self.buffer.push_str(raw_line);
     }
 
     pub fn to_file<P: AsRef<Path>>(&self, path: P) {

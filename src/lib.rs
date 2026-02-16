@@ -1,5 +1,6 @@
 pub mod aaml;
 pub mod found_value;
 pub mod error;
-mod test;
-mod builder;
+pub mod builder;
+mod test_imports;
+mod test_core;
