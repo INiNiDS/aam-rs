@@ -9,9 +9,8 @@ readme = "README.md"
 categories = [
     "data-structures",
     "parsing",
-    "serialization",
-    "file-formats",
-    "utilities",
+    "config",
+    "development"
 ]
 
 [dependencies]
