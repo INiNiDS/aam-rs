@@ -1,6 +1,6 @@
 [package]
 name = "aam-rs"
-version = "1.0.2"
+version = "1.0.3"
 description = "A Rust implementation of the Abstract Alias Mapping (AAM) framework for aliasing and maping aam files."
 license = "MIT"
 repository = "https://github.com/INiNiONC/aam-rs/"
@@ -13,7 +13,7 @@ categories = [
 ]
 
 [dependencies]
-ahash = { version = "0.8", optional = true }
+ahash = {version = "0.8", optional = true}
 
 [features]
 default = []
