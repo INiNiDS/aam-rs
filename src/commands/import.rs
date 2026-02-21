@@ -10,15 +10,16 @@ impl Command for ImportCommand {
     }
 
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
-        let path = args.trim();
-        if path.is_empty() {
+        let raw_path = args.trim();
+        if raw_path.is_empty() {
             return Err(AamlError::ParseError {
                 line: 0,
                 content: args.to_string(),
                 details: "Import path cannot be empty".to_string(),
             });
         }
-        
+
+        let path = AAML::unwrap_quotes(raw_path);
         aaml.merge_file(path)
     }
 }

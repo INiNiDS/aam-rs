@@ -28,7 +28,7 @@ mod tests {
         let sub_file = "test_sub_config.aam";
         let mut builder = AAMBuilder::new();
         builder.add_line("sub_key", "sub_value");
-        builder.to_file(sub_file);
+        builder.to_file(sub_file).unwrap();
 
         let content = format!("main_key = main_value\n@import {}", sub_file);
 
@@ -50,11 +50,11 @@ mod tests {
         let mut b1 = AAMBuilder::new();
         b1.add_raw(format!("@import {file2}").as_str());
         b1.add_line("key1", "val1");
-        b1.to_file(file1);
+        b1.to_file(file1).unwrap();
 
         let mut b2 = AAMBuilder::new();
         b2.add_line("key2", "val2");
-        b2.to_file(file2);
+        b2.to_file(file2).unwrap();
 
         let parser = AAML::load(file1);
 
@@ -72,7 +72,7 @@ mod tests {
         let sub_file = "quoted_import.aam";
         let mut b = AAMBuilder::new();
         b.add_line("q_key", "q_val");
-        b.to_file(sub_file);
+        b.to_file(sub_file).unwrap();
 
         let content = format!(r#"@import "{}""#, sub_file);
 

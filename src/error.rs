@@ -15,6 +15,7 @@ pub enum AamlError {
         type_name: String,
         details: String,
     },
+    DirectiveError(String, String),
 }
 
 impl fmt::Display for AamlError {
@@ -28,6 +29,9 @@ impl fmt::Display for AamlError {
             AamlError::InvalidValue(msg) => write!(f, "Invalid value: {}", msg),
             AamlError::InvalidType { type_name, details } => {
                 write!(f, "Invalid type '{}': {}", type_name, details)
+            }
+            AamlError::DirectiveError(cmd, msg) => {
+                write!(f, "Directive '@{}' error: {}", cmd, msg)
             }
         }
     }

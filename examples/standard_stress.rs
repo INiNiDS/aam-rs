@@ -3,7 +3,7 @@ use aam_rs::aaml::AAML;
 use aam_rs::builder::AAMBuilder;
 
 fn main() {
-    let count = 300;
+    let count = 30_000_000;
     println!("🚀 Начинаем тест для {} строк...", count);
 
     let gen_start = Instant::now();

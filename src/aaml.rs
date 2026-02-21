@@ -6,6 +6,7 @@ use std::fs;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 use std::sync::Arc;
+use crate::commands::schema::SchemaDef;
 use crate::types::Type;
 
 #[cfg(feature = "perf-hash")]
@@ -16,12 +17,11 @@ type Hasher = std::collections::hash_map::RandomState;
 
 type AamlString = Box<str>;
 
-pub type CommandHandler = Arc<dyn Fn(&mut AAML, &str) -> Result<(), AamlError> + Send + Sync>;
-
 pub struct AAML {
     map: HashMap<AamlString, AamlString, Hasher>,
     commands: HashMap<String, Arc<dyn Command>>,
     types: HashMap<String, Box<dyn Type>>,
+    schemas: HashMap<String, SchemaDef>,
 }
 
 impl std::fmt::Debug for AAML {
@@ -39,6 +39,7 @@ impl AAML {
             map: HashMap::with_hasher(Hasher::new()),
             commands: HashMap::new(),
             types: HashMap::new(),
+            schemas: HashMap::new(),
         };
         instance.register_default_commands();
         instance
@@ -49,9 +50,31 @@ impl AAML {
             map: HashMap::with_capacity_and_hasher(capacity, Hasher::default()),
             commands: HashMap::new(),
             types: HashMap::new(),
+            schemas: HashMap::new(),
         };
         instance.register_default_commands();
         instance
+    }
+
+    pub(crate) fn get_schemas_mut(&mut self) -> &mut HashMap<String, SchemaDef> {
+        &mut self.schemas
+    }
+
+    pub fn get_schema(&self, name: &str) -> Option<&SchemaDef> {
+        self.schemas.get(name)
+    }
+
+    pub(crate) fn get_map_mut(&mut self) -> &mut HashMap<AamlString, AamlString, Hasher> {
+        &mut self.map
+    }
+
+
+    pub fn check_type(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
+        if let Some(type_def) = self.types.get(type_name) {
+            type_def.validate(value)
+        } else {
+            Err(AamlError::NotFound(type_name.to_string()))
+        }
     }
 
     pub fn register_command<C>(&mut self, command: C)
@@ -91,30 +114,6 @@ impl AAML {
              self.process_line(&line, i + 1)?;
         }
         Ok(())
-    }
-
-    fn process_line(&mut self, raw_line: &str, line_num: usize) -> Result<(), AamlError> {
-        let line = Self::strip_comment(raw_line).trim();
-
-        if line.is_empty() {
-            return Ok(());
-        }
-
-        if let Some(rest) = line.strip_prefix('@') {
-            return self.process_directive(rest, line_num);
-        }
-
-        match Self::parse_assignment(line) {
-            Ok((key, value)) => {
-                self.map.insert(Box::from(key), Box::from(value));
-                Ok(())
-            }
-            Err(details) => Err(AamlError::ParseError {
-                line: line_num,
-                content: line.to_string(),
-                details: details.to_string(),
-            }),
-        }
     }
 
     pub fn merge_file<P: AsRef<Path>>(&mut self, file_path: P) -> Result<(), AamlError> {
@@ -181,6 +180,32 @@ impl AAML {
     fn register_default_commands(&mut self) {
         self.register_command(commands::import::ImportCommand);
         self.register_command(commands::typecm::TypeCommand);
+        self.register_command(commands::schema::SchemaCommand);
+        self.register_command(commands::derive::DeriveCommand);
+    }
+
+    fn process_line(&mut self, raw_line: &str, line_num: usize) -> Result<(), AamlError> {
+        let line = Self::strip_comment(raw_line).trim();
+
+        if line.is_empty() {
+            return Ok(());
+        }
+
+        if let Some(rest) = line.strip_prefix('@') {
+            return self.process_directive(rest, line_num);
+        }
+
+        match Self::parse_assignment(line) {
+            Ok((key, value)) => {
+                self.map.insert(Box::from(key), Box::from(value));
+                Ok(())
+            }
+            Err(details) => Err(AamlError::ParseError {
+                line: line_num,
+                content: line.to_string(),
+                details: details.to_string(),
+            }),
+        }
     }
 
     fn process_directive(&mut self, content: &str, line_num: usize) -> Result<(), AamlError> {
