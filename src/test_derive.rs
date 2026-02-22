@@ -64,7 +64,11 @@ mod tests {
     fn test_derive_inherits_schemas() {
         let base_file = "test_derive_schemas.aam";
         let mut base = AAMBuilder::new();
+        // Schema 'Point' declares x and y — both must be present so that the
+        // completeness check inside @derive succeeds.
         base.add_raw("@schema Point { x: f64, y: f64 }");
+        base.add_line("x", "1.0");
+        base.add_line("y", "2.0");
         base.add_line("origin", "0.0, 0.0");
         base.to_file(base_file).unwrap();
 
@@ -76,17 +80,25 @@ mod tests {
         // schema "Point" must be inherited
         assert!(parser.get_schema("Point").is_some());
         assert_eq!(parser.find_obj("origin").unwrap().as_str(), "0.0, 0.0");
+        assert_eq!(parser.find_obj("x").unwrap().as_str(), "1.0");
+        assert_eq!(parser.find_obj("y").unwrap().as_str(), "2.0");
     }
 
     #[test]
     fn test_derive_schema_not_overwritten_by_base() {
         let base_file = "test_derive_schema_nowipe.aam";
         let mut base = AAMBuilder::new();
+        // Base has Config with only 'timeout: i32'. It must supply that field.
         base.add_raw("@schema Config { timeout: i32 }");
+        base.add_line("timeout", "30");
         base.to_file(base_file).unwrap();
 
-        // Child defines its own schema with same name but different fields
-        let content = format!("@schema Config {{ timeout: f64, retries: i32 }}\n@derive {base_file}\n");
+        // Child defines its own Config schema with MORE fields and must supply them all.
+        // Child's schema wins on name conflict. After @derive both 'timeout' and 'retries'
+        // must be present (child supplies both, base would only supply 'timeout').
+        let content = format!(
+            "@schema Config {{ timeout: f64, retries: i32 }}\ntimeout = 5.0\nretries = 3\n@derive {base_file}\n"
+        );
         let parser = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
         let parser = parser.expect("Should parse @derive with conflicting schemas");

@@ -1,3 +1,12 @@
+//! Core AAML parser and runtime.
+//!
+//! [`AAML`] is the main entry point for parsing `.aam` configuration files.
+//! It supports:
+//! - Key-value assignments (`key = value`)
+//! - Directives: `@import`, `@derive`, `@schema`, `@type`
+//! - Runtime type validation via registered or built-in types
+//! - Schema-based struct validation with [`AAML::apply_schema`]
+
 use crate::commands::{self, Command};
 use crate::error::AamlError;
 use crate::found_value::FoundValue;
@@ -17,6 +26,19 @@ type Hasher = std::collections::hash_map::RandomState;
 
 type AamlString = Box<str>;
 
+/// The main AAML parser and configuration store.
+///
+/// Holds a flat key-value map, registered type definitions, command handlers,
+/// and schema definitions. All directives (`@derive`, `@schema`, etc.) are
+/// processed at parse time.
+///
+/// # Example
+/// ```no_run
+/// use aam_rs::aaml::AAML;
+///
+/// let cfg = AAML::parse("host = localhost\nport = 8080").unwrap();
+/// assert_eq!(cfg.find_obj("host").unwrap().as_str(), "localhost");
+/// ```
 pub struct AAML {
     map: HashMap<AamlString, AamlString, Hasher>,
     commands: HashMap<String, Arc<dyn Command>>,
@@ -34,6 +56,9 @@ impl std::fmt::Debug for AAML {
 }
 
 impl AAML {
+    /// Creates a new empty [`AAML`] instance with all default commands registered.
+    ///
+    /// Default commands: `@import`, `@derive`, `@schema`, `@type`.
     pub fn new() -> AAML {
         let mut instance = AAML {
             map: HashMap::with_hasher(Hasher::new()),
@@ -45,6 +70,10 @@ impl AAML {
         instance
     }
 
+    /// Creates a new [`AAML`] instance pre-allocated for `capacity` key-value entries.
+    ///
+    /// Useful when the approximate number of keys is known in advance to avoid
+    /// repeated reallocations.
     pub fn with_capacity(capacity: usize) -> AAML {
         let mut instance = AAML {
             map: HashMap::with_capacity_and_hasher(capacity, Hasher::default()),
@@ -56,19 +85,25 @@ impl AAML {
         instance
     }
 
+    /// Returns a mutable reference to the schema map (for use by commands).
     pub(crate) fn get_schemas_mut(&mut self) -> &mut HashMap<String, SchemaDef> {
         &mut self.schemas
     }
 
+    /// Returns the [`SchemaDef`] for the given schema name, or `None` if not registered.
     pub fn get_schema(&self, name: &str) -> Option<&SchemaDef> {
         self.schemas.get(name)
     }
 
+    /// Returns a mutable reference to the internal key-value map (for use by commands).
     pub(crate) fn get_map_mut(&mut self) -> &mut HashMap<AamlString, AamlString, Hasher> {
         &mut self.map
     }
 
-
+    /// Validates `value` against a type registered under `type_name`.
+    ///
+    /// Returns [`AamlError::NotFound`] if the type has not been registered via `@type`.
+    /// For built-in types use [`AAML::validate_value`] which also resolves primitives.
     pub fn check_type(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
         if let Some(type_def) = self.types.get(type_name) {
             type_def.validate(value)
@@ -77,6 +112,9 @@ impl AAML {
         }
     }
 
+    /// Registers a custom command handler.
+    ///
+    /// The command will be invoked when `@<name> <args>` is encountered during parsing.
     pub fn register_command<C>(&mut self, command: C)
     where
         C: Command + 'static,
@@ -84,6 +122,10 @@ impl AAML {
         self.commands.insert(command.name().to_string(), Arc::new(command));
     }
 
+    /// Registers a named type definition for use in schema field validation.
+    ///
+    /// After registration the type can be referenced in `@schema` fields and
+    /// validated with [`AAML::validate_value`].
     pub fn register_type<T>(&mut self, name: String, type_def: T)
     where
         T: Type + 'static,
@@ -91,10 +133,20 @@ impl AAML {
         self.types.insert(name, Box::new(type_def));
     }
 
+    /// Returns the type handler registered under `name`, or `None`.
     pub fn get_type(&self, name: &str) -> Option<&Box<dyn Type>> {
         self.types.get(name)
     }
 
+    /// Validates `value` against the type registered as `type_name`.
+    ///
+    /// Unlike [`AAML::check_type`] this also resolves built-in primitive types
+    /// (`i32`, `f64`, `string`, `bool`, `color`) and module paths such as
+    /// `math::vector3` or `physics::kilogram`.
+    ///
+    /// # Errors
+    /// - [`AamlError::NotFound`] — type is not registered and not a known built-in.
+    /// - [`AamlError::InvalidType`] — value does not satisfy the type constraint.
     pub fn validate_value(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
         if let Some(type_def) = self.types.get(type_name) {
             type_def.validate(value).map_err(|e| AamlError::InvalidType {
@@ -106,13 +158,48 @@ impl AAML {
         }
     }
 
-    /// Validate a single field value against all registered schemas.
-    /// If the field is found in any schema, its declared type is checked.
-    /// Primitive types (i32, f64, string, bool, color) and builtins work
-    /// without explicit `@type` registration.
+    /// Checks every field in every registered schema against the current map and
+    /// returns an error for the first schema that has at least one field whose
+    /// value is missing from the map.
+    ///
+    /// Call this after loading / deriving a file to enforce that the document
+    /// fully satisfies all schemas that are in scope.
+    ///
+    /// # Errors
+    /// [`AamlError::SchemaValidationError`] with `details` starting with
+    /// `"Missing required field"` if a key expected by a schema is absent.
+    pub fn validate_schemas_completeness(&self) -> Result<(), AamlError> {
+        for (schema_name, schema_def) in &self.schemas {
+            for (field, type_name) in &schema_def.fields {
+                if !self.map.contains_key(field.as_str()) {
+                    return Err(AamlError::SchemaValidationError {
+                        schema: schema_name.clone(),
+                        field: field.clone(),
+                        type_name: type_name.clone(),
+                        details: format!("Missing required field '{}'", field),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks a single field value against all schemas that declare it.
+    ///
+    /// Resolution order:
+    /// 1. Types registered via `@type` (aliases).
+    /// 2. Built-in primitives (`i32`, `f64`, `string`, `bool`, `color`).
+    /// 3. Built-in module paths (`math::*`, `physics::*`, `time::*`).
+    ///
+    /// If the field is not declared in any schema the function succeeds silently.
+    ///
+    /// # Errors
+    /// [`AamlError::SchemaValidationError`] when the value is invalid or the
+    /// declared type is unknown.
     fn validate_against_schemas(&self, field: &str, value: &str) -> Result<(), AamlError> {
         for (schema_name, schema_def) in &self.schemas {
             if let Some(type_name) = schema_def.fields.get(field) {
+                // 1. Registered @type alias
                 if let Some(type_def) = self.types.get(type_name.as_str()) {
                     return type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
                         schema: schema_name.clone(),
@@ -121,6 +208,7 @@ impl AAML {
                         details: e.to_string(),
                     });
                 }
+                // 2. Built-in / primitive
                 match resolve_builtin(type_name) {
                     Ok(type_def) => {
                         return type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
@@ -144,11 +232,28 @@ impl AAML {
         Ok(())
     }
 
-    /// Validate a complete data map against a named schema.
-    /// Returns an error if:
-    /// - The schema doesn't exist
-    /// - A required field is missing from `data`
-    /// - A field value doesn't match its declared type
+    /// Validates a complete `data` map against the named schema.
+    ///
+    /// For every field declared in the schema the method checks:
+    /// 1. The key is present in `data`.
+    /// 2. The value satisfies the declared type.
+    ///
+    /// # Errors
+    /// - [`AamlError::NotFound`] — schema does not exist.
+    /// - [`AamlError::SchemaValidationError`] — a field is missing or its value
+    ///   fails type validation.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use aam_rs::aaml::AAML;
+    /// use std::collections::HashMap;
+    ///
+    /// let cfg = AAML::parse("@schema Player { name: string, score: i32 }").unwrap();
+    /// let mut data = HashMap::new();
+    /// data.insert("name".into(), "Alice".into());
+    /// data.insert("score".into(), "100".into());
+    /// cfg.apply_schema("Player", &data).unwrap();
+    /// ```
     pub fn apply_schema(&self, schema_name: &str, data: &HashMap<String, String>) -> Result<(), AamlError> {
         let schema = self.schemas.get(schema_name).ok_or_else(|| {
             AamlError::NotFound(format!("Schema '{}' not found", schema_name))
@@ -162,7 +267,6 @@ impl AAML {
                 details: format!("Missing required field '{}'", field),
             })?;
 
-            // Validate type
             if let Some(type_def) = self.types.get(type_name.as_str()) {
                 type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
                     schema: schema_name.to_string(),
@@ -195,6 +299,10 @@ impl AAML {
         Ok(())
     }
 
+    /// Parses AAML content from a string, merging it into an existing instance.
+    ///
+    /// Lines are processed in order; directives may mutate the parser state
+    /// (e.g. `@derive` imports keys and schemas from another file).
     pub fn merge_content(&mut self, content: &str) -> Result<(), AamlError> {
         let estimated_size = content.len() / 40;
         self.map.reserve(estimated_size);
@@ -205,28 +313,48 @@ impl AAML {
         Ok(())
     }
 
+    /// Reads `file_path` from disk and merges its content into this instance.
+    ///
+    /// Equivalent to reading the file and calling [`AAML::merge_content`].
     pub fn merge_file<P: AsRef<Path>>(&mut self, file_path: P) -> Result<(), AamlError> {
         let content = fs::read_to_string(file_path)?;
         self.merge_content(&content)
     }
 
+    /// Parses an AAML string and returns a new [`AAML`] instance.
+    ///
+    /// # Errors
+    /// Returns the first [`AamlError`] encountered during parsing.
     pub fn parse(content: &str) -> Result<Self, AamlError> {
         let mut aaml = AAML::new();
         aaml.merge_content(content)?;
         Ok(aaml)
     }
 
+    /// Loads an AAML file from disk and returns a new [`AAML`] instance.
+    ///
+    /// # Errors
+    /// - [`AamlError::IoError`] — file cannot be read.
+    /// - Any parse error encountered in the file content.
     pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError> {
         let content = fs::read_to_string(file_path)?;
         Self::parse(&content)
     }
 
+    /// Looks up `key` in the map.  If not found as a key, searches for an
+    /// entry whose *value* matches `key` (reverse lookup).
+    ///
+    /// Returns `None` if neither lookup succeeds.
     pub fn find_obj(&self, key: &str) -> Option<FoundValue> {
         self.map.get(key)
             .map(|v| FoundValue::new(v))
             .or_else(|| self.find_key(key))
     }
 
+    /// Follows a chain of key → value → key lookups until a terminal value is
+    /// reached or a cycle is detected.
+    ///
+    /// Returns the last resolved value, or `None` if `key` is not present.
     pub fn find_deep(&self, key: &str) -> Option<FoundValue> {
         let mut current_key = key;
         let mut last_found = None;
@@ -251,6 +379,10 @@ impl AAML {
         last_found.map(|v| FoundValue::new(v))
     }
 
+    /// Reverse lookup: finds the key whose value equals `value`.
+    ///
+    /// Returns `None` if no such key exists.  When multiple keys share the
+    /// same value the first one encountered (HashMap order) is returned.
     pub fn find_key(&self, value: &str) -> Option<FoundValue> {
         self.map.iter()
             .find_map(|(k, v)| {
@@ -262,8 +394,58 @@ impl AAML {
             })
     }
 
+    /// Removes the type registered under `name`.
+    ///
+    /// After removal any schema field that referenced this type will yield an
+    /// `"Unknown type"` error during validation.
     pub fn unregister_type(&mut self, name: &str) {
         self.types.remove(name);
+    }
+
+    /// Strips the inline `#` comment from a raw source line, respecting
+    /// single- and double-quoted strings.
+    fn strip_comment(line: &str) -> &str {
+        let mut quote_state = None;
+
+        for (idx, c) in line.char_indices() {
+             match (quote_state, c) {
+                (None, '#') => return &line[..idx],
+                (None, '"' | '\'') => quote_state = Some(c),
+                (Some(q), c) if c == q => quote_state = None,
+                _ => {}
+            }
+        }
+        line
+    }
+
+    /// Parses a `key = value` assignment, returning trimmed key and value slices.
+    ///
+    /// Surrounding quotes are removed from the value via [`AAML::unwrap_quotes`].
+    fn parse_assignment(line: &'_ str) -> Result<(&'_ str, &'_ str), &'static str> {
+        let (key, val) = line.split_once('=')
+            .ok_or("Missing assignment operator '='")?;
+
+        let key = key.trim();
+        if key.is_empty() {
+            return Err("Key cannot be empty");
+        }
+
+        let value = Self::unwrap_quotes(val);
+        Ok((key, value))
+    }
+
+    /// Strips a matching pair of surrounding `"…"` or `'…'` quotes from `s`.
+    ///
+    /// If `s` is not quoted it is returned unchanged (trimmed of whitespace).
+    pub fn unwrap_quotes(s: &str) -> &str {
+        let s = s.trim();
+        if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+            return &s[1..s.len() - 1];
+        }
+        if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+            return &s[1..s.len() - 1];
+        }
+        s
     }
 
     fn register_default_commands(&mut self) {
@@ -323,44 +505,6 @@ impl AAML {
             })
         }
     }
-
-    fn strip_comment(line: &str) -> &str {
-        let mut quote_state = None;
-
-        for (idx, c) in line.char_indices() {
-             match (quote_state, c) {
-                (None, '#') => return &line[..idx],
-                (None, '"' | '\'') => quote_state = Some(c),
-                (Some(q), c) if c == q => quote_state = None,
-                _ => {}
-            }
-        }
-        line
-    }
-
-    fn parse_assignment(line: &'_ str) -> Result<(&'_ str, &'_ str), &'static str> {
-        let (key, val) = line.split_once('=')
-            .ok_or("Missing assignment operator '='")?;
-
-        let key = key.trim();
-        if key.is_empty() {
-            return Err("Key cannot be empty");
-        }
-
-        let value = Self::unwrap_quotes(val);
-        Ok((key, value))
-    }
-
-    pub fn unwrap_quotes(s: &str) -> &str {
-        let s = s.trim();
-        if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-            return &s[1..s.len() - 1];
-        }
-        if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-            return &s[1..s.len() - 1];
-        }
-        s
-    }
 }
 
 impl Add for AAML {
@@ -387,3 +531,4 @@ impl Default for AAML {
         Self::new()
     }
 }
+
