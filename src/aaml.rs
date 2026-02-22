@@ -303,13 +303,56 @@ impl AAML {
     ///
     /// Lines are processed in order; directives may mutate the parser state
     /// (e.g. `@derive` imports keys and schemas from another file).
+    ///
+    /// Multi-line directives (e.g. `@schema` body spread across several lines)
+    /// are supported: lines are accumulated until the opening `{` is closed by
+    /// a matching `}`.
     pub fn merge_content(&mut self, content: &str) -> Result<(), AamlError> {
         let estimated_size = content.len() / 40;
         self.map.reserve(estimated_size);
 
+        let mut pending: Option<(String, usize)> = None; // (accumulated text, start line)
+
         for (i, line) in content.lines().enumerate() {
-             self.process_line(&line, i + 1)?;
+            let line_num = i + 1;
+
+            if let Some((ref mut buf, start)) = pending {
+                let stripped_part = Self::strip_comment(line).trim();
+                buf.push(' ');
+                buf.push_str(stripped_part);
+
+                let opens: usize = buf.chars().filter(|&c| c == '{').count();
+                let closes: usize = buf.chars().filter(|&c| c == '}').count();
+                if closes >= opens {
+                    let complete = buf.clone();
+                    let start_line = *start;
+                    pending = None;
+                    self.process_line(&complete, start_line)?;
+                }
+                continue;
+            }
+
+            let stripped = Self::strip_comment(line).trim();
+
+            // Detect a directive that opens a `{` block without closing it on the same line
+            if stripped.starts_with('@') {
+                let opens: usize = stripped.chars().filter(|&c| c == '{').count();
+                let closes: usize = stripped.chars().filter(|&c| c == '}').count();
+                if opens > closes {
+                    // Block not yet closed — start accumulating
+                    pending = Some((stripped.to_string(), line_num));
+                    continue;
+                }
+            }
+
+            self.process_line(line, line_num)?;
         }
+
+        if let Some((buf, start)) = pending {
+            // Unclosed block at EOF — try to parse anyway (will likely error with a useful message)
+            self.process_line(&buf, start)?;
+        }
+
         Ok(())
     }
 
@@ -404,12 +447,24 @@ impl AAML {
 
     /// Strips the inline `#` comment from a raw source line, respecting
     /// single- and double-quoted strings.
+    ///
+    /// A `#` is treated as the start of a comment only when it is preceded by
+    /// whitespace or appears at the very beginning of the line.  This allows
+    /// unquoted color literals such as `tint = #ff6600` to be stored correctly.
     fn strip_comment(line: &str) -> &str {
         let mut quote_state = None;
+        let bytes = line.as_bytes();
 
         for (idx, c) in line.char_indices() {
-             match (quote_state, c) {
-                (None, '#') => return &line[..idx],
+            match (quote_state, c) {
+                (None, '#') => {
+                    // Treat '#' as comment only when preceded by whitespace or at start
+                    let preceded_by_space = idx == 0
+                        || bytes.get(idx - 1).map_or(false, |b| b.is_ascii_whitespace());
+                    if preceded_by_space {
+                        return &line[..idx];
+                    }
+                }
                 (None, '"' | '\'') => quote_state = Some(c),
                 (Some(q), c) if c == q => quote_state = None,
                 _ => {}

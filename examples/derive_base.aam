@@ -16,6 +16,10 @@ id     = 1
 name   = BaseApp
 active = true
 
+@type =
+@schema Entry {
+    id: types::physics::kilograms,
+}
 # ── Shared configuration defaults ─────────────────────────────────────────────
 app_name    = MyApp
 log_level   = info
