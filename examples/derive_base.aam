@@ -16,7 +16,6 @@ id     = 1
 name   = BaseApp
 active = true
 
-@type =
 @schema Entry {
     id: types::physics::kilograms,
 }

@@ -7,9 +7,11 @@
 #
 # 'Plugin' schema is defined here in the child and has its own two required fields
 # that MUST also be present before @derive completes successfully.
-
 # ── Plugin schema (child-only, all fields must be present before @derive) ─────
-@schema Plugin { plugin_name: string, enabled: bool }
+@schema Plugin {
+    plugin_name: string
+    enabled: bool
+}
 plugin_name = ChildPlugin
 enabled     = true
 
