@@ -16,6 +16,12 @@ pub enum AamlError {
         details: String,
     },
     DirectiveError(String, String),
+    SchemaValidationError {
+        schema: String,
+        field: String,
+        type_name: String,
+        details: String,
+    },
 }
 
 impl fmt::Display for AamlError {
@@ -32,6 +38,13 @@ impl fmt::Display for AamlError {
             }
             AamlError::DirectiveError(cmd, msg) => {
                 write!(f, "Directive '@{}' error: {}", cmd, msg)
+            }
+            AamlError::SchemaValidationError { schema, field, type_name, details } => {
+                write!(
+                    f,
+                    "Schema '{}' validation error: field '{}' (type '{}') — {}",
+                    schema, field, type_name, details
+                )
             }
         }
     }

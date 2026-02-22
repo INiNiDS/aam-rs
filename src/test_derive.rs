@@ -240,5 +240,148 @@ mod tests {
         let result = parser.validate_value("unknown_type", "value");
         assert!(result.is_err());
     }
+
+
+    #[test]
+    fn test_schema_field_valid_type() {
+        let content = "@schema Config { retries: i32 }\nretries = 5\n";
+        let result = AAML::parse(content);
+        assert!(result.is_ok(), "Expected Ok, got: {:?}", result.err());
+        let parser = result.unwrap();
+        assert_eq!(parser.find_obj("retries").unwrap().as_str(), "5");
+    }
+
+    #[test]
+    fn test_schema_field_invalid_type() {
+        let content = "@schema Config { retries: i32 }\nretries = hello\n";
+        let result = AAML::parse(content);
+        assert!(result.is_err(), "Expected Err for invalid i32");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, crate::error::AamlError::SchemaValidationError { .. }),
+            "Expected SchemaValidationError, got: {}", err
+        );
+    }
+
+    #[test]
+    fn test_schema_unknown_type_error() {
+        let content = "@schema Config { speed: unicorn_type }\nspeed = 42\n";
+        let result = AAML::parse(content);
+        assert!(result.is_err(), "Expected Err for unknown type");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, crate::error::AamlError::SchemaValidationError { .. }),
+            "Expected SchemaValidationError, got: {}", err
+        );
+    }
+
+    #[test]
+    fn test_schema_string_type_always_valid() {
+        let content = "@schema Config { name: string }\nname = hello world 123!@#\n";
+        let result = AAML::parse(content);
+        assert!(result.is_ok(), "Expected Ok for string type, got: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_schema_f64_valid() {
+        let content = "@schema Config { ratio: f64 }\nratio = 3.14\n";
+        assert!(AAML::parse(content).is_ok());
+    }
+
+    #[test]
+    fn test_schema_f64_invalid() {
+        let content = "@schema Config { ratio: f64 }\nratio = not_a_float\n";
+        let result = AAML::parse(content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::error::AamlError::SchemaValidationError { .. }));
+    }
+
+    #[test]
+    fn test_schema_bool_valid() {
+        let content = "@schema Config { enabled: bool }\nenabled = true\n";
+        assert!(AAML::parse(content).is_ok());
+    }
+
+    #[test]
+    fn test_schema_bool_invalid() {
+        let content = "@schema Config { enabled: bool }\nenabled = yes\n";
+        let result = AAML::parse(content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::error::AamlError::SchemaValidationError { .. }));
+    }
+
+    #[test]
+    fn test_schema_custom_type_alias_valid() {
+        let content = "@type age = i32\n@schema Person { age: age }\nage = 25\n";
+        assert!(AAML::parse(content).is_ok());
+    }
+
+    #[test]
+    fn test_schema_custom_type_alias_invalid() {
+        let content = "@type age = i32\n@schema Person { age: age }\nage = twenty-five\n";
+        let result = AAML::parse(content);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::error::AamlError::SchemaValidationError { .. }));
+    }
+    
+    #[test]
+    fn test_apply_schema_all_valid() {
+        let content = "@schema Player { name: string, score: i32, health: f64 }";
+        let parser = AAML::parse(content).unwrap();
+
+        let mut data = std::collections::HashMap::new();
+        data.insert("name".to_string(), "Alice".to_string());
+        data.insert("score".to_string(), "100".to_string());
+        data.insert("health".to_string(), "98.5".to_string());
+
+        assert!(parser.apply_schema("Player", &data).is_ok());
+    }
+
+    #[test]
+    fn test_apply_schema_missing_field() {
+        let content = "@schema Player { name: string, score: i32 }";
+        let parser = AAML::parse(content).unwrap();
+
+        let mut data = std::collections::HashMap::new();
+        data.insert("name".to_string(), "Alice".to_string());
+
+        let result = parser.apply_schema("Player", &data);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::error::AamlError::SchemaValidationError { .. }));
+    }
+
+    #[test]
+    fn test_apply_schema_wrong_value() {
+        let content = "@schema Player { score: i32 }";
+        let parser = AAML::parse(content).unwrap();
+
+        let mut data = std::collections::HashMap::new();
+        data.insert("score".to_string(), "not_a_number".to_string());
+
+        let result = parser.apply_schema("Player", &data);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::error::AamlError::SchemaValidationError { .. }));
+    }
+
+    #[test]
+    fn test_apply_schema_not_found() {
+        let parser = AAML::parse("").unwrap();
+        let result = parser.apply_schema("NonExistent", &std::collections::HashMap::new());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_schema_validation_via_derive() {
+        let base_file = "test_derive_schema_validation.aam";
+        let mut base = AAMBuilder::new();
+        base.add_raw("@schema Config { timeout: i32 }");
+        base.to_file(base_file).unwrap();
+
+        let content = format!("@derive {base_file}\ntimeout = not_a_number\n");
+        let result = AAML::parse(&content);
+        let _ = fs::remove_file(base_file);
+
+        assert!(result.is_err(), "Expected Err when derived schema type is violated");
+    }
 }
 

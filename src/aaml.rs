@@ -7,7 +7,7 @@ use std::ops::{Add, AddAssign};
 use std::path::Path;
 use std::sync::Arc;
 use crate::commands::schema::SchemaDef;
-use crate::types::Type;
+use crate::types::{resolve_builtin, Type};
 
 #[cfg(feature = "perf-hash")]
 type Hasher = ahash::RandomState;
@@ -106,6 +106,95 @@ impl AAML {
         }
     }
 
+    /// Validate a single field value against all registered schemas.
+    /// If the field is found in any schema, its declared type is checked.
+    /// Primitive types (i32, f64, string, bool, color) and builtins work
+    /// without explicit `@type` registration.
+    fn validate_against_schemas(&self, field: &str, value: &str) -> Result<(), AamlError> {
+        for (schema_name, schema_def) in &self.schemas {
+            if let Some(type_name) = schema_def.fields.get(field) {
+                if let Some(type_def) = self.types.get(type_name.as_str()) {
+                    return type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
+                        schema: schema_name.clone(),
+                        field: field.to_string(),
+                        type_name: type_name.clone(),
+                        details: e.to_string(),
+                    });
+                }
+                match resolve_builtin(type_name) {
+                    Ok(type_def) => {
+                        return type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
+                            schema: schema_name.clone(),
+                            field: field.to_string(),
+                            type_name: type_name.clone(),
+                            details: e.to_string(),
+                        });
+                    }
+                    Err(_) => {
+                        return Err(AamlError::SchemaValidationError {
+                            schema: schema_name.clone(),
+                            field: field.to_string(),
+                            type_name: type_name.clone(),
+                            details: format!("Unknown type '{}'", type_name),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate a complete data map against a named schema.
+    /// Returns an error if:
+    /// - The schema doesn't exist
+    /// - A required field is missing from `data`
+    /// - A field value doesn't match its declared type
+    pub fn apply_schema(&self, schema_name: &str, data: &HashMap<String, String>) -> Result<(), AamlError> {
+        let schema = self.schemas.get(schema_name).ok_or_else(|| {
+            AamlError::NotFound(format!("Schema '{}' not found", schema_name))
+        })?;
+
+        for (field, type_name) in &schema.fields {
+            let value = data.get(field).ok_or_else(|| AamlError::SchemaValidationError {
+                schema: schema_name.to_string(),
+                field: field.clone(),
+                type_name: type_name.clone(),
+                details: format!("Missing required field '{}'", field),
+            })?;
+
+            // Validate type
+            if let Some(type_def) = self.types.get(type_name.as_str()) {
+                type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
+                    schema: schema_name.to_string(),
+                    field: field.clone(),
+                    type_name: type_name.clone(),
+                    details: e.to_string(),
+                })?;
+            } else {
+                match resolve_builtin(type_name) {
+                    Ok(type_def) => {
+                        type_def.validate(value).map_err(|e| AamlError::SchemaValidationError {
+                            schema: schema_name.to_string(),
+                            field: field.clone(),
+                            type_name: type_name.clone(),
+                            details: e.to_string(),
+                        })?;
+                    }
+                    Err(_) => {
+                        return Err(AamlError::SchemaValidationError {
+                            schema: schema_name.to_string(),
+                            field: field.clone(),
+                            type_name: type_name.clone(),
+                            details: format!("Unknown type '{}'", type_name),
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn merge_content(&mut self, content: &str) -> Result<(), AamlError> {
         let estimated_size = content.len() / 40;
         self.map.reserve(estimated_size);
@@ -197,6 +286,7 @@ impl AAML {
 
         match Self::parse_assignment(line) {
             Ok((key, value)) => {
+                self.validate_against_schemas(key, value)?;
                 self.map.insert(Box::from(key), Box::from(value));
                 Ok(())
             }
