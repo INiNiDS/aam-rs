@@ -131,14 +131,19 @@ impl AAML {
     /// Validates `value` against the type registered as `type_name`, also
     /// resolving built-in primitive types and module paths.
     pub fn validate_value(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
-        self.types
-            .get(type_name)
-            .ok_or_else(|| AamlError::NotFound(type_name.to_string()))?
+        let make_err = |e: AamlError| AamlError::InvalidType {
+            type_name: type_name.to_string(),
+            details: e.to_string(),
+        };
+
+        if let Some(type_def) = self.types.get(type_name) {
+            return type_def.validate(value).map_err(make_err);
+        }
+
+        crate::types::resolve_builtin(type_name)
+            .map_err(|_| AamlError::NotFound(type_name.to_string()))?
             .validate(value)
-            .map_err(|e| AamlError::InvalidType {
-                type_name: type_name.to_string(),
-                details: e.to_string(),
-            })
+            .map_err(make_err)
     }
 
     // ── Parsing ──────────────────────────────────────────────────────────────

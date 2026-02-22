@@ -12,8 +12,11 @@ pub(super) fn strip_comment(line: &str) -> &str {
         match (quote_state, c) {
             (None, '#') => {
                 let preceded_by_space = idx == 0
-                    || bytes.get(idx - 1).map_or(false, |b| b.is_ascii_whitespace());
-                if preceded_by_space {
+                    || bytes.get(idx - 1).is_some_and(|b| b.is_ascii_whitespace());
+                let followed_by_space = bytes
+                    .get(idx + 1)
+                    .is_none_or(|b| b.is_ascii_whitespace());
+                if preceded_by_space && followed_by_space {
                     return &line[..idx];
                 }
             }

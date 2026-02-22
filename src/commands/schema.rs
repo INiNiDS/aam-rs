@@ -48,13 +48,26 @@ impl SchemaCommand {
             .0;
 
         let mut fields = HashMap::new();
-        for item in body.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            let (field, ty) = item.split_once(':')
-                .ok_or_else(|| AamlError::DirectiveError("schema".into(), format!("Bad field: {item}")))?;
-            let field = field.trim();
-            let ty = ty.trim();
+        // Normalize: commas and whitespace are both valid field separators.
+        // Replace commas with spaces so we can use split_whitespace uniformly.
+        let normalized = body.replace(',', " ");
+        let mut tokens = normalized.split_whitespace();
+        while let Some(token) = tokens.next() {
+            let (field, ty) = if let Some((f, t)) = token.split_once(':') {
+                // "field:type" or "field:" — type may follow as next token
+                let ty = if t.is_empty() {
+                    tokens.next().ok_or_else(|| {
+                        AamlError::DirectiveError("schema".into(), format!("Bad field: '{f}:' has no type"))
+                    })?
+                } else {
+                    t
+                };
+                (f, ty)
+            } else {
+                return Err(AamlError::DirectiveError("schema".into(), format!("Bad field: '{token}'")));
+            };
             if field.is_empty() || ty.is_empty() {
-                return Err(AamlError::DirectiveError("schema".into(), format!("Bad field: {item}")));
+                return Err(AamlError::DirectiveError("schema".into(), format!("Bad field: '{field}: {ty}'")));
             }
             fields.insert(field.to_string(), ty.to_string());
         }
