@@ -30,12 +30,10 @@ pub struct SchemaDef {
 pub struct SchemaCommand;
 
 impl SchemaCommand {
-    /// Parses the raw argument string into a `(name, SchemaDef)` pair.
-    ///
-    /// Expected format: `Name { field: type, ... }`
-    fn parse(args: &str) -> Result<(String, SchemaDef), AamlError> {
-        let args = args.trim();
-        let (name_part, body_part) = args.split_once('{')
+    /// Splits `args` into the schema name and the raw body between `{` and `}`.
+    fn parse_header(args: &str) -> Result<(&str, &str), AamlError> {
+        let (name_part, body_part) = args
+            .split_once('{')
             .ok_or_else(|| AamlError::DirectiveError("schema".into(), "Expected '{'".into()))?;
 
         let name = name_part.trim();
@@ -43,33 +41,58 @@ impl SchemaCommand {
             return Err(AamlError::DirectiveError("schema".into(), "Schema name is empty".into()));
         }
 
-        let body = body_part.rsplit_once('}')
+        let body = body_part
+            .rsplit_once('}')
             .ok_or_else(|| AamlError::DirectiveError("schema".into(), "Expected '}'".into()))?
             .0;
 
-        let mut fields = HashMap::new();
+        Ok((name, body))
+    }
+
+    /// Parses a single `field:type` token pair, consuming an extra token from
+    /// `tokens` when the colon is at the end (`"field:"`).
+    fn parse_field<'a>(
+        token: &'a str,
+        tokens: &mut impl Iterator<Item = &'a str>,
+    ) -> Result<(String, String), AamlError> {
+        let (field, ty) = token
+            .split_once(':')
+            .ok_or_else(|| AamlError::DirectiveError("schema".into(), format!("Bad field: '{token}'")))?;
+
+        // "field:type" or "field:" — type may follow as the next token.
+        let ty = if ty.is_empty() {
+            tokens.next().ok_or_else(|| {
+                AamlError::DirectiveError("schema".into(), format!("Bad field: '{field}:' has no type"))
+            })?
+        } else {
+            ty
+        };
+
+        if field.is_empty() || ty.is_empty() {
+            return Err(AamlError::DirectiveError(
+                "schema".into(),
+                format!("Bad field: '{field}: {ty}'"),
+            ));
+        }
+
+        Ok((field.to_string(), ty.to_string()))
+    }
+
+    /// Parses the raw argument string into a `(name, SchemaDef)` pair.
+    ///
+    /// Expected format: `Name { field: type, ... }`
+    fn parse(args: &str) -> Result<(String, SchemaDef), AamlError> {
+        let (name, body) = Self::parse_header(args.trim())?;
+
         // Normalize: commas and whitespace are both valid field separators.
         // Replace commas with spaces so we can use split_whitespace uniformly.
         let normalized = body.replace(',', " ");
         let mut tokens = normalized.split_whitespace();
+        let mut fields = HashMap::new();
+
         while let Some(token) = tokens.next() {
-            let (field, ty) = if let Some((f, t)) = token.split_once(':') {
-                // "field:type" or "field:" — type may follow as next token
-                let ty = if t.is_empty() {
-                    tokens.next().ok_or_else(|| {
-                        AamlError::DirectiveError("schema".into(), format!("Bad field: '{f}:' has no type"))
-                    })?
-                } else {
-                    t
-                };
-                (f, ty)
-            } else {
-                return Err(AamlError::DirectiveError("schema".into(), format!("Bad field: '{token}'")));
-            };
-            if field.is_empty() || ty.is_empty() {
-                return Err(AamlError::DirectiveError("schema".into(), format!("Bad field: '{field}: {ty}'")));
-            }
-            fields.insert(field.to_string(), ty.to_string());
+            let (field, ty) = Self::parse_field(token, &mut tokens)?;
+            fields.insert(field, ty);
         }
 
         Ok((name.to_string(), SchemaDef { fields }))

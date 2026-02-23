@@ -12,16 +12,17 @@
 @schema Entity { id: i32, name: string, active: bool }
 
 # ── Entity fields (required by the schema above) ──────────────────────────────
-id     = 1
-name   = BaseApp
+id = 1
+name = BaseApp
 active = true
 
 @schema Entry {
-    id: types::physics::kilograms,
+    id: types::physics::kilograms
 }
+
 # ── Shared configuration defaults ─────────────────────────────────────────────
-app_name    = MyApp
-log_level   = info
+app_name = MyApp
+log_level = info
 max_retries = 3
-timeout     = 30
-theme       = light
+timeout = 30
+theme = light

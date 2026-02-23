@@ -1,5 +1,4 @@
 use crate::error::AamlError;
-use crate::types::primitive_type::PrimitiveType;
 use crate::types::Type;
 
 pub enum TimeTypes {
@@ -9,13 +8,42 @@ pub enum TimeTypes {
     Day,
     Hour,
     Minute,
+}
 
+/// Returns `true` when `date` is a structurally valid `YYYY-MM-DD` string.
+fn validate_date_part(date: &str) -> bool {
+    let parts: Vec<&str> = date.split('-').collect();
+    parts.len() == 3
+        && parts[0].len() == 4
+        && parts[1].len() == 2
+        && parts[2].len() == 2
+        && parts[0].parse::<u32>().is_ok()
+        && parts[1].parse::<u32>().is_ok()
+        && parts[2].parse::<u32>().is_ok()
+}
+
+/// Validates an ISO 8601 date (`YYYY-MM-DD`) or datetime (`YYYY-MM-DDTHH:MM:SS`) string.
+fn validate_datetime(value: &str) -> Result<(), AamlError> {
+    if value.len() < 10 || !validate_date_part(&value[..10]) {
+        return Err(AamlError::InvalidValue(format!(
+            "Invalid DateTime '{}': expected ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+            value
+        )));
+    }
+    Ok(())
+}
+
+/// Validates that `value` parses as a finite `f64` number.
+fn validate_numeric(value: &str, label: &str) -> Result<(), AamlError> {
+    value.parse::<f64>().map(|_| ()).map_err(|_| {
+        AamlError::InvalidValue(format!("Invalid {} '{}': expected a number", label, value))
+    })
 }
 
 impl Type for TimeTypes {
-    fn from_name(name: &str) -> Result<Self, crate::error::AamlError>
+    fn from_name(name: &str) -> Result<Self, AamlError>
     where
-        Self: Sized
+        Self: Sized,
     {
         match name {
             "datetime" => Ok(TimeTypes::DateTime),
@@ -28,60 +56,25 @@ impl Type for TimeTypes {
         }
     }
 
-    fn base_type(&self) -> PrimitiveType {
-        PrimitiveType::F64
+    fn base_type(&self) -> crate::types::primitive_type::PrimitiveType {
+        crate::types::primitive_type::PrimitiveType::F64
     }
 
     fn validate(&self, value: &str) -> Result<(), AamlError> {
         match self {
-            TimeTypes::DateTime => {
-                // Waiting format ISO 8601: YYYY-MM-DDTHH:MM:SS или YYYY-MM-DD
-                if value.len() < 10 {
-                    return Err(AamlError::InvalidValue(format!(
-                        "Invalid DateTime '{}': expected ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
-                        value
-                    )));
-                }
-                let date_part = &value[..10];
-                let parts: Vec<&str> = date_part.split('-').collect();
-                if parts.len() != 3
-                    || parts[0].len() != 4
-                    || parts[1].len() != 2
-                    || parts[2].len() != 2
-                    || parts[0].parse::<u32>().is_err()
-                    || parts[1].parse::<u32>().is_err()
-                    || parts[2].parse::<u32>().is_err()
-                {
-                    return Err(AamlError::InvalidValue(format!(
-                        "Invalid DateTime '{}': expected ISO 8601 format",
-                        value
-                    )));
-                }
-                Ok(())
-            }
+            TimeTypes::DateTime => validate_datetime(value),
             TimeTypes::Duration => {
-                //  ISO 8601 duration (PnYnMnDTnHnMnS)
+                // ISO 8601 duration (PnYnMnDTnHnMnS) or plain seconds as f64.
                 if value.starts_with('P') {
-                    Ok(()) 
-                } else {
-                    value.parse::<f64>().map_err(|_| {
-                        AamlError::InvalidValue(format!(
-                            "Invalid Duration '{}': expected number (seconds) or ISO 8601 duration",
-                            value
-                        ))
-                    })?;
                     Ok(())
+                } else {
+                    validate_numeric(value, "Duration")
                 }
             }
-            TimeTypes::Year | TimeTypes::Day | TimeTypes::Hour | TimeTypes::Minute => {
-                value.parse::<f64>().map_err(|_| {
-                    AamlError::InvalidValue(format!(
-                        "Invalid time value '{}': expected a number",
-                        value
-                    ))
-                })?;
-                Ok(())
-            }
+            TimeTypes::Year => validate_numeric(value, "Year"),
+            TimeTypes::Day => validate_numeric(value, "Day"),
+            TimeTypes::Hour => validate_numeric(value, "Hour"),
+            TimeTypes::Minute => validate_numeric(value, "Minute"),
         }
     }
 }

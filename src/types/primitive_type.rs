@@ -12,7 +12,7 @@ pub enum PrimitiveType {
 }
 
 impl Type for PrimitiveType {
-    fn from_name(name: &str) -> Result<Self, crate::error::AamlError>
+    fn from_name(name: &str) -> Result<Self, AamlError>
     where
         Self: Sized
     {
@@ -22,7 +22,7 @@ impl Type for PrimitiveType {
             "string" => Ok(PrimitiveType::String),
             "bool" => Ok(PrimitiveType::Bool),
             "color" => Ok(PrimitiveType::Color),
-            _ => Err(crate::error::AamlError::NotFound(name.to_string())),
+            _ => Err(AamlError::NotFound(name.to_string())),
         }
     }
 
@@ -43,7 +43,7 @@ impl Type for PrimitiveType {
                 })?;
             }
             PrimitiveType::String => {
-                // Любая строка валидна
+                // Any string is valid, so no validation needed.
             }
             PrimitiveType::Bool => {
                 match value.to_lowercase().as_str() {

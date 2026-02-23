@@ -22,7 +22,7 @@ impl Type for MathTypes {
             "quaternion" => Ok(MathTypes::Quaternion),
             "matrix3x3" => Ok(MathTypes::Matrix3x3),
             "matrix4x4" => Ok(MathTypes::Matrix4x4),
-            _ => Err(crate::error::AamlError::NotFound(name.to_string())),
+            _ => Err(AamlError::NotFound(name.to_string())),
         }
     }
 

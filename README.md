@@ -2,7 +2,7 @@
 
 A robust and lightweight configuration parser for Rust that supports key-value pairs, recursive dependency resolution, file imports, and bidirectional lookups. Designed for applications that need flexible configuration files with references, aliases, and a modular structure.
 
-## 🚀 Features
+## Features
 
 - **Simple syntax**: A `key = value` format that is easy to read and write.
 - **Import support**: The `@import` directive lets you split configuration into multiple files.
@@ -14,13 +14,16 @@ A robust and lightweight configuration parser for Rust that supports key-value p
 - **Configuration merging**: Supports the `+` operator to combine two `AAML` instances.
 - **Typed errors**: Detailed parsing and I/O error handling via `AamlError`.
 
-## 📦 Installation
+## Format
+You can find documentation and examples for the format in the [docs](https://aam.ininids.in.rs/)
+
+## Installation
 
 Add the library to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aaml = "1.0.0"
+aaml = "1.0.5"
 ```
 
 ## Configuration syntax (.aam)
