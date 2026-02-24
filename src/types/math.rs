@@ -11,7 +11,7 @@ pub enum MathTypes {
 }
 
 impl Type for MathTypes {
-    fn from_name(name: &str) -> Result<Self, crate::error::AamlError>
+    fn from_name(name: &str) -> Result<Self, AamlError>
     where
         Self: Sized
     {

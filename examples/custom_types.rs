@@ -1,5 +1,5 @@
 use aam_rs::aaml::AAML;
-use aam_rs::builder::AAMBuilder;
+use aam_rs::builder::{AAMBuilder, SchemaField};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== AAML Custom Types Example ===\n");
@@ -7,13 +7,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Builtin primitive types ---
     println!("--- 1. Built-in primitive types ---");
     let mut b = AAMBuilder::new();
-    b.add_raw("@schema Primitives {");
-    b.add_raw("    name: string,");
-    b.add_raw("    age: i32,");
-    b.add_raw("    score: f64,");
-    b.add_raw("    active: bool,");
-    b.add_raw("    tint: color");
-    b.add_raw("}");
+    b.schema("Primitives", [
+        SchemaField::required("name",   "string"),
+        SchemaField::required("age",    "i32"),
+        SchemaField::required("score",  "f64"),
+        SchemaField::required("active", "bool"),
+        SchemaField::required("tint",   "color"),
+    ]);
     b.add_line("name", "Alice");
     b.add_line("age", "30");
     b.add_line("score", "9.75");
@@ -36,12 +36,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 2. @type aliases ---
     println!("--- 2. @type aliases (ipv4 -> string, port -> i32) ---");
     let mut b = AAMBuilder::new();
-    b.add_raw("@type ipv4 = string");
-    b.add_raw("@type port = i32");
-    b.add_raw("@schema Network {");
-    b.add_raw("    ip: ipv4,");
-    b.add_raw("    port: port");
-    b.add_raw("}");
+    b.type_alias("ipv4", "string");
+    b.type_alias("port", "i32");
+    b.schema("Network", [
+        SchemaField::required("ip",   "ipv4"),
+        SchemaField::required("port", "port"),
+    ]);
     b.add_line("ip", "192.168.1.1");
     b.add_line("port", "8080");
 
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- 3. Type validation errors ---");
 
     let mut b = AAMBuilder::new();
-    b.add_raw("@schema S { val: i32 }");
+    b.schema("S", [SchemaField::required("val", "i32")]);
     b.add_line("val", "not_a_number");
     match AAML::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad i32 accepted"),
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut b = AAMBuilder::new();
-    b.add_raw("@schema S { flag: bool }");
+    b.schema("S", [SchemaField::required("flag", "bool")]);
     b.add_line("flag", "yes_please");
     match AAML::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad bool accepted"),
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut b = AAMBuilder::new();
-    b.add_raw("@schema S { c: color }");
+    b.schema("S", [SchemaField::required("c", "color")]);
     b.add_line("c", "notacolor");
     match AAML::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad color accepted"),
@@ -85,10 +85,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 4. apply_schema ---
     println!("\n--- 4. apply_schema ---");
     let mut b = AAMBuilder::new();
-    b.add_raw("@schema Player {");
-    b.add_raw("    name: string,");
-    b.add_raw("    score: i32");
-    b.add_raw("}");
+    b.schema("Player", [
+        SchemaField::required("name",  "string"),
+        SchemaField::required("score", "i32"),
+    ]);
     let cfg = AAML::parse(&b.build())?;
 
     let mut data = std::collections::HashMap::new();

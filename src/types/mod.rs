@@ -17,6 +17,7 @@ use crate::types::primitive_type::PrimitiveType;
 
 pub(crate) mod physics;
 pub(crate) mod primitive_type;
+pub(crate) mod list;
 mod math;
 mod time;
 
@@ -46,11 +47,17 @@ pub trait Type {
 /// - `math::<name>` — see [`math::MathTypes`]
 /// - `time::<name>` — see [`time::TimeTypes`]
 /// - `physics::<name>` — see [`physics::PhysicsTypes`]
+/// - `list<T>` — a homogeneous list of elements with type `T`
 /// - `<name>` (no `::`) — a [`PrimitiveType`] name
 ///
 /// # Errors
 /// [`AamlError::NotFound`] if the path is not recognised.
 pub fn resolve_builtin(path: &str) -> Result<Box<dyn Type>, AamlError> {
+    // list<T> — must be checked before splitn to avoid confusion
+    if let Some(inner) = list::ListType::parse_inner(path) {
+        return Ok(Box::new(list::ListType::new(inner)));
+    }
+
     let parts: Vec<&str> = path.splitn(2, "::").collect();
 
     match parts.as_slice() {

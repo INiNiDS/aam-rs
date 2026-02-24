@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::aaml::AAML;
-    use crate::found_value::FoundValue;
+    use aam_rs::aaml::AAML;
+    use aam_rs::found_value::FoundValue;
 
     const TEST_CONFIG: &str = "
         a = b

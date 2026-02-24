@@ -1,6 +1,6 @@
 [package]
 name = "aam-rs"
-version = "1.0.5"
+version = "1.1.0"
 description = "A Rust implementation of the Abstract Alias Mapping (AAM) framework for aliasing and maping aam files."
 license = "MIT"
 repository = "https://github.com/INiNiDS/aam-rs/"
@@ -13,8 +13,32 @@ categories = [
 ]
 
 [dependencies]
-ahash = {version = "0.8", optional = true}
+ahash = {version = "0.8.12", optional = true}
 
 [features]
 default = []
 perf-hash = ["ahash"]
+
+[[example]]
+name = "standard"
+
+[[example]]
+name = "standard_stress"
+
+[[example]]
+name = "derive"
+
+[[example]]
+name = "custom_types"
+
+[[example]]
+name = "advanced"
+
+[[example]]
+name = "schema_in_schema"
+
+[[example]]
+name = "config_inheritance"
+
+[[example]]
+name = "builder"

@@ -1,6 +1,10 @@
 use aam_rs::aaml::AAML;
 use std::collections::HashMap;
 
+mod test_imports;
+mod test_derive;
+mod test_core;
+
 #[test]
 fn test_builtin_types() {
     let aaml = AAML::new();

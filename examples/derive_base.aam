@@ -16,6 +16,7 @@ id = 1
 name = BaseApp
 active = true
 
+
 @schema Entry {
     id: types::physics::kilograms
 }
@@ -26,3 +27,4 @@ log_level = info
 max_retries = 3
 timeout = 30
 theme = light
+list = [1, 2, 3]

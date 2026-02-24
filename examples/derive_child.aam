@@ -15,10 +15,8 @@
 plugin_name = ChildPlugin
 enabled = true
 
-# ── Override inherited Entity fields ──────────────────────────────────────────
-id = 42
-name = ChildApp
-active = false
+plugin = { plugin_name = ChildPlugin, enabled = true }
+entity = { id = 42, name = ChildApp, active = false }
 
 # ── Override shared config values ─────────────────────────────────────────────
 log_level = debug

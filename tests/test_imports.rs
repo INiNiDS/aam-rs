@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::aaml::AAML;
-    use crate::builder::AAMBuilder;
+    use aam_rs::aaml::AAML;
+    use aam_rs::builder::AAMBuilder;
     use std::fs;
 
 
@@ -48,7 +48,7 @@ mod tests {
         let file2 = "rec_import_2.aam";
 
         let mut b1 = AAMBuilder::new();
-        b1.add_raw(format!("@import {file2}").as_str());
+        b1.import(file2);
         b1.add_line("key1", "val1");
         b1.to_file(file1).unwrap();
 

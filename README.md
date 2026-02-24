@@ -132,13 +132,18 @@ assert_eq!(final_val, "/usr/bin");
 Use `AAMBuilder` to generate configuration files programmatically.
 
 ```rust
-use aaml::builder::AAMBuilder;
+use aam_rs::builder::{AAMBuilder, SchemaField};
 
 let mut builder = AAMBuilder::new();
-builder.add_line("host", "127.0.0.1");
-builder.add_line("port", "8000");
-builder.add_raw("# Custom comment section");
-builder.add_line("debug", "true");
+builder.comment("Server configuration")
+       .type_alias("port_t", "i32")
+       .schema("Server", [
+           SchemaField::required("host",  "string"),
+           SchemaField::required("port",  "port_t"),
+           SchemaField::optional("debug", "bool"),
+       ])
+       .add_line("host", "127.0.0.1")
+       .add_line("port", "8000");
 
 // Save to file
 builder.to_file("generated_config.aam");
@@ -179,7 +184,13 @@ assert_eq!(value.as_str(), "Hello");
 
 - `new() -> Self`: Creates a new builder.
 - `add_line(key: &str, value: &str)`: Adds a `key = value` pair.
-- `add_raw(raw_line: &str)`: Adds a raw line (e.g., a comment).
+- `comment(text: &str)`: Adds a `# text` comment line.
+- `schema(name: &str, fields: impl IntoIterator<Item = SchemaField>)`: Adds a `@schema Name { ... }` directive (inline).
+- `schema_multiline(name: &str, fields: impl IntoIterator<Item = SchemaField>)`: Adds a `@schema Name { ... }` directive (one field per line).
+- `derive(path: &str, schemas: impl IntoIterator<Item = impl AsRef<str>>)`: Adds a `@derive path[::Schema...]` directive.
+- `import(path: &str)`: Adds a `@import path` directive.
+- `type_alias(alias: &str, type_name: &str)`: Adds a `@type alias = type_name` directive.
+- `add_raw(raw_line: &str)` *(deprecated)*: Adds a raw line as-is. Prefer the typed methods above.
 - `to_file<P: AsRef<Path>>(&self, path: P)`: Writes the buffer to a file.
 
 ### AamlError
