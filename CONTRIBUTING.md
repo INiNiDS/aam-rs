@@ -68,4 +68,4 @@ If you find a bug, please create an issue including:
 
 ## 📜 License
 
-By contributing, you agree that your contributions will be licensed under the same License that covers the project (see the [LICENSE](LICENSE) file).
+By contributing, you agree that your contributions will be licensed under the same License that covers the project (see the [MIT](LICENSE-MIT) and [APACHE-2.0](LICENSE-APACHE) file).
