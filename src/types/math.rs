@@ -1,6 +1,7 @@
 use crate::error::AamlError;
 use crate::types::Type;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MathTypes {
     Vector2,
     Vector3,
@@ -13,7 +14,7 @@ pub enum MathTypes {
 impl Type for MathTypes {
     fn from_name(name: &str) -> Result<Self, AamlError>
     where
-        Self: Sized
+        Self: Sized,
     {
         match name {
             "vector2" => Ok(MathTypes::Vector2),
@@ -41,7 +42,11 @@ impl Type for MathTypes {
         };
 
         if parts.len() != expected_len {
-            return Err(AamlError::InvalidValue(format!("Expected {} components, got {}", expected_len, parts.len())));
+            return Err(AamlError::InvalidValue(format!(
+                "Expected {} components, got {}",
+                expected_len,
+                parts.len()
+            )));
         }
 
         for part in parts {

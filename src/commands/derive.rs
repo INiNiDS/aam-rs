@@ -24,6 +24,7 @@ use crate::commands::Command;
 use crate::error::AamlError;
 
 /// Command handler for the `@derive` directive.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DeriveCommand;
 
 /// Splits a raw `@derive` argument into `(file_path, schema_selectors)`.
@@ -60,7 +61,9 @@ fn parse_derive_arg(raw: &str) -> (&str, Vec<&str>) {
 }
 
 impl Command for DeriveCommand {
-    fn name(&self) -> &str { "derive" }
+    fn name(&self) -> &str {
+        "derive"
+    }
 
     /// Loads the base file, merges its schemas and key-value pairs into `aaml`
     /// (child entries win on conflict), then verifies that every required field
@@ -79,12 +82,14 @@ impl Command for DeriveCommand {
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
         let raw = args.trim();
         if raw.is_empty() {
-            return Err(AamlError::DirectiveError("derive".into(), "Missing file path".into()));
+            return Err(AamlError::DirectiveError(
+                "derive".into(),
+                "Missing file path".into(),
+            ));
         }
 
         // Snapshot child-owned schema names BEFORE merging base schemas.
-        let child_schema_names: Vec<String> =
-            aaml.get_schemas_mut().keys().cloned().collect();
+        let child_schema_names: Vec<String> = aaml.get_schemas_mut().keys().cloned().collect();
 
         let (path, selectors) = parse_derive_arg(raw);
         let mut base = AAML::load(path)?;
@@ -101,7 +106,9 @@ impl Command for DeriveCommand {
                         format!("Schema '{selector}' not found in '{path}'"),
                     )
                 })?;
-                aaml.get_schemas_mut().entry(selector.to_string()).or_insert(schema);
+                aaml.get_schemas_mut()
+                    .entry(selector.to_string())
+                    .or_insert(schema);
             }
         }
 

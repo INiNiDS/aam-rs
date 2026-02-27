@@ -13,11 +13,11 @@
 //! a schema field is automatically validated against the declared type.
 //! Use [`AAML::apply_schema`] to validate a complete data map programmatically.
 
-use std::collections::HashSet;
-use std::collections::HashMap;
 use crate::aaml::AAML;
 use crate::commands::Command;
 use crate::error::AamlError;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// A parsed schema definition: maps field names to their declared type strings.
 ///
@@ -28,6 +28,7 @@ use crate::error::AamlError;
 /// Fields listed in `optional_fields` do not have to be present in the data map,
 /// but if they *are* present their values are still validated.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaDef {
     /// Map of `field_name → type_name`.
     pub fields: HashMap<String, String>,
@@ -43,6 +44,7 @@ impl SchemaDef {
 }
 
 /// Command handler for the `@schema` directive.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaCommand;
 
 impl SchemaCommand {
@@ -54,7 +56,10 @@ impl SchemaCommand {
 
         let name = name_part.trim();
         if name.is_empty() {
-            return Err(AamlError::DirectiveError("schema".into(), "Schema name is empty".into()));
+            return Err(AamlError::DirectiveError(
+                "schema".into(),
+                "Schema name is empty".into(),
+            ));
         }
 
         let body = body_part
@@ -74,14 +79,17 @@ impl SchemaCommand {
         token: &'a str,
         tokens: &mut impl Iterator<Item = &'a str>,
     ) -> Result<(String, String, bool), AamlError> {
-        let (field_raw, ty) = token
-            .split_once(':')
-            .ok_or_else(|| AamlError::DirectiveError("schema".into(), format!("Bad field: '{token}'")))?;
+        let (field_raw, ty) = token.split_once(':').ok_or_else(|| {
+            AamlError::DirectiveError("schema".into(), format!("Bad field: '{token}'"))
+        })?;
 
         // "field:type" or "field:" — type may follow as the next token.
         let ty = if ty.is_empty() {
             tokens.next().ok_or_else(|| {
-                AamlError::DirectiveError("schema".into(), format!("Bad field: '{field_raw}:' has no type"))
+                AamlError::DirectiveError(
+                    "schema".into(),
+                    format!("Bad field: '{field_raw}:' has no type"),
+                )
             })?
         } else {
             ty
@@ -125,12 +133,20 @@ impl SchemaCommand {
             fields.insert(field, ty);
         }
 
-        Ok((name.to_string(), SchemaDef { fields, optional_fields }))
+        Ok((
+            name.to_string(),
+            SchemaDef {
+                fields,
+                optional_fields,
+            },
+        ))
     }
 }
 
 impl Command for SchemaCommand {
-    fn name(&self) -> &str { "schema" }
+    fn name(&self) -> &str {
+        "schema"
+    }
 
     /// Parses the schema definition and registers it in the current [`AAML`] instance.
     ///

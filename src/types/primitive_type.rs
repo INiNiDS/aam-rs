@@ -1,8 +1,9 @@
-use std::fmt;
 use crate::error::AamlError;
 use crate::types::Type;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PrimitiveType {
     I32,
     F64,
@@ -14,7 +15,7 @@ pub enum PrimitiveType {
 impl Type for PrimitiveType {
     fn from_name(name: &str) -> Result<Self, AamlError>
     where
-        Self: Sized
+        Self: Sized,
     {
         match name {
             "i32" => Ok(PrimitiveType::I32),
@@ -45,24 +46,27 @@ impl Type for PrimitiveType {
             PrimitiveType::String => {
                 // Any string is valid, so no validation needed.
             }
-            PrimitiveType::Bool => {
-                match value.to_lowercase().as_str() {
-                    "true" | "false" | "1" | "0" => {}
-                    _ => return Err(AamlError::InvalidValue(format!(
-                        "Expected bool (true/false/1/0), got '{}'", value
-                    ))),
+            PrimitiveType::Bool => match value.to_lowercase().as_str() {
+                "true" | "false" | "1" | "0" => {}
+                _ => {
+                    return Err(AamlError::InvalidValue(format!(
+                        "Expected bool (true/false/1/0), got '{}'",
+                        value
+                    )));
                 }
-            }
+            },
             PrimitiveType::Color => {
                 // Waiting hex #RRGGBB or #RRGGBBAA
                 if !value.starts_with('#') || (value.len() != 7 && value.len() != 9) {
                     return Err(AamlError::InvalidValue(format!(
-                        "Expected color in #RRGGBB or #RRGGBBAA format, got '{}'", value
+                        "Expected color in #RRGGBB or #RRGGBBAA format, got '{}'",
+                        value
                     )));
                 }
                 if u64::from_str_radix(&value[1..], 16).is_err() {
                     return Err(AamlError::InvalidValue(format!(
-                        "Invalid hex color '{}'", value
+                        "Invalid hex color '{}'",
+                        value
                     )));
                 }
             }

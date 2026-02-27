@@ -16,10 +16,13 @@ use crate::commands::Command;
 use crate::error::AamlError;
 
 /// Command handler for the `@import` directive.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImportCommand;
 
 impl Command for ImportCommand {
-    fn name(&self) -> &str { "import" }
+    fn name(&self) -> &str {
+        "import"
+    }
 
     /// Reads the file at the given path and merges its content into `aaml`.
     ///

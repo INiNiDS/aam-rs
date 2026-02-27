@@ -21,6 +21,8 @@ mod lookup;
 mod validation;
 pub mod parsing;
 pub mod types_registry;
+#[cfg(feature = "serde")]
+pub mod serialize;
 
 #[cfg(feature = "perf-hash")]
 type Hasher = ahash::RandomState;

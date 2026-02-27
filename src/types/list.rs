@@ -16,10 +16,11 @@
 //! ```
 
 use crate::error::AamlError;
-use crate::types::{resolve_builtin, Type};
 use crate::types::primitive_type::PrimitiveType;
+use crate::types::{Type, resolve_builtin};
 
 /// A list type that validates every element against an inner type.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ListType {
     /// Name of the inner element type (e.g. `"i32"`, `"math::vector3"`).
     pub(crate) inner_type: String,

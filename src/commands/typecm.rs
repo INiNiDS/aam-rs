@@ -21,8 +21,8 @@
 
 use crate::commands::Command;
 use crate::error::AamlError;
-use crate::types::{resolve_builtin, Type};
 use crate::types::primitive_type::PrimitiveType;
+use crate::types::{Type, resolve_builtin};
 
 /// A resolved type definition stored in the [`AAML`](crate::aaml::AAML) type registry.
 ///
@@ -30,6 +30,7 @@ use crate::types::primitive_type::PrimitiveType;
 /// - [`TypeDefinition::Primitive`] — a primitive name such as `i32` or `bool`.
 /// - [`TypeDefinition::Builtin`] — a module-qualified path such as `math::vector3`.
 /// - [`TypeDefinition::Alias`] — an opaque alias (currently always passes validation).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypeDefinition {
     /// A primitive type identified by name (e.g. `"i32"`, `"f64"`).
     Primitive(String),
@@ -44,18 +45,20 @@ impl Type for TypeDefinition {
     where
         Self: Sized,
     {
-        Err(AamlError::NotFound("TypeDefinition::from_name not supported".to_string()))
+        Err(AamlError::NotFound(
+            "TypeDefinition::from_name not supported".to_string(),
+        ))
     }
 
     /// Returns the underlying [`PrimitiveType`] that best represents this type.
     fn base_type(&self) -> PrimitiveType {
         match self {
-            TypeDefinition::Builtin(path) => {
-                resolve_builtin(path).map(|t| t.base_type()).unwrap_or(PrimitiveType::String)
-            }
-            TypeDefinition::Primitive(name) => {
-                PrimitiveType::from_name(name).unwrap_or(PrimitiveType::String).base_type()
-            }
+            TypeDefinition::Builtin(path) => resolve_builtin(path)
+                .map(|t| t.base_type())
+                .unwrap_or(PrimitiveType::String),
+            TypeDefinition::Primitive(name) => PrimitiveType::from_name(name)
+                .unwrap_or(PrimitiveType::String)
+                .base_type(),
             TypeDefinition::Alias(_) => PrimitiveType::String,
         }
     }
@@ -75,10 +78,13 @@ impl Type for TypeDefinition {
 }
 
 /// Command handler for the `@type` directive.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeCommand;
 
 impl Command for TypeCommand {
-    fn name(&self) -> &str { "type" }
+    fn name(&self) -> &str {
+        "type"
+    }
 
     /// Parses `name = definition` and registers the resulting [`TypeDefinition`].
     ///

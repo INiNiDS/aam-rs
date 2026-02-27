@@ -1,6 +1,7 @@
 use crate::error::AamlError;
 use crate::types::Type;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TimeTypes {
     DateTime,
     Duration,

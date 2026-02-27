@@ -1,16 +1,17 @@
 //! Wrapper type returned by AAML lookup methods.
 
-use std::fmt::Display;
-use std::ops::Deref;
-use std::collections::HashMap;
 use crate::aaml::parsing;
 use crate::types::list::ListType;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::ops::Deref;
 
 /// The result of a successful key lookup in an [`AAML`](crate::aaml::AAML) map.
 ///
 /// `FoundValue` wraps the string value associated with a key and provides
 /// helper methods for common transformations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FoundValue {
     inner: String,
 }

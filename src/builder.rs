@@ -57,6 +57,7 @@ use std::path::Path;
 /// assert_eq!(g.to_aaml(), "debug*: bool");
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SchemaField {
     name: String,
     type_name: String,
@@ -66,12 +67,20 @@ pub struct SchemaField {
 impl SchemaField {
     /// Creates a **required** field (rendered as `name: type`).
     pub fn required(name: impl Into<String>, type_name: impl Into<String>) -> Self {
-        Self { name: name.into(), type_name: type_name.into(), optional: false }
+        Self {
+            name: name.into(),
+            type_name: type_name.into(),
+            optional: false,
+        }
     }
 
     /// Creates an **optional** field (rendered as `name*: type`).
     pub fn optional(name: impl Into<String>, type_name: impl Into<String>) -> Self {
-        Self { name: name.into(), type_name: type_name.into(), optional: true }
+        Self {
+            name: name.into(),
+            type_name: type_name.into(),
+            optional: true,
+        }
     }
 
     /// Renders the field as an AAML field declaration string.
@@ -96,6 +105,7 @@ impl SchemaField {
 /// let content = b.build();
 /// assert!(content.contains("host = localhost"));
 /// ```
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AAMBuilder {
     buffer: String,
 }
@@ -103,12 +113,16 @@ pub struct AAMBuilder {
 impl AAMBuilder {
     /// Creates a new empty builder.
     pub fn new() -> Self {
-        Self { buffer: String::new() }
+        Self {
+            buffer: String::new(),
+        }
     }
 
     /// Creates a new builder with the given initial buffer capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { buffer: String::with_capacity(capacity) }
+        Self {
+            buffer: String::with_capacity(capacity),
+        }
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────
@@ -291,7 +305,10 @@ impl AAMBuilder {
     /// > [`type_alias`](Self::type_alias)) over this method when possible.
     ///
     /// Returns `&mut self` for chaining.
-    #[deprecated(since="1.1.0", note="Prefer the typed directive methods (schema, derive, import, type_alias) over this method when possible.")]
+    #[deprecated(
+        since = "1.1.0",
+        note = "Prefer the typed directive methods (schema, derive, import, type_alias) over this method when possible."
+    )]
     pub fn add_raw(&mut self, raw_line: &str) -> &mut Self {
         self.push_sep();
         self.buffer.push_str(raw_line);
@@ -337,4 +354,3 @@ impl Display for AAMBuilder {
         write!(f, "{}", self.buffer)
     }
 }
-
