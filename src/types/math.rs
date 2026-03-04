@@ -1,3 +1,4 @@
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::Type;
 
@@ -31,7 +32,7 @@ impl Type for MathTypes {
         crate::types::primitive_type::PrimitiveType::F64
     }
 
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
         let expected_len = match self {
             MathTypes::Vector2 => 2,

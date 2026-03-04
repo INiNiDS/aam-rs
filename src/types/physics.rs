@@ -1,4 +1,5 @@
 use std::fmt;
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 use crate::types::Type;
@@ -306,7 +307,7 @@ impl Type for PhysicsTypes {
         }
     }
 
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         match self.base_type() {
             PrimitiveType::I32 => {
                 value.parse::<i32>().map_err(|_| AamlError::InvalidValue(format!("Expected integer for unit {self}, got '{value}'")))?;

@@ -23,7 +23,7 @@ Add the library to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aaml = "1.0.5"
+aaml = "1.2.1"
 ```
 
 ## Configuration syntax (.aam)
@@ -202,3 +202,6 @@ assert_eq!(value.as_str(), "Hello");
 ## License
 
 See the `LICENSE` file.
+
+## Full Documentation
+Full API documentation is available at [docs.rs/aaml](https://docs.rs/aaml/) or in [main documentation of AAM](https://aam.ininids.in.rs).

@@ -19,12 +19,13 @@
 //! definitions and validated via [`AAML::validate_value`].
 //!
 
+use crate::aaml::AAML;
 use crate::commands::Command;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 use crate::types::{Type, resolve_builtin};
 
-/// A resolved type definition stored in the [`AAML`](crate::aaml::AAML) type registry.
+/// A resolved type definition stored in the [`AAML`](AAML) type registry.
 ///
 /// Variants correspond to the three ways a type can be declared:
 /// - [`TypeDefinition::Primitive`] — a primitive name such as `i32` or `bool`.
@@ -68,10 +69,10 @@ impl Type for TypeDefinition {
     /// - `Builtin` — delegates to the corresponding module type.
     /// - `Primitive` — delegates to [`PrimitiveType`].
     /// - `Alias` — always returns `Ok(())`.
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
         match self {
-            TypeDefinition::Builtin(path) => resolve_builtin(path)?.validate(value),
-            TypeDefinition::Primitive(name) => PrimitiveType::from_name(name)?.validate(value),
+            TypeDefinition::Builtin(path) => resolve_builtin(path)?.validate(value, aaml),
+            TypeDefinition::Primitive(name) => PrimitiveType::from_name(name)?.validate(value, aaml),
             TypeDefinition::Alias(_) => Ok(()),
         }
     }
@@ -93,7 +94,7 @@ impl Command for TypeCommand {
     ///
     /// # Errors
     /// [`AamlError::ParseError`] if the format is invalid or name/definition is empty.
-    fn execute(&self, aaml: &mut crate::aaml::AAML, args: &str) -> Result<(), AamlError> {
+    fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
         let (name, definition) = args.split_once('=').ok_or_else(|| AamlError::ParseError {
             line: 0,
             content: args.to_string(),

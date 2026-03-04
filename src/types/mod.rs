@@ -12,6 +12,7 @@
 //! | `physics::kilogram` | Non-negative floating-point mass |
 //! | `time::datetime` | ISO 8601 date or datetime string |
 
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 
@@ -38,7 +39,7 @@ pub trait Type {
     ///
     /// Returns `Ok(())` if the value is acceptable, or an
     /// [`AamlError`] with a human-readable message otherwise.
-    fn validate(&self, value: &str) -> Result<(), AamlError>;
+    fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError>;
 }
 
 /// Resolves a type from a module-qualified path or a plain primitive name.

@@ -47,7 +47,7 @@ impl AAML {
 
         // 1. Registered custom type alias
         if let Some(type_def) = self.types.get(type_name) {
-            return type_def.validate(value).map_err(|e| make_err(e.to_string()));
+            return type_def.validate(value, self).map_err(|e| make_err(e.to_string()));
         }
 
         // 2. Nested schema — type_name matches a registered schema name
@@ -57,55 +57,11 @@ impl AAML {
                 .map_err(|e| make_err(e.to_string()));
         }
 
-        // 3. list<T>
-        if let Some(inner_type) = ListType::parse_inner(type_name) {
-            return self
-                .validate_list_value(value, &inner_type)
-                .map_err(|e| make_err(e.to_string()));
-        }
-
-        // 4. Built-in types
+        // 3. Built-in types
         match resolve_builtin(type_name) {
-            Ok(type_def) => type_def.validate(value).map_err(|e| make_err(e.to_string())),
+            Ok(type_def) => type_def.validate(value, self).map_err(|e| make_err(e.to_string())),
             Err(_) => Err(make_err(format!("Unknown type '{}'", type_name))),
         }
-    }
-
-    /// Validates a `[item, item, ...]` literal where each item is validated
-    /// against `inner_type`.
-    ///
-    /// If `inner_type` names a registered schema the items are treated as
-    /// inline objects `{ k = v, ... }` and validated against that schema.
-    /// Validates a `[item, …]` literal where each item is checked against `inner_type`.
-    /// Items are split respecting nested `{}` / `[]`, so `list<Schema>` works correctly.
-    fn validate_list_value(&self, value: &str, inner_type: &str) -> Result<(), AamlError> {
-        let items = ListType::parse_items(value).ok_or_else(|| {
-            AamlError::InvalidValue(format!("Expected a list literal '[…]', got '{value}'"))
-        })?;
-
-        for item in &items {
-            if let Some(nested_schema) = self.schemas.get(inner_type) {
-                let fields = nested_schema.fields.clone();
-                self.validate_inline_object_against_schema(item, inner_type, fields)?;
-            } else if let Ok(builtin) = resolve_builtin(inner_type) {
-                builtin.validate(item).map_err(|e| {
-                    AamlError::InvalidValue(format!(
-                        "List item '{item}' failed for type '{inner_type}': {e}"
-                    ))
-                })?;
-            } else if let Some(type_def) = self.types.get(inner_type) {
-                type_def.validate(item).map_err(|e| {
-                    AamlError::InvalidValue(format!(
-                        "List item '{item}' failed for type '{inner_type}': {e}"
-                    ))
-                })?;
-            } else {
-                return Err(AamlError::NotFound(format!(
-                    "Unknown list element type '{inner_type}'"
-                )));
-            }
-        }
-        Ok(())
     }
 
     /// Validates an inline object literal `{ key = val, ... }` against the
@@ -178,6 +134,7 @@ impl AAML {
         self.validate_schemas_completeness_for(&names)
     }
 
+    // Medium Complexity
     /// Checks required fields only for the named schemas.
     /// Used by `@derive` to validate only child-defined schemas, not inherited ones.
     pub fn validate_schemas_completeness_for(&self, schema_names: &[&str]) -> Result<(), AamlError> {

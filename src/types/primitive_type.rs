@@ -1,6 +1,7 @@
 use crate::error::AamlError;
 use crate::types::Type;
 use std::fmt;
+use crate::aaml::AAML;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -31,7 +32,7 @@ impl Type for PrimitiveType {
         *self
     }
 
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         match self {
             PrimitiveType::I32 => {
                 value.parse::<i32>().map_err(|_| {

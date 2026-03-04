@@ -1,3 +1,4 @@
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::Type;
 
@@ -61,7 +62,7 @@ impl Type for TimeTypes {
         crate::types::primitive_type::PrimitiveType::F64
     }
 
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         match self {
             TimeTypes::DateTime => validate_datetime(value),
             TimeTypes::Duration => {

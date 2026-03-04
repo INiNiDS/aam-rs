@@ -10,7 +10,7 @@
 use crate::commands::{self, Command};
 use crate::error::AamlError;
 use crate::commands::schema::SchemaDef;
-use crate::types::Type;
+use crate::types::{resolve_builtin, Type};
 use std::collections::HashMap;
 use std::fs;
 use std::ops::{Add, AddAssign};
@@ -21,6 +21,7 @@ mod lookup;
 mod validation;
 pub mod parsing;
 pub mod types_registry;
+
 #[cfg(feature = "serde")]
 pub mod serialize;
 
@@ -127,7 +128,7 @@ impl AAML {
         self.types
             .get(type_name)
             .ok_or_else(|| AamlError::NotFound(type_name.to_string()))?
-            .validate(value)
+            .validate(value, self)
     }
 
     /// Validates `value` against the type registered as `type_name`, also
@@ -139,12 +140,12 @@ impl AAML {
         };
 
         if let Some(type_def) = self.types.get(type_name) {
-            return type_def.validate(value).map_err(make_err);
+            return type_def.validate(value, self).map_err(make_err);
         }
 
-        crate::types::resolve_builtin(type_name)
+        resolve_builtin(type_name)
             .map_err(|_| AamlError::NotFound(type_name.to_string()))?
-            .validate(value)
+            .validate(value, self)
             .map_err(make_err)
     }
 

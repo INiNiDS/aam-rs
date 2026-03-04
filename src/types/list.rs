@@ -15,6 +15,7 @@
 //! @schema Post { tags: list<string>, scores: list<f64> }
 //! ```
 
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 use crate::types::{Type, resolve_builtin};
@@ -117,7 +118,7 @@ impl Type for ListType {
 
     /// Validates the list literal `[item, item, ...]` where each item must
     /// satisfy the inner type.
-    fn validate(&self, value: &str) -> Result<(), AamlError> {
+    fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
         let items = ListType::parse_items(value).ok_or_else(|| {
             AamlError::InvalidValue(format!(
                 "Expected a list literal in the form [item, item, ...], got '{}'",
@@ -130,7 +131,12 @@ impl Type for ListType {
         })?;
 
         for item in &items {
-            inner.validate(item).map_err(|e| {
+            aaml.validate_typed_field(
+                &self.inner_type,
+                item,
+                &format!("list<{}>", self.inner_type),
+                "list_item"
+            ).map_err(|e| {
                 AamlError::InvalidValue(format!(
                     "List item '{}' failed validation for type '{}': {}",
                     item, self.inner_type, e
