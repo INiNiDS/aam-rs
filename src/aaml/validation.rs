@@ -1,11 +1,10 @@
-//! Schema validation methods for [`AAML`](super::AAML).
+//! Schema validation methods for [`AAML`](AAML).
 
-use std::collections::HashMap;
-use crate::error::AamlError;
-use crate::types::{resolve_builtin};
-use crate::types::list::ListType;
-use crate::aaml::parsing;
 use super::AAML;
+use crate::aaml::parsing;
+use crate::error::AamlError;
+use crate::types::resolve_builtin;
+use std::collections::HashMap;
 
 impl AAML {
     /// Validates a single field value against any schema that declares it.

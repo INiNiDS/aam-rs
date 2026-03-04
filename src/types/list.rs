@@ -18,7 +18,7 @@
 use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
-use crate::types::{Type, resolve_builtin};
+use crate::types::Type;
 
 /// A list type that validates every element against an inner type.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -124,10 +124,6 @@ impl Type for ListType {
                 "Expected a list literal in the form [item, item, ...], got '{}'",
                 value
             ))
-        })?;
-
-        let inner = resolve_builtin(&self.inner_type).map_err(|_| {
-            AamlError::NotFound(format!("Unknown list element type '{}'", self.inner_type))
         })?;
 
         for item in &items {
