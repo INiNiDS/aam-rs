@@ -205,7 +205,7 @@ fn print_key(cfg: &AAML, key: &str) {
 }
 
 fn print_schema_compact(cfg: &AAML, name: &str) {
-    match cfg.get_schema(name) {
+        match cfg.get_schema(name) {
         Some(s) => {
             let mut fields: Vec<_> = s.fields.iter().collect();
             fields.sort_by_key(|(k, _)| k.as_str());

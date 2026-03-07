@@ -12,7 +12,7 @@
 //! ```
 
 use aam_rs::aaml::AAML;
-use aam_rs::builder::AAMBuilder;
+use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use std::collections::HashMap;
 use std::path::Path;
@@ -61,57 +61,58 @@ fn main() {
 
     // ── 2. Missing required field → SchemaValidationError ────────────────────
     println!("\n▶ 2. Missing required Entity field 'active' → expect SchemaValidationError");
+    // ── 2. Missing field → SchemaValidationError ─────────────────────────────
+    println!("\n▶ 2. Field 'active' is omitted → expect SchemaValidationError");
     {
         // Write a temporary base that defines the schema but does NOT supply 'active'
         let base_path = "tmp_base_missing_field.aam";
         let mut b = AAMBuilder::new();
-        b.add_raw("@schema Entity { id: i32, name: string, active: bool }");
-        b.add_line("id", "10");
-        b.add_line("name", "TestApp");
+        b.schema(
+                "Entity",
+                [
+                    SchemaField::required("id", "i32"),
+                    SchemaField::required("name", "string"),
+                    SchemaField::required("active", "bool"),
+                ]
+            )
+            .add_line("id", "10")
+            .add_line("name", "TestApp");
         // 'active' is intentionally omitted
+
         b.to_file(base_path).unwrap();
 
         let content = format!("@derive {base_path}\n");
         let result = AAML::parse(&content);
         let _ = std::fs::remove_file(base_path);
 
-        match result {
-            Err(AamlError::SchemaValidationError { schema, field, type_name, details }) => {
-                println!(
-                    "   ✔ Got expected error — schema: '{schema}', field: '{field}' \
-                     (type: '{type_name}'), reason: {details}"
-                );
-            }
-            Err(other) => eprintln!("   ✘ Wrong error type: {other}"),
-            Ok(_) => eprintln!("   ✘ Expected an error but parsing succeeded"),
-        }
+        match_result::<AAML, AamlError>(result)
     }
 
     // ── 3. Wrong type for a field → SchemaValidationError ────────────────────
     println!("\n▶ 3. Field 'id' set to a non-integer → expect SchemaValidationError");
     {
         let base_path = "tmp_base_wrong_type.aam";
+
         let mut b = AAMBuilder::new();
-        b.add_raw("@schema Entity { id: i32, name: string, active: bool }");
-        b.add_line("id", "not-a-number");   // ← wrong type
-        b.add_line("name", "TestApp");
-        b.add_line("active", "true");
+        b.schema(
+                "Entity",
+                [
+                    SchemaField::required("id", "i32"),
+                    SchemaField::required("name", "string"),
+                    SchemaField::required("active", "bool"),
+                ]
+            )
+            .add_line("id", "not-a-number")   // ← wrong type
+            .add_line("name", "TestApp")
+            .add_line("active", "true");
+
         b.to_file(base_path).unwrap();
 
         let content = format!("@derive {base_path}\n");
         let result = AAML::parse(&content);
         let _ = std::fs::remove_file(base_path);
 
-        match result {
-            Err(AamlError::SchemaValidationError { schema, field, type_name, details }) => {
-                println!(
-                    "   ✔ Got expected error — schema: '{schema}', field: '{field}' \
-                     (type: '{type_name}'), reason: {details}"
-                );
-            }
-            Err(other) => eprintln!("   ✘ Wrong error type: {other}"),
-            Ok(_) => eprintln!("   ✘ Expected an error but parsing succeeded"),
-        }
+        match_result::<AAML, AamlError>(result)
     }
 
     // ── 4. apply_schema — validate an arbitrary data map ─────────────────────
@@ -182,5 +183,18 @@ fn print_schema(config: &AAML, schema_name: &str) {
             }
         }
         None => println!("   Schema '{schema_name}' not found"),
+    }
+}
+
+fn match_result<T, E: std::fmt::Debug + std::fmt::Display>(result: Result<T, AamlError>) {
+    match result {
+        Err(AamlError::SchemaValidationError { schema, field, type_name, details }) => {
+            println!(
+                "   ✔ Got expected error — schema: '{schema}', field: '{field}' \
+                     (type: '{type_name}'), reason: {details}"
+            );
+        }
+        Err(other) => eprintln!("   ✘ Wrong error type: {other}"),
+        Ok(_) => eprintln!("   ✘ Expected an error but parsing succeeded"),
     }
 }

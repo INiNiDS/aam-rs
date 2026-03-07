@@ -16,6 +16,7 @@ use std::fs;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 use std::sync::Arc;
+use crate::types::list::ListType;
 
 mod lookup;
 mod validation;
@@ -73,6 +74,10 @@ impl AAML {
         };
         instance.register_default_commands();
         instance
+    }
+
+    pub fn get_schemas(&self) -> &HashMap<String, SchemaDef> {
+        &self.schemas
     }
 
     /// Creates a new [`AAML`] instance pre-allocated for `capacity` key-value entries.
@@ -172,6 +177,13 @@ impl AAML {
         Ok(())
     }
 
+    /// Returns a mutable reference to the registered type definitions.
+    /// Used by commands like `@type` to add new types at parse time.
+    /// The keys are the type names, and the values are boxed trait objects implementing [`Type`].
+    pub(crate) fn get_types_mut(&mut self) -> &mut HashMap<String, Box<dyn Type>> {
+        &mut self.types
+    }
+
     /// Handles one source line: either appends it to a pending multi-line block
     /// or processes it immediately. Returns `Some((text, line_num))` when a
     /// complete directive has been accumulated and is ready to process.
@@ -226,6 +238,28 @@ impl AAML {
     /// if it is not quoted.
     pub fn unwrap_quotes(s: &str) -> &str {
         parsing::unwrap_quotes(s)
+    }
+
+    pub fn import_schema(&mut self, name: &str, source: &mut AAML) -> Result<(), AamlError> {
+        let schema = source.get_schemas_mut().remove(name).ok_or_else(|| {
+            AamlError::DirectiveError("derive".into(), format!("Schema '{name}' not found"))
+        })?;
+
+        for ty_str in schema.fields.values() {
+            let ty_name = ListType::parse_inner(ty_str).unwrap_or_else(|| ty_str.clone());
+            if let Some(ty_def) = source.get_types_mut().remove(&ty_name) {
+                self.get_types_mut().entry(ty_name).or_insert(ty_def);
+            }
+        }
+
+        self.get_schemas_mut().entry(name.to_string()).or_insert(schema);
+        Ok(())
+    }
+
+    pub fn merge_map_weak(&mut self, other_map: &mut HashMap<AamlString, AamlString>) {
+        for (k, v) in other_map.drain() {
+            self.get_map_mut().entry(k).or_insert(v);
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

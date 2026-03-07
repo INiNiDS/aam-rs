@@ -2,7 +2,7 @@
 //!
 //! Each directive (`@import`, `@derive`, `@schema`, `@type`) is implemented as
 //! a struct that implements the [`Command`] trait and is registered in
-//! [`AAML::register_default_commands`](crate::aaml::AAML).
+//! [`AAML::register_default_commands`](AAML).
 
 use crate::aaml::AAML;
 use crate::error::AamlError;

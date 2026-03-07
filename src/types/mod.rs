@@ -65,7 +65,7 @@ pub fn resolve_builtin(path: &str) -> Result<Box<dyn Type>, AamlError> {
         ["math", name] => Ok(Box::new(math::MathTypes::from_name(name)?)),
         ["time", name] => Ok(Box::new(time::TimeTypes::from_name(name)?)),
         ["physics", name] => Ok(Box::new(physics::PhysicsTypes::from_name(name)?)),
-        [name] => Ok(Box::new(primitive_type::PrimitiveType::from_name(name)?)),
+        [name] => Ok(Box::new(PrimitiveType::from_name(name)?)),
         _ => Err(AamlError::NotFound(path.to_string())),
     }
 }
