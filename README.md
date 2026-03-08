@@ -23,7 +23,7 @@ Add the library to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aam-rs = "1.2.3"
+aam-rs = "1.2.4"
 ```
 
 ## Configuration syntax (.aam)

@@ -256,7 +256,7 @@ impl AAML {
         Ok(())
     }
 
-    pub fn merge_map_weak(&mut self, other_map: &mut HashMap<AamlString, AamlString>) {
+    pub fn merge_map_weak(&mut self, other_map: &mut HashMap<AamlString, AamlString, Hasher>) {
         for (k, v) in other_map.drain() {
             self.get_map_mut().entry(k).or_insert(v);
         }
