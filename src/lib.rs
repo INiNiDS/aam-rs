@@ -25,3 +25,6 @@ pub mod error;
 pub mod builder;
 pub mod commands;
 mod types;
+
+#[cfg(feature = "ffi")]
+pub mod ffi;

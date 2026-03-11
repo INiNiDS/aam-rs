@@ -36,8 +36,8 @@ host = "localhost"
 port = 8080
 
 # Import other configuration files
-@import "database.aam"
-@import "theme.aam"
+@import database.aam
+@import theme.aam
 
 # You can define aliases for deep lookup
 base_path = /var/www
