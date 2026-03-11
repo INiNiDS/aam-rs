@@ -117,9 +117,9 @@ jobs:
           run: |
             cd package
             zip -r ../${{ matrix.artifact_name }}.zip ./*
-
+  
         - name: Upload Release Artifact
           uses: softprops/action-gh-release@v2
           with:
             tag_name: ${{ needs.release-please.outputs.tag_name }}
-            files: ${{ matrix.artifact_name }}.restrict.zip
+            files: ${{ matrix.artifact_name }}.zip
