@@ -43,3 +43,5 @@ rust-toolchain.toml
 *.log
 callgrind.out.*
 flamegraph.svg
+
+build/
