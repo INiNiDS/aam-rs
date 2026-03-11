@@ -20,5 +20,20 @@
         }
       ]
     }
+  },
+  "extra-plugins": [
+    {
+      "type": "sentence-case"
+    }
+  ],
+  "include-component-in-tag": false,
+  "changelog-type": "default",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "types": {
+    "refactor": {
+      "changelog-section": "Performance & Refactoring",
+      "release-type": "patch"
+    }
   }
 }
