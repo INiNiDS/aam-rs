@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/INiNiDS/aam-rs/compare/v1.3.2...v1.3.3) (2026-03-11)
+
+
+### Bug Fixes
+
+* Add C examples demonstrating aam-rs API usage and configuration loading ([258af0b](https://github.com/INiNiDS/aam-rs/commit/258af0b5258e0475c9f3eb08f50b490ecfbd6879))
+
 ## [1.3.2](https://github.com/INiNiDS/aam-rs/compare/v1.3.1...v1.3.2) (2026-03-11)
 
 
