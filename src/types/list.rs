@@ -17,8 +17,8 @@
 
 use crate::aaml::AAML;
 use crate::error::AamlError;
-use crate::types::primitive_type::PrimitiveType;
 use crate::types::Type;
+use crate::types::primitive_type::PrimitiveType;
 
 /// A list type that validates every element against an inner type.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -131,8 +131,9 @@ impl Type for ListType {
                 &self.inner_type,
                 item,
                 &format!("list<{}>", self.inner_type),
-                "list_item"
-            ).map_err(|e| {
+                "list_item",
+            )
+            .map_err(|e| {
                 AamlError::InvalidValue(format!(
                     "List item '{}' failed validation for type '{}': {}",
                     item, self.inner_type, e

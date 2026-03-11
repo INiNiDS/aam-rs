@@ -7,13 +7,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Builtin primitive types ---
     println!("--- 1. Built-in primitive types ---");
     let mut b = AAMBuilder::new();
-    b.schema("Primitives", [
-        SchemaField::required("name",   "string"),
-        SchemaField::required("age",    "i32"),
-        SchemaField::required("score",  "f64"),
-        SchemaField::required("active", "bool"),
-        SchemaField::required("tint",   "color"),
-    ]);
+    b.schema(
+        "Primitives",
+        [
+            SchemaField::required("name", "string"),
+            SchemaField::required("age", "i32"),
+            SchemaField::required("score", "f64"),
+            SchemaField::required("active", "bool"),
+            SchemaField::required("tint", "color"),
+        ],
+    );
     b.add_line("name", "Alice");
     b.add_line("age", "30");
     b.add_line("score", "9.75");
@@ -38,10 +41,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut b = AAMBuilder::new();
     b.type_alias("ipv4", "string");
     b.type_alias("port", "i32");
-    b.schema("Network", [
-        SchemaField::required("ip",   "ipv4"),
-        SchemaField::required("port", "port"),
-    ]);
+    b.schema(
+        "Network",
+        [
+            SchemaField::required("ip", "ipv4"),
+            SchemaField::required("port", "port"),
+        ],
+    );
     b.add_line("ip", "192.168.1.1");
     b.add_line("port", "8080");
 
@@ -85,10 +91,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 4. apply_schema ---
     println!("\n--- 4. apply_schema ---");
     let mut b = AAMBuilder::new();
-    b.schema("Player", [
-        SchemaField::required("name",  "string"),
-        SchemaField::required("score", "i32"),
-    ]);
+    b.schema(
+        "Player",
+        [
+            SchemaField::required("name", "string"),
+            SchemaField::required("score", "i32"),
+        ],
+    );
     let cfg = AAML::parse(&b.build())?;
 
     let mut data = std::collections::HashMap::new();

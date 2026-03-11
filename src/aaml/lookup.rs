@@ -1,8 +1,8 @@
 //! Key lookup methods for [`AAML`](AAML).
 
-use std::collections::HashSet;
-use crate::found_value::FoundValue;
 use super::{AAML, Hasher};
+use crate::found_value::FoundValue;
+use std::collections::HashSet;
 
 impl AAML {
     /// Looks up `key` in the map. If not found as a key, performs a reverse

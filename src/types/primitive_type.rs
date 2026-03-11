@@ -1,7 +1,7 @@
+use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::Type;
 use std::fmt;
-use crate::aaml::AAML;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

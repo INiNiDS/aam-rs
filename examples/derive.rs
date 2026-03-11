@@ -68,15 +68,15 @@ fn main() {
         let base_path = "tmp_base_missing_field.aam";
         let mut b = AAMBuilder::new();
         b.schema(
-                "Entity",
-                [
-                    SchemaField::required("id", "i32"),
-                    SchemaField::required("name", "string"),
-                    SchemaField::required("active", "bool"),
-                ]
-            )
-            .add_line("id", "10")
-            .add_line("name", "TestApp");
+            "Entity",
+            [
+                SchemaField::required("id", "i32"),
+                SchemaField::required("name", "string"),
+                SchemaField::required("active", "bool"),
+            ],
+        )
+        .add_line("id", "10")
+        .add_line("name", "TestApp");
         // 'active' is intentionally omitted
 
         b.to_file(base_path).unwrap();
@@ -95,16 +95,16 @@ fn main() {
 
         let mut b = AAMBuilder::new();
         b.schema(
-                "Entity",
-                [
-                    SchemaField::required("id", "i32"),
-                    SchemaField::required("name", "string"),
-                    SchemaField::required("active", "bool"),
-                ]
-            )
-            .add_line("id", "not-a-number")   // ← wrong type
-            .add_line("name", "TestApp")
-            .add_line("active", "true");
+            "Entity",
+            [
+                SchemaField::required("id", "i32"),
+                SchemaField::required("name", "string"),
+                SchemaField::required("active", "bool"),
+            ],
+        )
+        .add_line("id", "not-a-number") // ← wrong type
+        .add_line("name", "TestApp")
+        .add_line("active", "true");
 
         b.to_file(base_path).unwrap();
 
@@ -151,7 +151,12 @@ fn main() {
         wrong_type.insert("health".to_string(), "99.0".to_string());
 
         match config.apply_schema("Player", &wrong_type) {
-            Err(AamlError::SchemaValidationError { field, type_name, details, .. }) => {
+            Err(AamlError::SchemaValidationError {
+                field,
+                type_name,
+                details,
+                ..
+            }) => {
                 println!("   ✔ Wrong type for '{field}' (expected {type_name}) caught — {details}");
             }
             other => eprintln!("   ✘ Unexpected result: {other:?}"),
@@ -188,7 +193,12 @@ fn print_schema(config: &AAML, schema_name: &str) {
 
 fn match_result<T, E: std::fmt::Debug + std::fmt::Display>(result: Result<T, AamlError>) {
     match result {
-        Err(AamlError::SchemaValidationError { schema, field, type_name, details }) => {
+        Err(AamlError::SchemaValidationError {
+            schema,
+            field,
+            type_name,
+            details,
+        }) => {
             println!(
                 "   ✔ Got expected error — schema: '{schema}', field: '{field}' \
                      (type: '{type_name}'), reason: {details}"

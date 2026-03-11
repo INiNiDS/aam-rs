@@ -16,10 +16,10 @@ use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 
-pub(crate) mod physics;
-pub(crate) mod primitive_type;
 pub(crate) mod list;
 mod math;
+pub(crate) mod physics;
+pub(crate) mod primitive_type;
 mod time;
 
 /// Core trait that every AAML type must implement.
@@ -28,7 +28,9 @@ pub trait Type {
     ///
     /// Used internally by [`resolve_builtin`] to create type instances from
     /// the sub-name after the `::` separator.
-    fn from_name(name: &str) -> Result<Self, AamlError> where Self: Sized;
+    fn from_name(name: &str) -> Result<Self, AamlError>
+    where
+        Self: Sized;
 
     /// Returns the primitive type that best represents this type.
     ///

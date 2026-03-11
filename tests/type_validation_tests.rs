@@ -1,9 +1,9 @@
 use aam_rs::aaml::AAML;
 use std::collections::HashMap;
 
-mod test_imports;
-mod test_derive;
 mod test_core;
+mod test_derive;
+mod test_imports;
 
 #[test]
 fn test_builtin_types() {
@@ -31,7 +31,8 @@ fn test_schema_field_validation() {
     "#;
 
     let aaml = AAML::parse(config).expect("Should parse valid config");
-    aaml.validate_schemas_completeness().expect("Schema should be complete");
+    aaml.validate_schemas_completeness()
+        .expect("Schema should be complete");
 }
 
 #[test]
@@ -49,14 +50,18 @@ fn test_schema_validation_failure() {
     // However, schema is defined *before* assignment here, so it should be active.
 
     let res = AAML::parse(config);
-    assert!(res.is_err(), "Should fail because 'id' is defined as i32 but assigned string");
+    assert!(
+        res.is_err(),
+        "Should fail because 'id' is defined as i32 but assigned string"
+    );
 }
 
 #[test]
 fn test_apply_schema_manual() {
     let mut aaml = AAML::new();
     // Valid schema definition
-    aaml.merge_content("@schema Point { x: i32, y: i32 }").unwrap();
+    aaml.merge_content("@schema Point { x: i32, y: i32 }")
+        .unwrap();
 
     let mut data = HashMap::new();
     data.insert("x".to_string(), "10".to_string());
@@ -67,4 +72,3 @@ fn test_apply_schema_manual() {
     data.insert("y".to_string(), "invalid".to_string());
     assert!(aaml.apply_schema("Point", &data).is_err());
 }
-

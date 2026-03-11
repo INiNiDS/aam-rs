@@ -45,7 +45,14 @@ fn section_1_base() {
                 print_schema_compact(&cfg, name);
             }
             divider();
-            for key in &["app_env", "build_id", "tags", "feature_flags", "server", "database"] {
+            for key in &[
+                "app_env",
+                "build_id",
+                "tags",
+                "feature_flags",
+                "server",
+                "database",
+            ] {
                 print_key(&cfg, key);
             }
         }
@@ -116,38 +123,60 @@ fn section_4_apply_schema_runtime() {
         "@schema Server { name: string, version: string, address: Address, ",
         "allowed_ips: list<string>, debug*: bool }\n",
         "@schema Address { host: string, port: i32, tls*: bool }\n",
-    )).expect("Schema parse failed");
+    ))
+    .expect("Schema parse failed");
 
     // 4a. Valid complete map
     let valid: HashMap<String, String> = [
-        ("name".into(),        "ProdServer".into()),
-        ("version".into(),     "2.0.0".into()),
-        ("address".into(),     "{ host = prod.example.com, port = 443, tls = true }".into()),
+        ("name".into(), "ProdServer".into()),
+        ("version".into(), "2.0.0".into()),
+        (
+            "address".into(),
+            "{ host = prod.example.com, port = 443, tls = true }".into(),
+        ),
         ("allowed_ips".into(), "[10.0.0.1, 10.0.0.2]".into()),
-    ].into();
+    ]
+    .into();
     validate_map(&cfg, "Server", &valid, "valid server map (no debug*) → ✔");
 
     // 4b. debug* included
     let mut with_debug = valid.clone();
     with_debug.insert("debug".into(), "false".into());
-    validate_map(&cfg, "Server", &with_debug, "debug* = false               → ✔");
+    validate_map(
+        &cfg,
+        "Server",
+        &with_debug,
+        "debug* = false               → ✔",
+    );
 
     // 4c. port wrong type
     let bad_port: HashMap<String, String> = [
-        ("name".into(),        "BadServer".into()),
-        ("version".into(),     "1.0".into()),
-        ("address".into(),     "{ host = x, port = eighty }".into()),
+        ("name".into(), "BadServer".into()),
+        ("version".into(), "1.0".into()),
+        ("address".into(), "{ host = x, port = eighty }".into()),
         ("allowed_ips".into(), "[1.2.3.4]".into()),
-    ].into();
-    validate_map(&cfg, "Server", &bad_port, "port = 'eighty'              → ✘");
+    ]
+    .into();
+    validate_map(
+        &cfg,
+        "Server",
+        &bad_port,
+        "port = 'eighty'              → ✘",
+    );
 
     // 4d. required field missing
     let missing_name: HashMap<String, String> = [
-        ("version".into(),     "1.0".into()),
-        ("address".into(),     "{ host = x, port = 80 }".into()),
+        ("version".into(), "1.0".into()),
+        ("address".into(), "{ host = x, port = 80 }".into()),
         ("allowed_ips".into(), "[]".into()),
-    ].into();
-    validate_map(&cfg, "Server", &missing_name, "name missing                 → ✘");
+    ]
+    .into();
+    validate_map(
+        &cfg,
+        "Server",
+        &missing_name,
+        "name missing                 → ✘",
+    );
 }
 
 // ── 5. Error cases ────────────────────────────────────────────────────────────
@@ -158,8 +187,7 @@ fn section_5_error_cases() {
     // 5a. Derive non-existent schema
     println!("   5a. @derive config_base.aam::PhantomSchema → DirectiveError");
     match AAML::parse("@derive config_base.aam::PhantomSchema\n") {
-        Err(AamlError::DirectiveError(cmd, msg)) =>
-            println!("       ✔ @{cmd}: {msg}"),
+        Err(AamlError::DirectiveError(cmd, msg)) => println!("       ✔ @{cmd}: {msg}"),
         other => eprintln!("       ✘ Unexpected: {other:?}"),
     }
 
@@ -167,19 +195,30 @@ fn section_5_error_cases() {
     println!("\n   5b. build_id = not-a-number  in @schema with i32 → SchemaValidationError");
     let src = "@schema Build { build_id: i32, env: string }\nbuild_id = not-a-number\nenv = prod\n";
     match AAML::parse(src) {
-        Err(AamlError::SchemaValidationError { schema, field, type_name, details }) =>
-            println!(
-                "       ✔ schema '{schema}', field '{field}' ({type_name}): {details}"
-            ),
+        Err(AamlError::SchemaValidationError {
+            schema,
+            field,
+            type_name,
+            details,
+        }) => println!("       ✔ schema '{schema}', field '{field}' ({type_name}): {details}"),
         other => eprintln!("       ✘ Unexpected: {other:?}"),
     }
 
     // 5c. Required field missing — detected via validate_schemas_completeness()
-    println!("\n   5c. Required field 'env' absent → SchemaValidationError (via completeness check)");
+    println!(
+        "\n   5c. Required field 'env' absent → SchemaValidationError (via completeness check)"
+    );
     let src2 = "@schema Build { build_id: i32, env: string }\nbuild_id = 7\n";
-    match AAML::parse(src2).and_then(|cfg| { cfg.validate_schemas_completeness()?; Ok(cfg) }) {
-        Err(AamlError::SchemaValidationError { schema, field, details, .. }) =>
-            println!("       ✔ schema '{schema}', field '{field}': {details}"),
+    match AAML::parse(src2).and_then(|cfg| {
+        cfg.validate_schemas_completeness()?;
+        Ok(cfg)
+    }) {
+        Err(AamlError::SchemaValidationError {
+            schema,
+            field,
+            details,
+            ..
+        }) => println!("       ✔ schema '{schema}', field '{field}': {details}"),
         other => eprintln!("       ✘ Unexpected: {other:?}"),
     }
 }
@@ -188,24 +227,26 @@ fn section_5_error_cases() {
 
 fn validate_map(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) {
     match cfg.apply_schema(schema, data) {
-        Ok(()) =>
-            println!("   ✔ {label}"),
-        Err(AamlError::SchemaValidationError { field, type_name, details, .. }) =>
-            println!("   ✔ {label}\n       ↳ '{field}' ({type_name}): {details}"),
-        Err(e) =>
-            eprintln!("   ✘ {label} — unexpected: {e}"),
+        Ok(()) => println!("   ✔ {label}"),
+        Err(AamlError::SchemaValidationError {
+            field,
+            type_name,
+            details,
+            ..
+        }) => println!("   ✔ {label}\n       ↳ '{field}' ({type_name}): {details}"),
+        Err(e) => eprintln!("   ✘ {label} — unexpected: {e}"),
     }
 }
 
 fn print_key(cfg: &AAML, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {key:>15} = {v}"),
-        None    => println!("   {key:>15} = <not found>"),
+        None => println!("   {key:>15} = <not found>"),
     }
 }
 
 fn print_schema_compact(cfg: &AAML, name: &str) {
-        match cfg.get_schema(name) {
+    match cfg.get_schema(name) {
         Some(s) => {
             let mut fields: Vec<_> = s.fields.iter().collect();
             fields.sort_by_key(|(k, _)| k.as_str());
@@ -222,14 +263,16 @@ fn print_schema_compact(cfg: &AAML, name: &str) {
 
 fn schema_marker(cfg: &AAML, name: &str, expect_present: bool) -> &'static str {
     match (cfg.get_schema(name).is_some(), expect_present) {
-        (true,  true)  => "present  ✔",
+        (true, true) => "present  ✔",
         (false, false) => "absent   ✔",
-        (true,  false) => "present  ✗ (unexpected!)",
-        (false, true)  => "absent   ✗ (expected!)",
+        (true, false) => "present  ✗ (unexpected!)",
+        (false, true) => "absent   ✗ (expected!)",
     }
 }
 
-fn divider() { println!("   {}", "─".repeat(52)); }
+fn divider() {
+    println!("   {}", "─".repeat(52));
+}
 
 fn header(title: &str) {
     println!("\n{}", "═".repeat(64));
@@ -248,4 +291,3 @@ fn footer() {
     println!("  Done.");
     println!("{}", "═".repeat(64));
 }
-

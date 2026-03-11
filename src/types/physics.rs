@@ -1,8 +1,8 @@
-use std::fmt;
 use crate::aaml::AAML;
 use crate::error::AamlError;
-use crate::types::primitive_type::PrimitiveType;
 use crate::types::Type;
+use crate::types::primitive_type::PrimitiveType;
+use std::fmt;
 
 pub(crate) enum PhysicsTypes {
     Meter,
@@ -134,7 +134,7 @@ pub(crate) enum PhysicsTypes {
     MachNumber,
     Knots,
     NauticalMile,
-    Horsepower
+    Horsepower,
 }
 
 impl Type for PhysicsTypes {
@@ -298,9 +298,7 @@ impl Type for PhysicsTypes {
     fn base_type(&self) -> PrimitiveType {
         match self {
             // Units typically represented as integers (counting, data sizes)
-            PhysicsTypes::Bit |
-            PhysicsTypes::Byte |
-            PhysicsTypes::Baud => PrimitiveType::I32,
+            PhysicsTypes::Bit | PhysicsTypes::Byte | PhysicsTypes::Baud => PrimitiveType::I32,
 
             // Most physical quantities require high precision floating point
             _ => PrimitiveType::F64,
@@ -310,12 +308,26 @@ impl Type for PhysicsTypes {
     fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         match self.base_type() {
             PrimitiveType::I32 => {
-                value.parse::<i32>().map_err(|_| AamlError::InvalidValue(format!("Expected integer for unit {self}, got '{value}'")))?;
+                value.parse::<i32>().map_err(|_| {
+                    AamlError::InvalidValue(format!(
+                        "Expected integer for unit {self}, got '{value}'"
+                    ))
+                })?;
             }
             PrimitiveType::F64 => {
-                value.parse::<f64>().map_err(|_| AamlError::InvalidValue(format!("Expected number for unit {}, got '{}'", self, value)))?;
+                value.parse::<f64>().map_err(|_| {
+                    AamlError::InvalidValue(format!(
+                        "Expected number for unit {}, got '{}'",
+                        self, value
+                    ))
+                })?;
             }
-            _ => return Err(AamlError::InvalidValue(format!("Unsupported base type for unit {}", self))),
+            _ => {
+                return Err(AamlError::InvalidValue(format!(
+                    "Unsupported base type for unit {}",
+                    self
+                )));
+            }
         }
         Ok(())
     }

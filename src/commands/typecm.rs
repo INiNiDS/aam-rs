@@ -72,7 +72,9 @@ impl Type for TypeDefinition {
     fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
         match self {
             TypeDefinition::Builtin(path) => resolve_builtin(path)?.validate(value, aaml),
-            TypeDefinition::Primitive(name) => PrimitiveType::from_name(name)?.validate(value, aaml),
+            TypeDefinition::Primitive(name) => {
+                PrimitiveType::from_name(name)?.validate(value, aaml)
+            }
             TypeDefinition::Alias(_) => Ok(()),
         }
     }

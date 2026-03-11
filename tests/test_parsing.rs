@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use aam_rs::aaml::parsing::{is_inline_object, parse_inline_object};
     use aam_rs::aaml::parsing::strip_comment;
+    use aam_rs::aaml::parsing::{is_inline_object, parse_inline_object};
 
     #[test]
     fn color_not_stripped() {
@@ -16,7 +16,10 @@ mod tests {
 
     #[test]
     fn quoted_hash_preserved() {
-        assert_eq!(strip_comment(r#"key = "val # not comment""#), r#"key = "val # not comment""#);
+        assert_eq!(
+            strip_comment(r#"key = "val # not comment""#),
+            r#"key = "val # not comment""#
+        );
     }
 
     #[test]
@@ -64,4 +67,3 @@ mod tests {
         assert_eq!(tags.1, "[a, b, c]");
     }
 }
-

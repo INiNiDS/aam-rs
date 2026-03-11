@@ -136,7 +136,10 @@ mod tests {
     fn test_comments_inside_quotes() {
         let content = r#"key = "value # not a comment""#;
         let parser = AAML::parse(content).expect("Should parse");
-        assert_eq!(parser.find_obj("key").unwrap().as_str(), "value # not a comment");
+        assert_eq!(
+            parser.find_obj("key").unwrap().as_str(),
+            "value # not a comment"
+        );
     }
 
     #[test]

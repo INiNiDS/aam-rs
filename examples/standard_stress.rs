@@ -10,9 +10,9 @@
 //! cargo run --release --example standard_stress
 //! ```
 
-use std::time::Instant;
 use aam_rs::aaml::AAML;
 use aam_rs::builder::AAMBuilder;
+use std::time::Instant;
 
 fn main() {
     let count = 30_000_000;
@@ -43,8 +43,12 @@ fn main() {
     let search_duration = search_start.elapsed();
 
     match result {
-        Some(v) => println!("✅ Lookup:      {:?}  (found: {})", search_duration, v.as_str()),
-        None    => println!("❌ Lookup:      {:?}  (not found)", search_duration),
+        Some(v) => println!(
+            "✅ Lookup:      {:?}  (found: {})",
+            search_duration,
+            v.as_str()
+        ),
+        None => println!("❌ Lookup:      {:?}  (not found)", search_duration),
     }
 
     println!("---");

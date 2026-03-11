@@ -7,21 +7,21 @@
 //! - Runtime type validation via registered or built-in types
 //! - Schema-based struct validation with [`AAML::apply_schema`]
 
+use crate::commands::schema::SchemaDef;
 use crate::commands::{self, Command};
 use crate::error::AamlError;
-use crate::commands::schema::SchemaDef;
-use crate::types::{resolve_builtin, Type};
+use crate::types::list::ListType;
+use crate::types::{Type, resolve_builtin};
 use std::collections::HashMap;
 use std::fs;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 use std::sync::Arc;
-use crate::types::list::ListType;
 
 mod lookup;
-mod validation;
 pub mod parsing;
 pub mod types_registry;
+mod validation;
 
 #[cfg(feature = "serde")]
 pub mod serialize;
@@ -110,7 +110,8 @@ impl AAML {
 
     /// Registers a custom command handler.
     pub fn register_command<C: Command + 'static>(&mut self, command: C) {
-        self.commands.insert(command.name().to_string(), Arc::new(command));
+        self.commands
+            .insert(command.name().to_string(), Arc::new(command));
     }
 
     /// Registers a named type definition for use in schema field validation.
@@ -252,7 +253,9 @@ impl AAML {
             }
         }
 
-        self.get_schemas_mut().entry(name.to_string()).or_insert(schema);
+        self.get_schemas_mut()
+            .entry(name.to_string())
+            .or_insert(schema);
         Ok(())
     }
 
@@ -346,4 +349,3 @@ impl Default for AAML {
         Self::new()
     }
 }
-

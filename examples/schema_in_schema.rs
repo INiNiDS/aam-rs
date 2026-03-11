@@ -39,7 +39,7 @@ fn main() {
 
 fn section_1_inline_nested() {
     section("1. Nested schema: Server { address: Address }");
-    
+
     let src = "
         @schema Address {
             host: string
@@ -78,7 +78,6 @@ fn section_1_inline_nested() {
 fn section_2_optional_fields() {
     section("2. Optional fields marked with *");
 
-
     let src = "
         @schema Config {
             app_name: string
@@ -92,26 +91,29 @@ fn section_2_optional_fields() {
 
     // All required fields present, all optional absent
     let minimal: HashMap<String, String> = [
-        ("app_name".into(),    "MyApp".into()),
+        ("app_name".into(), "MyApp".into()),
         ("max_retries".into(), "3".into()),
-    ].into();
+    ]
+    .into();
     check(&cfg, "Config", &minimal, "only required fields    → ✔");
 
     // All fields present
     let full: HashMap<String, String> = [
-        ("app_name".into(),    "MyApp".into()),
+        ("app_name".into(), "MyApp".into()),
         ("max_retries".into(), "5".into()),
-        ("log_level".into(),   "debug".into()),
-        ("debug".into(),       "true".into()),
-        ("timeout".into(),     "30.0".into()),
-    ].into();
+        ("log_level".into(), "debug".into()),
+        ("debug".into(), "true".into()),
+        ("timeout".into(), "30.0".into()),
+    ]
+    .into();
     check(&cfg, "Config", &full, "all fields present      → ✔");
 
     // Missing required field
     let missing: HashMap<String, String> = [
         ("app_name".into(), "Partial".into()),
         // max_retries intentionally omitted
-    ].into();
+    ]
+    .into();
     check(&cfg, "Config", &missing, "max_retries missing     → ✘");
 }
 
@@ -119,7 +121,6 @@ fn section_2_optional_fields() {
 
 fn section_3_list_of_primitives() {
     section("3. list<string> and list<i32>");
-
 
     let src = "
         @schema Profile {
@@ -133,26 +134,39 @@ fn section_3_list_of_primitives() {
 
     let ok: HashMap<String, String> = [
         ("username".into(), "alice".into()),
-        ("tags".into(),     "[rust, systems, embedded]".into()),
-        ("scores".into(),   "[100, 250, 375]".into()),
+        ("tags".into(), "[rust, systems, embedded]".into()),
+        ("scores".into(), "[100, 250, 375]".into()),
         // nicknames* omitted
-    ].into();
+    ]
+    .into();
     check(&cfg, "Profile", &ok, "tags + scores, no nicknames* → ✔");
 
     let with_opt: HashMap<String, String> = [
-        ("username".into(),  "bob".into()),
-        ("tags".into(),      "[gamedev, audio]".into()),
-        ("scores".into(),    "[42, 77]".into()),
+        ("username".into(), "bob".into()),
+        ("tags".into(), "[gamedev, audio]".into()),
+        ("scores".into(), "[42, 77]".into()),
         ("nicknames".into(), "[Bobby, B-man]".into()),
-    ].into();
-    check(&cfg, "Profile", &with_opt, "all including nicknames*     → ✔");
+    ]
+    .into();
+    check(
+        &cfg,
+        "Profile",
+        &with_opt,
+        "all including nicknames*     → ✔",
+    );
 
     let bad_score: HashMap<String, String> = [
         ("username".into(), "carol".into()),
-        ("tags".into(),     "[tag]".into()),
-        ("scores".into(),   "[1, two, 3]".into()),  // "two" is not i32
-    ].into();
-    check(&cfg, "Profile", &bad_score, "scores contains 'two'        → ✘");
+        ("tags".into(), "[tag]".into()),
+        ("scores".into(), "[1, two, 3]".into()), // "two" is not i32
+    ]
+    .into();
+    check(
+        &cfg,
+        "Profile",
+        &bad_score,
+        "scores contains 'two'        → ✘",
+    );
 }
 
 // ── 4. list<Schema> ──────────────────────────────────────────────────────────
@@ -170,34 +184,51 @@ fn section_4_list_of_schemas() {
 
     let chest_ok: HashMap<String, String> = [
         ("chest_name".into(), "Ancient Chest".into()),
-        ("gold".into(),       "250".into()),
-        ("loot".into(),
-         "[{ item_name = Iron Sword, item_weight = 3.2 }, \
-           { item_name = Magic Gem, item_weight = 0.1, item_rare = true }]".into()),
-    ].into();
+        ("gold".into(), "250".into()),
+        (
+            "loot".into(),
+            "[{ item_name = Iron Sword, item_weight = 3.2 }, \
+           { item_name = Magic Gem, item_weight = 0.1, item_rare = true }]"
+                .into(),
+        ),
+    ]
+    .into();
     check(&cfg, "Chest", &chest_ok, "2 valid Items, no owner*   → ✔");
 
     let chest_full: HashMap<String, String> = [
         ("chest_name".into(), "Boss Chest".into()),
-        ("gold".into(),       "999".into()),
-        ("loot".into(),
-         "[{ item_name = Dragon Scale, item_weight = 5.0, item_rare = true }]".into()),
-        ("owner".into(),      "DragonKing".into()),
-    ].into();
+        ("gold".into(), "999".into()),
+        (
+            "loot".into(),
+            "[{ item_name = Dragon Scale, item_weight = 5.0, item_rare = true }]".into(),
+        ),
+        ("owner".into(), "DragonKing".into()),
+    ]
+    .into();
     check(&cfg, "Chest", &chest_full, "1 Item + owner*            → ✔");
 
     let chest_bad: HashMap<String, String> = [
         ("chest_name".into(), "Broken Chest".into()),
-        ("gold".into(),       "10".into()),
-        ("loot".into(), "[{ item_name = Junk, item_weight = heavy }]".into()),
-    ].into();
+        ("gold".into(), "10".into()),
+        (
+            "loot".into(),
+            "[{ item_name = Junk, item_weight = heavy }]".into(),
+        ),
+    ]
+    .into();
     check(&cfg, "Chest", &chest_bad, "item_weight = 'heavy'      → ✘");
 
     let chest_no_gold: HashMap<String, String> = [
         ("chest_name".into(), "Empty Chest".into()),
-        ("loot".into(),       "[]".into()),
-    ].into();
-    check(&cfg, "Chest", &chest_no_gold, "gold field missing         → ✘");
+        ("loot".into(), "[]".into()),
+    ]
+    .into();
+    check(
+        &cfg,
+        "Chest",
+        &chest_no_gold,
+        "gold field missing         → ✘",
+    );
 }
 
 // ── 5. File-based load ────────────────────────────────────────────────────────
@@ -210,12 +241,22 @@ fn section_5_file_based() {
             println!("   ✔ Loaded config_base.aam\n");
             println!("   Schemas in file:");
             for name in &["Address", "Database", "Server"] {
-                let marker = if cfg.get_schema(name).is_some() { "✔" } else { "✗" };
+                let marker = if cfg.get_schema(name).is_some() {
+                    "✔"
+                } else {
+                    "✗"
+                };
                 println!("     {marker} {name}");
             }
             println!();
             println!("   Values:");
-            for key in &["app_env", "build_id", "description", "tags", "feature_flags"] {
+            for key in &[
+                "app_env",
+                "build_id",
+                "description",
+                "tags",
+                "feature_flags",
+            ] {
                 print_key(&cfg, key);
             }
             println!();
@@ -232,19 +273,21 @@ fn section_5_file_based() {
 
 fn check(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) {
     match cfg.apply_schema(schema, data) {
-        Ok(()) =>
-            println!("   ✔ {label}"),
-        Err(AamlError::SchemaValidationError { field, type_name, details, .. }) =>
-            println!("   ✔ {label}\n       ↳ field '{field}' ({type_name}): {details}"),
-        Err(e) =>
-            eprintln!("   ✘ {label} — unexpected: {e}"),
+        Ok(()) => println!("   ✔ {label}"),
+        Err(AamlError::SchemaValidationError {
+            field,
+            type_name,
+            details,
+            ..
+        }) => println!("   ✔ {label}\n       ↳ field '{field}' ({type_name}): {details}"),
+        Err(e) => eprintln!("   ✘ {label} — unexpected: {e}"),
     }
 }
 
 fn print_key(cfg: &AAML, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {key:>15} = {v}"),
-        None    => println!("   {key:>15} = <not found>"),
+        None => println!("   {key:>15} = <not found>"),
     }
 }
 

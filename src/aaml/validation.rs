@@ -46,19 +46,27 @@ impl AAML {
 
         // 1. Registered custom type alias
         if let Some(type_def) = self.types.get(type_name) {
-            return type_def.validate(value, self).map_err(|e| make_err(e.to_string()));
+            return type_def
+                .validate(value, self)
+                .map_err(|e| make_err(e.to_string()));
         }
 
         // 2. Nested schema — type_name matches a registered schema name
         if let Some(nested_schema) = self.schemas.get(type_name) {
             return self
-                .validate_inline_object_against_schema(value, type_name, nested_schema.fields.clone())
+                .validate_inline_object_against_schema(
+                    value,
+                    type_name,
+                    nested_schema.fields.clone(),
+                )
                 .map_err(|e| make_err(e.to_string()));
         }
 
         // 3. Built-in types
         match resolve_builtin(type_name) {
-            Ok(type_def) => type_def.validate(value, self).map_err(|e| make_err(e.to_string())),
+            Ok(type_def) => type_def
+                .validate(value, self)
+                .map_err(|e| make_err(e.to_string())),
             Err(_) => Err(make_err(format!("Unknown type '{}'", type_name))),
         }
     }
@@ -136,11 +144,18 @@ impl AAML {
     // Medium Complexity
     /// Checks required fields only for the named schemas.
     /// Used by `@derive` to validate only child-defined schemas, not inherited ones.
-    pub fn validate_schemas_completeness_for(&self, schema_names: &[&str]) -> Result<(), AamlError> {
+    pub fn validate_schemas_completeness_for(
+        &self,
+        schema_names: &[&str],
+    ) -> Result<(), AamlError> {
         for name in schema_names {
-            let Some(schema_def) = self.schemas.get(*name) else { continue };
+            let Some(schema_def) = self.schemas.get(*name) else {
+                continue;
+            };
             for (field, type_name) in &schema_def.fields {
-                if schema_def.is_optional(field) { continue; }
+                if schema_def.is_optional(field) {
+                    continue;
+                }
                 if !self.map.contains_key(field.as_str()) {
                     return Err(AamlError::SchemaValidationError {
                         schema: name.to_string(),
@@ -167,9 +182,10 @@ impl AAML {
         schema_name: &str,
         data: &HashMap<String, String>,
     ) -> Result<(), AamlError> {
-        let schema = self.schemas.get(schema_name).ok_or_else(|| {
-            AamlError::NotFound(format!("Schema '{}' not found", schema_name))
-        })?;
+        let schema = self
+            .schemas
+            .get(schema_name)
+            .ok_or_else(|| AamlError::NotFound(format!("Schema '{}' not found", schema_name)))?;
 
         let fields: Vec<(String, String)> = schema
             .fields
@@ -200,4 +216,3 @@ impl AAML {
         Ok(())
     }
 }
-

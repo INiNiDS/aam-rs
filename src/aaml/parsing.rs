@@ -11,11 +11,9 @@ pub fn strip_comment(line: &str) -> &str {
     for (idx, c) in line.char_indices() {
         match (quote_state, c) {
             (None, '#') => {
-                let preceded_by_space = idx == 0
-                    || bytes.get(idx - 1).is_some_and(|b| b.is_ascii_whitespace());
-                let followed_by_space = bytes
-                    .get(idx + 1)
-                    .is_none_or(|b| b.is_ascii_whitespace());
+                let preceded_by_space =
+                    idx == 0 || bytes.get(idx - 1).is_some_and(|b| b.is_ascii_whitespace());
+                let followed_by_space = bytes.get(idx + 1).is_none_or(|b| b.is_ascii_whitespace());
                 if preceded_by_space && followed_by_space {
                     return &line[..idx];
                 }
@@ -113,7 +111,7 @@ pub fn is_inline_object(value: &str) -> bool {
 ///
 /// Field separators are commas respecting `{}` / `[]` nesting, so values like
 /// `{ base = { x = 1, y = 2 }, z = 3 }` are parsed correctly.
-// Medium Complexity 
+// Medium Complexity
 pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, String> {
     let s = value.trim();
     let inner = s
@@ -124,7 +122,9 @@ pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, String>
     let mut fields = Vec::new();
     for entry in split_top_level_fields(inner) {
         let entry = entry.trim().to_string();
-        if entry.is_empty() { continue; }
+        if entry.is_empty() {
+            continue;
+        }
 
         let (k, v) = split_field_pair(&entry)?;
         let k = k.trim();
@@ -148,13 +148,21 @@ fn split_top_level_fields(s: &str) -> Vec<String> {
     let mut cur = String::new();
     for ch in s.chars() {
         match ch {
-            '{' | '[' => { depth += 1; cur.push(ch); }
-            '}' | ']' => { depth -= 1; cur.push(ch); }
+            '{' | '[' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            '}' | ']' => {
+                depth -= 1;
+                cur.push(ch);
+            }
             ',' if depth == 0 => {
                 items.push(cur.clone());
                 cur.clear();
             }
-            _ => { cur.push(ch); }
+            _ => {
+                cur.push(ch);
+            }
         }
     }
     items.push(cur);
@@ -172,5 +180,7 @@ fn split_field_pair(entry: &str) -> Result<(&str, &str), String> {
             _ => {}
         }
     }
-    Err(format!("Inline object field '{entry}' has no '=' or ':' separator"))
+    Err(format!(
+        "Inline object field '{entry}' has no '=' or ':' separator"
+    ))
 }

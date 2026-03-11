@@ -4,7 +4,6 @@ mod tests {
     use aam_rs::builder::AAMBuilder;
     use std::fs;
 
-
     #[test]
     fn test_parse_error_missing_equals() {
         let content = "invalid_line_without_equals";

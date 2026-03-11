@@ -37,10 +37,10 @@ fn section_1_simple_kv() {
     section("1. Simple key-value document");
 
     let mut b = AAMBuilder::new();
-    b.add_line("host",    "localhost");
-    b.add_line("port",    "5432");
+    b.add_line("host", "localhost");
+    b.add_line("port", "5432");
     b.add_line("db_name", "my_database");
-    b.add_line("user",    "admin");
+    b.add_line("user", "admin");
 
     let content = b.build();
     println!("   Generated AAML:\n");
@@ -62,17 +62,20 @@ fn section_2_schema_required_optional() {
     section("2. Schema — required + optional fields");
 
     let mut b = AAMBuilder::new();
-    b.schema_multiline("AppConfig", [
-        SchemaField::required("app_name",    "string"),
-        SchemaField::required("max_retries", "i32"),
-        SchemaField::required("timeout",     "f64"),
-        SchemaField::optional("log_level",   "string"),
-        SchemaField::optional("debug",       "bool"),
-    ]);
+    b.schema_multiline(
+        "AppConfig",
+        [
+            SchemaField::required("app_name", "string"),
+            SchemaField::required("max_retries", "i32"),
+            SchemaField::required("timeout", "f64"),
+            SchemaField::optional("log_level", "string"),
+            SchemaField::optional("debug", "bool"),
+        ],
+    );
     // Required fields only (optional ones deliberately omitted)
-    b.add_line("app_name",    "MyService");
+    b.add_line("app_name", "MyService");
     b.add_line("max_retries", "3");
-    b.add_line("timeout",     "30.0");
+    b.add_line("timeout", "30.0");
 
     let content = b.build();
     println!("   Generated AAML:\n");
@@ -101,15 +104,18 @@ fn section_3_list_field() {
     section("3. list<string> and list<i32> fields");
 
     let mut b = AAMBuilder::new();
-    b.schema_multiline("Route", [
-        SchemaField::required("path",    "string"),
-        SchemaField::required("methods", "list<string>"),
-        SchemaField::required("codes",   "list<i32>"),
-        SchemaField::optional("tags",    "list<string>"),
-    ]);
-    b.add_line("path",    "/api/users");
+    b.schema_multiline(
+        "Route",
+        [
+            SchemaField::required("path", "string"),
+            SchemaField::required("methods", "list<string>"),
+            SchemaField::required("codes", "list<i32>"),
+            SchemaField::optional("tags", "list<string>"),
+        ],
+    );
+    b.add_line("path", "/api/users");
     b.add_line("methods", "[GET, POST, DELETE]");
-    b.add_line("codes",   "[200, 201, 204, 400, 404]");
+    b.add_line("codes", "[200, 201, 204, 400, 404]");
     // tags* omitted
 
     let content = b.build();
@@ -133,20 +139,29 @@ fn section_4_inline_object() {
     section("4. Inline nested object — Address inside Server");
 
     let mut b = AAMBuilder::new();
-    b.schema("Address", [
-        SchemaField::required("host", "string"),
-        SchemaField::required("port", "i32"),
-        SchemaField::optional("tls",  "bool"),
-    ]);
-    b.schema("Server", [
-        SchemaField::required("name",    "string"),
-        SchemaField::required("address", "Address"),
-        SchemaField::required("workers", "i32"),
-    ]);
-    b.add_line("name",    "ApiGateway");
+    b.schema(
+        "Address",
+        [
+            SchemaField::required("host", "string"),
+            SchemaField::required("port", "i32"),
+            SchemaField::optional("tls", "bool"),
+        ],
+    );
+    b.schema(
+        "Server",
+        [
+            SchemaField::required("name", "string"),
+            SchemaField::required("address", "Address"),
+            SchemaField::required("workers", "i32"),
+        ],
+    );
+    b.add_line("name", "ApiGateway");
     b.add_line("workers", "8");
     // Inline object for 'address' field — validated against Address schema
-    b.add_line("address", "{ host = gateway.example.com, port = 8443, tls = true }");
+    b.add_line(
+        "address",
+        "{ host = gateway.example.com, port = 8443, tls = true }",
+    );
 
     let content = b.build();
     match AAML::parse(&content) {
@@ -172,18 +187,24 @@ fn section_5_roundtrip_file() {
     let tmp_path = "tmp_builder_roundtrip.aam";
 
     let mut b = AAMBuilder::new();
-    b.schema("Plugin", [
-        SchemaField::required("plugin_name", "string"),
-        SchemaField::required("enabled",     "bool"),
-        SchemaField::optional("priority",    "i32"),
-    ]);
+    b.schema(
+        "Plugin",
+        [
+            SchemaField::required("plugin_name", "string"),
+            SchemaField::required("enabled", "bool"),
+            SchemaField::optional("priority", "i32"),
+        ],
+    );
     b.add_line("plugin_name", "AuthPlugin");
-    b.add_line("enabled",     "true");
+    b.add_line("enabled", "true");
     // priority* omitted
 
     match b.to_file(tmp_path) {
         Ok(()) => println!("   ✔ Written to {tmp_path}"),
-        Err(e) => { eprintln!("   ✘ Write error: {e}"); return; }
+        Err(e) => {
+            eprintln!("   ✘ Write error: {e}");
+            return;
+        }
     }
 
     match AAML::load(tmp_path) {
@@ -204,19 +225,31 @@ fn section_5_roundtrip_file() {
     println!("\n   ✔ Temporary file removed");
 
     // 5b. Intentional error: required field missing — detected via completeness check
-    println!("\n   5b. Missing required 'enabled' → expect SchemaValidationError (completeness check)");
+    println!(
+        "\n   5b. Missing required 'enabled' → expect SchemaValidationError (completeness check)"
+    );
     let mut b2 = AAMBuilder::new();
-    b2.schema("Plugin", [
-        SchemaField::required("plugin_name", "string"),
-        SchemaField::required("enabled",     "bool"),
-        SchemaField::optional("priority",    "i32"),
-    ]);
+    b2.schema(
+        "Plugin",
+        [
+            SchemaField::required("plugin_name", "string"),
+            SchemaField::required("enabled", "bool"),
+            SchemaField::optional("priority", "i32"),
+        ],
+    );
     b2.add_line("plugin_name", "BrokenPlugin");
     // enabled is intentionally omitted
 
-    match AAML::parse(&b2.build()).and_then(|cfg| { cfg.validate_schemas_completeness()?; Ok(cfg) }) {
-        Err(AamlError::SchemaValidationError { schema, field, details, .. }) =>
-            println!("   ✔ Schema '{schema}', field '{field}': {details}"),
+    match AAML::parse(&b2.build()).and_then(|cfg| {
+        cfg.validate_schemas_completeness()?;
+        Ok(cfg)
+    }) {
+        Err(AamlError::SchemaValidationError {
+            schema,
+            field,
+            details,
+            ..
+        }) => println!("   ✔ Schema '{schema}', field '{field}': {details}"),
         other => eprintln!("   ✘ Unexpected result: {other:?}"),
     }
 }
@@ -226,7 +259,7 @@ fn section_5_roundtrip_file() {
 fn print_key(cfg: &AAML, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {key:>15} = {v}"),
-        None    => println!("   {key:>15} = <not set>"),
+        None => println!("   {key:>15} = <not set>"),
     }
 }
 
@@ -262,4 +295,3 @@ fn footer() {
     println!("  Done.");
     println!("{}", "═".repeat(64));
 }
-

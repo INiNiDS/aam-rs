@@ -3,8 +3,8 @@ mod tests {
     use aam_rs::aaml::AAML;
     use aam_rs::builder::{AAMBuilder, SchemaField};
     use aam_rs::error::AamlError;
-    use std::fs;
     use std::collections::HashMap;
+    use std::fs;
 
     // ─────────────────────────────────────────────────────────────
     //  @derive tests
@@ -18,9 +18,7 @@ mod tests {
         base.add_line("shared_key", "from_base");
         base.to_file(base_file).unwrap();
 
-        let content = format!(
-            "@derive {base_file}\nchild_key = child_val\n"
-        );
+        let content = format!("@derive {base_file}\nchild_key = child_val\n");
         let parser = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
         let parser = parser.expect("Should parse @derive");
@@ -36,15 +34,16 @@ mod tests {
         base.add_line("shared_key", "from_base");
         base.to_file(base_file).unwrap();
 
-        let content = format!(
-            "shared_key = from_child\n@derive {base_file}\n"
-        );
+        let content = format!("shared_key = from_child\n@derive {base_file}\n");
         let parser = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
         let parser = parser.expect("Should parse @derive");
 
         // Child key must NOT be overwritten by base
-        assert_eq!(parser.find_obj("shared_key").unwrap().as_str(), "from_child");
+        assert_eq!(
+            parser.find_obj("shared_key").unwrap().as_str(),
+            "from_child"
+        );
     }
 
     #[test]
@@ -68,7 +67,13 @@ mod tests {
         let mut base = AAMBuilder::new();
         // Schema 'Point' declares x and y — both must be present so that the
         // completeness check inside @derive succeeds.
-        base.schema("Point", [SchemaField::required("x", "f64"), SchemaField::required("y", "f64")]);
+        base.schema(
+            "Point",
+            [
+                SchemaField::required("x", "f64"),
+                SchemaField::required("y", "f64"),
+            ],
+        );
         base.add_line("x", "1.0");
         base.add_line("y", "2.0");
         base.add_line("origin", "0.0, 0.0");
@@ -134,7 +139,9 @@ mod tests {
         let content = "@schema Player { name: string, score: i32, health: f64 }";
         let parser = AAML::parse(content).expect("Should parse schema");
 
-        let schema = parser.get_schema("Player").expect("Schema 'Player' must exist");
+        let schema = parser
+            .get_schema("Player")
+            .expect("Schema 'Player' must exist");
         assert_eq!(schema.fields.get("name").unwrap(), "string");
         assert_eq!(schema.fields.get("score").unwrap(), "i32");
         assert_eq!(schema.fields.get("health").unwrap(), "f64");
@@ -144,7 +151,9 @@ mod tests {
     fn test_schema_empty_body() {
         let content = "@schema Empty {  }";
         let parser = AAML::parse(content).expect("Should parse empty schema");
-        let schema = parser.get_schema("Empty").expect("Schema 'Empty' must exist");
+        let schema = parser
+            .get_schema("Empty")
+            .expect("Schema 'Empty' must exist");
         assert!(schema.fields.is_empty());
     }
 
@@ -255,7 +264,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-
     #[test]
     fn test_schema_field_valid_type() {
         let content = "@schema Config { retries: i32 }\nretries = 5\n";
@@ -273,7 +281,8 @@ mod tests {
         let err = result.unwrap_err();
         assert!(
             matches!(err, AamlError::SchemaValidationError { .. }),
-            "Expected SchemaValidationError, got: {}", err
+            "Expected SchemaValidationError, got: {}",
+            err
         );
     }
 
@@ -285,7 +294,8 @@ mod tests {
         let err = result.unwrap_err();
         assert!(
             matches!(err, AamlError::SchemaValidationError { .. }),
-            "Expected SchemaValidationError, got: {}", err
+            "Expected SchemaValidationError, got: {}",
+            err
         );
     }
 
@@ -293,7 +303,11 @@ mod tests {
     fn test_schema_string_type_always_valid() {
         let content = "@schema Config { name: string }\nname = hello world 123!@#\n";
         let result = AAML::parse(content);
-        assert!(result.is_ok(), "Expected Ok for string type, got: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Expected Ok for string type, got: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -307,7 +321,10 @@ mod tests {
         let content = "@schema Config { ratio: f64 }\nratio = not_a_float\n";
         let result = AAML::parse(content);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
 
     #[test]
@@ -321,7 +338,10 @@ mod tests {
         let content = "@schema Config { enabled: bool }\nenabled = yes\n";
         let result = AAML::parse(content);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
 
     #[test]
@@ -335,9 +355,12 @@ mod tests {
         let content = "@type age = i32\n@schema Person { age: age }\nage = twenty-five\n";
         let result = AAML::parse(content);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
-    
+
     #[test]
     fn test_apply_schema_all_valid() {
         let content = "@schema Player { name: string, score: i32, health: f64 }";
@@ -361,7 +384,10 @@ mod tests {
 
         let result = parser.apply_schema("Player", &data);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
 
     #[test]
@@ -374,7 +400,10 @@ mod tests {
 
         let result = parser.apply_schema("Player", &data);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
 
     #[test]
@@ -395,7 +424,10 @@ mod tests {
         let result = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
 
-        assert!(result.is_err(), "Expected Err when derived schema type is violated");
+        assert!(
+            result.is_err(),
+            "Expected Err when derived schema type is violated"
+        );
     }
 
     #[test]
@@ -409,43 +441,68 @@ mod tests {
         base.add_line("b_val", "hello");
         base.to_file(base_file).unwrap();
 
-        let content = format!(
-            "@derive {base_file}::SchemaA::SchemaB\na_val = 42\nb_val = world\n"
-        );
+        let content = format!("@derive {base_file}::SchemaA::SchemaB\na_val = 42\nb_val = world\n");
         let parser = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
         let parser = parser.expect("@derive with two selectors must succeed");
 
-        assert!(parser.get_schema("SchemaA").is_some(), "SchemaA must be imported");
-        assert!(parser.get_schema("SchemaB").is_some(), "SchemaB must be imported");
-        assert!(parser.get_schema("SchemaC").is_none(), "SchemaC must NOT be imported");
+        assert!(
+            parser.get_schema("SchemaA").is_some(),
+            "SchemaA must be imported"
+        );
+        assert!(
+            parser.get_schema("SchemaB").is_some(),
+            "SchemaB must be imported"
+        );
+        assert!(
+            parser.get_schema("SchemaC").is_none(),
+            "SchemaC must NOT be imported"
+        );
     }
 
     #[test]
     fn test_derive_selector_child_values_win() {
         let base_file = "test_derive_selector_child_wins.aam";
         let mut base = AAMBuilder::new();
-        base.schema("Config", [SchemaField::required("port", "i32"), SchemaField::required("host", "string")]);
+        base.schema(
+            "Config",
+            [
+                SchemaField::required("port", "i32"),
+                SchemaField::required("host", "string"),
+            ],
+        );
         base.add_line("port", "8080");
         base.add_line("host", "base-host");
         base.to_file(base_file).unwrap();
 
-        let content = format!(
-            "port = 9090\nhost = child-host\n@derive {base_file}::Config\n"
-        );
+        let content = format!("port = 9090\nhost = child-host\n@derive {base_file}::Config\n");
         let parser = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
         let parser = parser.expect("derive with selector must succeed");
 
-        assert_eq!(parser.find_obj("port").unwrap().as_str(), "9090", "child port wins");
-        assert_eq!(parser.find_obj("host").unwrap().as_str(), "child-host", "child host wins");
+        assert_eq!(
+            parser.find_obj("port").unwrap().as_str(),
+            "9090",
+            "child port wins"
+        );
+        assert_eq!(
+            parser.find_obj("host").unwrap().as_str(),
+            "child-host",
+            "child host wins"
+        );
     }
 
     #[test]
     fn test_derive_optional_field_absent_is_ok() {
         let base_file = "test_derive_optional_absent.aam";
         let mut base = AAMBuilder::new();
-        base.schema("Config", [SchemaField::required("timeout", "i32"), SchemaField::optional("retries", "i32")]);
+        base.schema(
+            "Config",
+            [
+                SchemaField::required("timeout", "i32"),
+                SchemaField::optional("retries", "i32"),
+            ],
+        );
         base.add_line("timeout", "30");
         base.to_file(base_file).unwrap();
 
@@ -453,18 +510,31 @@ mod tests {
         let result = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
 
-        assert!(result.is_ok(), "optional field absent must not be an error: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "optional field absent must not be an error: {:?}",
+            result.err()
+        );
         let parser = result.unwrap();
         let schema = parser.get_schema("Config").unwrap();
         assert!(schema.is_optional("retries"), "retries must be optional");
-        assert!(parser.find_obj("retries").is_none(), "retries must not be set");
+        assert!(
+            parser.find_obj("retries").is_none(),
+            "retries must not be set"
+        );
     }
 
     #[test]
     fn test_derive_optional_field_present_validated() {
         let base_file = "test_derive_optional_valid.aam";
         let mut base = AAMBuilder::new();
-        base.schema("Config", [SchemaField::required("timeout", "i32"), SchemaField::optional("retries", "i32")]);
+        base.schema(
+            "Config",
+            [
+                SchemaField::required("timeout", "i32"),
+                SchemaField::optional("retries", "i32"),
+            ],
+        );
         base.add_line("timeout", "30");
         base.to_file(base_file).unwrap();
 
@@ -476,7 +546,11 @@ mod tests {
 
         let _ = fs::remove_file(base_file);
 
-        assert!(result_ok.is_ok(), "valid optional field must pass: {:?}", result_ok.err());
+        assert!(
+            result_ok.is_ok(),
+            "valid optional field must pass: {:?}",
+            result_ok.err()
+        );
         assert!(result_bad.is_err(), "invalid optional field must fail");
         assert!(matches!(
             result_bad.unwrap_err(),
@@ -496,7 +570,10 @@ mod tests {
         let result = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
 
-        assert!(result.is_err(), "must fail for non-existent schema selector");
+        assert!(
+            result.is_err(),
+            "must fail for non-existent schema selector"
+        );
         assert!(matches!(result.unwrap_err(), AamlError::DirectiveError(..)));
     }
 
@@ -511,7 +588,10 @@ mod tests {
         let mut ok: HashMap<String, String> = HashMap::new();
         ok.insert("center".into(), "{ x = 1.0, y = 2.5 }".into());
         ok.insert("radius".into(), "5.0".into());
-        assert!(cfg.apply_schema("Circle", &ok).is_ok(), "valid Circle must pass");
+        assert!(
+            cfg.apply_schema("Circle", &ok).is_ok(),
+            "valid Circle must pass"
+        );
 
         let mut bad_center: HashMap<String, String> = HashMap::new();
         bad_center.insert("center".into(), "{ x = not_a_float, y = 2.5 }".into());
@@ -530,7 +610,10 @@ mod tests {
 
         let mut data: HashMap<String, String> = HashMap::new();
         // item_rare* не указан — это допустимо
-        data.insert("base".into(), "{ item_name = Sword, item_weight = 2.5 }".into());
+        data.insert(
+            "base".into(),
+            "{ item_name = Sword, item_weight = 2.5 }".into(),
+        );
         data.insert("damage".into(), "50".into());
 
         assert!(cfg.apply_schema("Weapon", &data).is_ok());
@@ -625,7 +708,10 @@ mod tests {
         assert!(schema.is_optional("tags"));
 
         let result = cfg.apply_schema("Meta", &HashMap::new());
-        assert!(result.is_ok(), "empty data for all-optional schema must be ok");
+        assert!(
+            result.is_ok(),
+            "empty data for all-optional schema must be ok"
+        );
     }
 
     #[test]
@@ -635,13 +721,14 @@ mod tests {
         base.add_line("some_key", "some_val");
         base.to_file(base_file).unwrap();
 
-        let content = format!(
-            "@schema Required {{ must_exist: string }}\n@derive {base_file}\n"
-        );
+        let content = format!("@schema Required {{ must_exist: string }}\n@derive {base_file}\n");
         let result = AAML::parse(&content);
         let _ = fs::remove_file(base_file);
 
         assert!(result.is_err(), "missing required field must cause error");
-        assert!(matches!(result.unwrap_err(), AamlError::SchemaValidationError { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::SchemaValidationError { .. }
+        ));
     }
 }

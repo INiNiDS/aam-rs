@@ -20,10 +20,10 @@
 //! ```
 
 pub mod aaml;
-pub mod found_value;
-pub mod error;
 pub mod builder;
 pub mod commands;
+pub mod error;
+pub mod found_value;
 mod types;
 
 #[cfg(feature = "ffi")]

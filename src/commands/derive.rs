@@ -61,7 +61,9 @@ fn parse_derive_arg(raw: &str) -> (&str, Vec<&str>) {
 }
 
 impl Command for DeriveCommand {
-    fn name(&self) -> &str { "derive" }
+    fn name(&self) -> &str {
+        "derive"
+    }
 
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
         let (path, selectors) = parse_derive_arg(args.trim());

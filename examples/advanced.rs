@@ -65,7 +65,7 @@ fn demo_selective_derive() {
             println!("   ✔ Loaded successfully\n");
             println!("   Schema presence after @derive::Player:");
             println!("     Player : {}", schema_marker(&cfg, "Player", true));
-            println!("     Item   : {}", schema_marker(&cfg, "Item",   false));
+            println!("     Item   : {}", schema_marker(&cfg, "Item", false));
             println!("     Weapon : {}", schema_marker(&cfg, "Weapon", false));
             println!();
             print_all_schemas(&cfg, &["Player"]);
@@ -76,7 +76,7 @@ fn demo_selective_derive() {
             print_key(&cfg, "equipped_ids");
             match cfg.find_obj("score") {
                 Some(v) => println!("   {:>15} = {v}", "score"),
-                None    => println!("   {:>15} = <not set — optional ✔>", "score"),
+                None => println!("   {:>15} = <not set — optional ✔>", "score"),
             }
         }
         Err(e) => eprintln!("   ✘ Unexpected error: {e}"),
@@ -103,26 +103,43 @@ fn demo_nested_schema_validation() {
     validate(&cfg, "Weapon", &w, "Weapon with description*     → ✔");
 
     let w_bad = make_weapon("{ item_name = Stick, item_weight = bad_num }", "5", None);
-    validate(&cfg, "Weapon", &w_bad, "item_weight = bad_num        → ✘ expect error");
+    validate(
+        &cfg,
+        "Weapon",
+        &w_bad,
+        "item_weight = bad_num        → ✘ expect error",
+    );
 
     let w_no_base: HashMap<String, String> = [("damage".into(), "10".into())].into();
-    validate(&cfg, "Weapon", &w_no_base, "base missing                 → ✘ expect error");
+    validate(
+        &cfg,
+        "Weapon",
+        &w_no_base,
+        "base missing                 → ✘ expect error",
+    );
 }
 
 fn make_weapon(base: &str, damage: &str, desc: Option<&str>) -> HashMap<String, String> {
     let mut m: HashMap<String, String> = [
         ("base".into(), base.into()),
         ("damage".into(), damage.into()),
-    ].into();
-    if let Some(d) = desc { m.insert("description".into(), d.into()); }
+    ]
+    .into();
+    if let Some(d) = desc {
+        m.insert("description".into(), d.into());
+    }
     m
 }
 
 fn validate(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) {
     match cfg.apply_schema(schema, data) {
         Ok(()) => println!("   ✔ {label}"),
-        Err(AamlError::SchemaValidationError { field, type_name, details, .. }) =>
-            println!("   ✔ {label}\n       ↳ field '{field}' ({type_name}): {details}"),
+        Err(AamlError::SchemaValidationError {
+            field,
+            type_name,
+            details,
+            ..
+        }) => println!("   ✔ {label}\n       ↳ field '{field}' ({type_name}): {details}"),
         Err(e) => eprintln!("   ✘ {label} — unexpected error: {e}"),
     }
 }
@@ -143,7 +160,8 @@ fn demo_list_of_schemas() {
     chest_ok.insert(
         "loot".into(),
         "[{ item_name = Gold Coin, item_weight = 0.1 }, \
-          { item_name = Gem, item_weight = 0.3, item_rare = true }]".into(),
+          { item_name = Gem, item_weight = 0.3, item_rare = true }]"
+            .into(),
     );
     validate(&cfg, "Chest", &chest_ok, "two valid Items in loot   → ✔");
 
@@ -152,7 +170,12 @@ fn demo_list_of_schemas() {
         "loot".into(),
         "[{ item_name = Broken, item_weight = bad_weight }]".into(),
     );
-    validate(&cfg, "Chest", &chest_bad, "item_weight = bad_weight  → ✘ expect error");
+    validate(
+        &cfg,
+        "Chest",
+        &chest_bad,
+        "item_weight = bad_weight  → ✘ expect error",
+    );
 }
 
 // ── Section 5: @derive with two schemas ──────────────────────────────────────
@@ -175,7 +198,7 @@ fn demo_derive_two_schemas() {
             println!("   ✔ Loaded successfully\n");
             println!("   Schema presence:");
             println!("     Player : {}", schema_marker(&cfg, "Player", true));
-            println!("     Item   : {}", schema_marker(&cfg, "Item",   true));
+            println!("     Item   : {}", schema_marker(&cfg, "Item", true));
             println!("     Weapon : {}", schema_marker(&cfg, "Weapon", false));
             println!();
             print_all_schemas(&cfg, &["Player", "Item"]);
@@ -196,10 +219,8 @@ fn demo_derive_nonexistent_schema() {
     println!("   @derive advanced_base.aam::NonExistentSchema\n");
 
     match AAML::parse("@derive advanced_base.aam::NonExistentSchema\n") {
-        Err(AamlError::DirectiveError(cmd, msg)) =>
-            println!("   ✔ @{cmd}: {msg}"),
-        other =>
-            eprintln!("   ✘ Unexpected result: {other:?}"),
+        Err(AamlError::DirectiveError(cmd, msg)) => println!("   ✔ @{cmd}: {msg}"),
+        other => eprintln!("   ✘ Unexpected result: {other:?}"),
     }
 }
 
@@ -231,17 +252,17 @@ fn footer() {
 /// and whether that matches the expectation (`expect_present`).
 fn schema_marker(cfg: &AAML, name: &str, expect_present: bool) -> &'static str {
     match (cfg.get_schema(name).is_some(), expect_present) {
-        (true,  true)  => "present  ✔",
+        (true, true) => "present  ✔",
         (false, false) => "absent   ✔",
-        (true,  false) => "present  ✗ (unexpected!)",
-        (false, true)  => "absent   ✗ (expected!)",
+        (true, false) => "present  ✗ (unexpected!)",
+        (false, true) => "absent   ✗ (expected!)",
     }
 }
 
 fn print_key(cfg: &AAML, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {:>15} = {v}", key),
-        None    => println!("   {:>15} = <not found>", key),
+        None => println!("   {:>15} = <not found>", key),
     }
 }
 

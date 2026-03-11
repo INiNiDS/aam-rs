@@ -7,10 +7,10 @@
 use crate::aaml::AAML;
 use crate::error::AamlError;
 
+pub mod derive;
 pub mod import;
 pub mod schema;
 pub mod typecm;
-pub mod derive;
 
 /// Trait implemented by every AAML directive handler.
 ///
