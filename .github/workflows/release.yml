@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Force publish to crates.io even if no new version is detected (useful for hotfixes or manual releases)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -60,7 +66,7 @@ jobs:
 
   build-c-libs:
       needs: release-please
-      if: ${{ needs.release-please.outputs.release_created == 'true' }}
+      if: ${{ needs.release-please.outputs.release_created == 'true' || github.event.inputs.force_publish == 'true' }}
       strategy:
         matrix:
           include:
