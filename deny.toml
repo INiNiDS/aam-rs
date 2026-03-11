@@ -11,10 +11,10 @@ allow = [
 
 [advisories]
 version = 2
-vulnerability = "deny"
-unmaintained = "deny"
-unsound = "deny"
-notice = "deny"
+vulnerability = "all"
+unmaintained = "all"
+unsound = "all"
+notice = "all"
 
 [bans]
 multiple-versions = "warn"
