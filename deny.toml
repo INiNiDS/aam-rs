@@ -11,10 +11,7 @@ allow = [
 
 [advisories]
 version = 2
-vulnerability = "all"
 unmaintained = "all"
-unsound = "all"
-notice = "all"
 
 [bans]
 multiple-versions = "warn"
