@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/INiNiDS/aam-rs/compare/v1.3.1...v1.3.2) (2026-03-11)
+
+
+### Bug Fixes
+
+* Deleted unnecessary file ([ac64d9a](https://github.com/INiNiDS/aam-rs/commit/ac64d9a5cbb798485aaaf157e59fde83325b4acf))
+
 ## [1.3.1](https://github.com/INiNiDS/aam-rs/compare/v1.3.0...v1.3.1) (2026-03-11)
 
 
