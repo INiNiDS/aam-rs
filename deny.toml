@@ -1,0 +1,14 @@
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "LGPL-2.1-or-later",
+]
+copyleft = "deny"
+confidence-threshold = 0.8
+
+[licenses.private]
+ignore = false
