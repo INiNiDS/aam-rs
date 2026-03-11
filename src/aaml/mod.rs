@@ -212,7 +212,7 @@ impl AAML {
             return Ok(None);
         }
 
-        self.process_line(line, line_num)?;
+        self.process_stripped_line(stripped, line_num)?;
         Ok(None)
     }
 
@@ -276,6 +276,10 @@ impl AAML {
 
     fn process_line(&mut self, raw_line: &str, line_num: usize) -> Result<(), AamlError> {
         let line = parsing::strip_comment(raw_line).trim();
+        self.process_stripped_line(line, line_num)
+    }
+
+    fn process_stripped_line(&mut self, line: &str, line_num: usize) -> Result<(), AamlError> {
         if line.is_empty() {
             return Ok(());
         }

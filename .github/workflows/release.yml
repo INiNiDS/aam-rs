@@ -105,19 +105,19 @@ jobs:
             cbindgen --config cbindgen.toml --crate ${{ github.event.repository.name }} --output package/include/mylib.h
 
             if [ "${{ runner.os }}" == "Windows" ]; then
-              cp target/release/mylib.dll package/bin/
-              cp target/release/mylib.dll.lib package/lib/ # Важно для MSVC!
+              cp target/release/libaam_rs.dll package/bin/
+              cp target/release/libaam_rs.dll.lib package/lib/ # For MSVC, copy the .lib file as well
             elif [ "${{ runner.os }}" == "macOS" ]; then
-              cp target/release/libmylib.dylib package/lib/
+              cp target/release/libaam_rs.dylib package/lib/
             else
-              cp target/release/libmylib.so package/lib/
+              cp target/release/libaam_rs.so package/lib/
             fi
 
         - name: Zip Package
           run: |
             cd package
             zip -r ../${{ matrix.artifact_name }}.zip ./*
-  
+
         - name: Upload Release Artifact
           uses: softprops/action-gh-release@v2
           with:

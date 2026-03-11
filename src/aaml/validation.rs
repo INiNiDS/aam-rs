@@ -53,12 +53,9 @@ impl AAML {
 
         // 2. Nested schema — type_name matches a registered schema name
         if let Some(nested_schema) = self.schemas.get(type_name) {
+            let fields = nested_schema.fields.clone();
             return self
-                .validate_inline_object_against_schema(
-                    value,
-                    type_name,
-                    nested_schema.fields.clone(),
-                )
+                .validate_inline_object_against_schema(value, type_name, &fields)
                 .map_err(|e| make_err(e.to_string()));
         }
 
@@ -81,7 +78,7 @@ impl AAML {
         &self,
         value: &str,
         schema_name: &str,
-        schema_fields: HashMap<String, String>,
+        schema_fields: &HashMap<String, String>,
     ) -> Result<(), AamlError> {
         if !parsing::is_inline_object(value) {
             return Err(AamlError::InvalidValue(format!(
@@ -109,7 +106,7 @@ impl AAML {
             .map(|s| s.optional_fields.clone())
             .unwrap_or_default();
 
-        for (field, type_name) in &schema_fields {
+        for (field, type_name) in schema_fields.iter() {
             match pair_map.get(field.as_str()) {
                 None => {
                     // Missing field — only an error for required fields
@@ -187,18 +184,10 @@ impl AAML {
             .get(schema_name)
             .ok_or_else(|| AamlError::NotFound(format!("Schema '{}' not found", schema_name)))?;
 
-        let fields: Vec<(String, String)> = schema
-            .fields
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-
-        let optional = schema.optional_fields.clone();
-
-        for (field, type_name) in &fields {
+        for (field, type_name) in &schema.fields {
             match data.get(field) {
                 None => {
-                    if !optional.contains(field.as_str()) {
+                    if !schema.optional_fields.contains(field.as_str()) {
                         return Err(AamlError::SchemaValidationError {
                             schema: schema_name.to_string(),
                             field: field.clone(),

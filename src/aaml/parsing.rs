@@ -111,61 +111,57 @@ pub fn is_inline_object(value: &str) -> bool {
 ///
 /// Field separators are commas respecting `{}` / `[]` nesting, so values like
 /// `{ base = { x = 1, y = 2 }, z = 3 }` are parsed correctly.
-// Medium Complexity
 pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, String> {
-    let s = value.trim();
-    let inner = s
+    let inner = value
+        .trim()
         .strip_prefix('{')
         .and_then(|s| s.strip_suffix('}'))
         .ok_or_else(|| format!("Inline object must be wrapped in '{{}}', got: '{value}'"))?;
 
-    let mut fields = Vec::new();
-    for entry in split_top_level_fields(inner) {
-        let entry = entry.trim().to_string();
-        if entry.is_empty() {
-            continue;
-        }
+    split_top_level_fields(inner)
+        .into_iter()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|entry| {
+            let (k, v) = split_field_pair(entry)?;
+            let k = k.trim();
 
-        let (k, v) = split_field_pair(&entry)?;
-        let k = k.trim();
-        let v = if v.trim().starts_with('{') || v.trim().starts_with('[') {
-            v.trim()
-        } else {
-            unwrap_quotes(v.trim())
-        };
-        if k.is_empty() {
-            return Err(format!("Empty key in inline object field '{entry}'"));
-        }
-        fields.push((k.to_string(), v.to_string()));
-    }
-    Ok(fields)
+            if k.is_empty() {
+                return Err(format!("Empty key in inline object field '{entry}'"));
+            }
+
+            let v = v.trim();
+            let final_v = match v.chars().next() {
+                Some('{') | Some('[') => v,
+                _ => unwrap_quotes(v),
+            };
+
+            Ok((k.to_string(), final_v.to_string()))
+        })
+        .collect()
 }
 
 /// Splits `s` on commas that are not inside `{}` or `[]` nesting.
-fn split_top_level_fields(s: &str) -> Vec<String> {
+fn split_top_level_fields(s: &str) -> Vec<&str> {
     let mut items = Vec::new();
     let mut depth: i32 = 0;
-    let mut cur = String::new();
-    for ch in s.chars() {
+    let mut start = 0;
+
+    for (i, ch) in s.char_indices() {
         match ch {
-            '{' | '[' => {
-                depth += 1;
-                cur.push(ch);
-            }
-            '}' | ']' => {
-                depth -= 1;
-                cur.push(ch);
-            }
+            '{' | '[' => depth += 1,
+            '}' | ']' => depth -= 1,
             ',' if depth == 0 => {
-                items.push(cur.clone());
-                cur.clear();
+                items.push(&s[start..i]);
+                start = i + 1;
             }
-            _ => {
-                cur.push(ch);
-            }
+            _ => {}
         }
     }
-    items.push(cur);
+    if start <= s.len() {
+        items.push(&s[start..]);
+    }
+
     items
 }
 

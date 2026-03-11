@@ -33,7 +33,6 @@ impl Type for MathTypes {
     }
 
     fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
-        let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
         let expected_len = match self {
             MathTypes::Vector2 => 2,
             MathTypes::Vector3 => 3,
@@ -42,18 +41,20 @@ impl Type for MathTypes {
             MathTypes::Matrix4x4 => 16,
         };
 
-        if parts.len() != expected_len {
-            return Err(AamlError::InvalidValue(format!(
-                "Expected {} components, got {}",
-                expected_len,
-                parts.len()
-            )));
-        }
-
-        for part in parts {
+        let mut count = 0usize;
+        for part in value.split(',') {
+            let part = part.trim();
             if part.parse::<f64>().is_err() {
                 return Err(AamlError::InvalidValue(format!("Invalid number: {}", part)));
             }
+            count += 1;
+        }
+
+        if count != expected_len {
+            return Err(AamlError::InvalidValue(format!(
+                "Expected {} components, got {}",
+                expected_len, count
+            )));
         }
 
         Ok(())

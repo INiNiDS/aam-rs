@@ -17,7 +17,7 @@ fn main() {
 
     if let Some(d) = parser.find_obj("c") {
         println!("{}", d);
-        if let Some(e) = parser.find_obj(&**d) {
+        if let Some(e) = parser.find_obj(&*d) {
             println!("{}", e);
         }
     } else {

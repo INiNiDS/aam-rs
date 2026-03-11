@@ -50,7 +50,6 @@ impl FoundValue {
     /// ```
     pub fn as_list(&self) -> Option<Vec<String>> {
         ListType::parse_items(&self.inner)
-            .map(|items| items.iter().map(|s| s.to_string()).collect())
     }
 
     /// Parses the value as an inline object `{ k = v, ... }` and returns a
@@ -100,12 +99,12 @@ impl PartialEq<&str> for FoundValue {
 
 impl Display for FoundValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.clone())
+        f.write_str(&self.inner)
     }
 }
 
 impl Deref for FoundValue {
-    type Target = String;
+    type Target = str;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
