@@ -265,6 +265,19 @@ impl AAML {
         }
     }
 
+    /// Returns all keys currently stored in the map.
+    pub fn keys(&self) -> Vec<&str> {
+        self.map.keys().map(|k| k.as_ref()).collect()
+    }
+
+    /// Returns all key-value pairs as a `HashMap<String, String>`.
+    pub fn to_map(&self) -> HashMap<String, String> {
+        self.map
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     fn register_default_commands(&mut self) {

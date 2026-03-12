@@ -28,3 +28,15 @@ mod types;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
+
+#[cfg(feature = "python")]
+pub mod python;
+
+/// Python extension-module entry point, compiled only with `--features python`.
+///
+/// In Python: `from aam_rs import AAML`
+#[cfg(feature = "python")]
+#[pyo3::pymodule]
+fn aam_rs(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
+    python::register(m)
+}
