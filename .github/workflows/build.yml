@@ -110,7 +110,6 @@ jobs:
           files: ${{ matrix.artifact_name }}.zip
 
   linux:
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -153,7 +152,6 @@ jobs:
           path: dist
 
   musllinux:
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -192,7 +190,6 @@ jobs:
           path: dist
 
   windows:
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -235,7 +232,6 @@ jobs:
           path: dist
 
   macos:
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -268,7 +264,6 @@ jobs:
           path: dist
 
   sdist:
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -286,7 +281,6 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [ linux, musllinux, windows, macos, sdist ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
