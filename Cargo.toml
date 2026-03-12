@@ -15,7 +15,7 @@ categories = [
 [dependencies]
 ahash = {version = "0.8.12", optional = true}
 serde = {version = "1.0.228", features = ["derive"], optional = true}
-pyo3 = { version = "0.23", optional = true, features = ["extension-module", "abi3-py38"] }
+pyo3 = { version = "0.28", optional = true, features = ["extension-module", "abi3-py38"] }
 
 [features]
 default = []
