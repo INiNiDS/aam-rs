@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      force_publish:
-        description: 'Force publish to crates.io even if no new version is detected (useful for hotfixes or manual releases)'
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -66,7 +60,7 @@ jobs:
 
   build-c-libs:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' || github.event.inputs.force_publish == 'true' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -102,22 +96,23 @@ jobs:
         run: |
           mkdir -p package/include package/lib/cmake/aam-c package/bin package/examples
           
-          cbindgen --config cbindgen.toml --crate ${{ github.event.repository.name }} --output package/include/aam-c.h
+          cbindgen --config cbindgen.toml --crate aam_rs --output package/include/aam-c.h
           
           cp LICENSE package/ 2>/dev/null || true
-          cp  examples/*.aam package/examples/ 2>/dev/null || true
-          cp  examples/*.c package/examples/ 2>/dev/null || true
-          cp  examples/Makefile package/examples/ 2>/dev/null || true
+          cp examples/c/*.c package/examples/ 2>/dev/null || true
+          cp examples/c/*.aam package/examples/ 2>/dev/null || true
+          cp examples/c/Makefile package/examples/ 2>/dev/null || true
+          cp examples/c/CMakeLists.txt package/examples/ 2>/dev/null || true
           
           cp aam-cConfig.cmake package/lib/cmake/aam-c/ 2>/dev/null || true
-          
+          \
           if [ "${{ runner.os }}" == "Windows" ]; then
-            cp target/release/aam_c.dll package/bin/aam-c.dll
-            cp target/release/aam_c.dll.lib package/lib/aam-c.lib
+            cp target/release/aam_rs.dll package/bin/aam-c.dll
+            cp target/release/aam_rs.dll.lib package/lib/aam-c.lib
           elif [ "${{ runner.os }}" == "macOS" ]; then
-            cp target/release/libaam_c.dylib package/lib/libaam-c.dylib
+            cp target/release/libaam_rs.dylib package/lib/libaam-c.dylib
           else
-            cp target/release/libaam_c.so package/lib/libaam-c.so
+            cp target/release/libaam_rs.so package/lib/libaam-c.so
           fi
 
       - name: Zip Package
