@@ -97,7 +97,11 @@ jobs:
       - name: Zip Package
         run: |
           cd package
-          zip -r ../${{ matrix.artifact_name }}.zip ./*
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            7z a -tzip ../${{ matrix.artifact_name }}.zip *
+          else
+            zip -r ../${{ matrix.artifact_name }}.zip ./*
+          fi
 
       - name: Upload Release Artifact
         uses: softprops/action-gh-release@v2
