@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/INiNiDS/aam-rs/compare/v1.3.3...v1.4.0) (2026-03-12)
+
+
+### Features
+
+* Add Python bindings and update CI workflow for packaging ([d5035e6](https://github.com/INiNiDS/aam-rs/commit/d5035e67dae6956bbe4f078a5c354e4cf9920778))
+
+
+### Bug Fixes
+
+* Fixed deny.toml ([3eb10d3](https://github.com/INiNiDS/aam-rs/commit/3eb10d30a99877ec1c1522f7967330e426a20807))
+
 ## [1.3.3](https://github.com/INiNiDS/aam-rs/compare/v1.3.2...v1.3.3) (2026-03-11)
 
 
