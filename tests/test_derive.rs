@@ -731,4 +731,109 @@ mod tests {
             AamlError::SchemaValidationError { .. }
         ));
     }
+
+    // ─────────────────────────────────────────────────────────────
+    //  list<SchemaType> validation via @derive
+    // ─────────────────────────────────────────────────────────────
+
+    /// Full `@derive base.aam` — both schemas are imported; `list<Author>` items
+    /// must be validated against the `Author` schema.
+    #[test]
+    fn test_derive_list_of_nested_schema_full_import() {
+        let base_file = "test_derive_list_nested_full.aam";
+        let content_base = r#"
+@schema Author {
+    name: string
+    email: string
+}
+@schema PyProject {
+    title: string
+    authors*: list<Author>
+}
+title = "my_pkg"
+"#;
+        fs::write(base_file, content_base).unwrap();
+
+        let child = format!(
+            "@derive {base_file}\nauthors = [{{name = \"Alice\", email = \"a@example.com\"}}]\n"
+        );
+        let result = AAML::parse(&child);
+        let _ = fs::remove_file(base_file);
+
+        assert!(
+            result.is_ok(),
+            "list<Author> with valid inline objects should pass: {:?}",
+            result.err()
+        );
+    }
+
+    /// Selective `@derive base.aam::PyProject` — only `PyProject` is requested,
+    /// but `Author` must be pulled in transitively so that `list<Author>` validation works.
+    #[test]
+    fn test_derive_list_of_nested_schema_selective_import() {
+        let base_file = "test_derive_list_nested_selective.aam";
+        let content_base = r#"
+@schema Author {
+    name: string
+    email: string
+}
+@schema PyProject {
+    title: string
+    authors*: list<Author>
+}
+"#;
+        fs::write(base_file, content_base).unwrap();
+
+        let child = format!(
+            "@derive {base_file}::PyProject\ntitle = \"my_pkg\"\nauthors = [{{name = \"Bob\", email = \"b@example.com\"}}]\n"
+        );
+        let result = AAML::parse(&child);
+        let _ = fs::remove_file(base_file);
+
+        assert!(
+            result.is_ok(),
+            "Selective @derive::PyProject must pull Author in transitively: {:?}",
+            result.err()
+        );
+
+        let aaml = result.unwrap();
+        assert!(
+            aaml.get_schema("Author").is_some(),
+            "Author schema must be present after transitive import"
+        );
+        assert!(
+            aaml.get_schema("PyProject").is_some(),
+            "PyProject schema must be present"
+        );
+    }
+
+    /// Invalid inline object for `list<Author>` must still be rejected after
+    /// the transitive import fix.
+    #[test]
+    fn test_derive_list_of_nested_schema_rejects_invalid_item() {
+        let base_file = "test_derive_list_nested_invalid.aam";
+        let content_base = r#"
+@schema Author {
+    name: string
+    email: string
+}
+@schema PyProject {
+    title: string
+    authors*: list<Author>
+}
+"#;
+        fs::write(base_file, content_base).unwrap();
+
+        // Missing required `email` field inside the inline Author object.
+        let child = format!(
+            "@derive {base_file}::PyProject\ntitle = \"my_pkg\"\nauthors = [{{name = \"Bob\"}}]\n"
+        );
+        let result = AAML::parse(&child);
+        let _ = fs::remove_file(base_file);
+
+        assert!(
+            result.is_err(),
+            "list<Author> item missing required 'email' must be rejected"
+        );
+    }
 }

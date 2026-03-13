@@ -7,6 +7,7 @@ will maintain support for the last two major versions.
 
 | Version | Supported |
 |---------|-----------|
+| 1.4.x   | Yes       |
 | 1.3.x   | Yes       |
 | 1.2.x   | Yes       |
 | < 1.2.0 | No        |

@@ -20,7 +20,6 @@ use std::sync::Arc;
 
 mod lookup;
 pub mod parsing;
-pub mod types_registry;
 mod validation;
 
 #[cfg(feature = "serde")]
@@ -242,20 +241,41 @@ impl AAML {
     }
 
     pub fn import_schema(&mut self, name: &str, source: &mut AAML) -> Result<(), AamlError> {
+        // Already imported (e.g., as a transitive dependency of another schema) — skip.
+        if self.get_schemas().contains_key(name) {
+            return Ok(());
+        }
+
         let schema = source.get_schemas_mut().remove(name).ok_or_else(|| {
             AamlError::DirectiveError("derive".into(), format!("Schema '{name}' not found"))
         })?;
 
-        for ty_str in schema.fields.values() {
-            let ty_name = ListType::parse_inner(ty_str).unwrap_or_else(|| ty_str.clone());
-            if let Some(ty_def) = source.get_types_mut().remove(&ty_name) {
-                self.get_types_mut().entry(ty_name).or_insert(ty_def);
-            }
-        }
+        // Collect field type strings before `schema` is moved into the map.
+        let field_type_strings: Vec<String> = schema.fields.values().cloned().collect();
 
+        // Insert the schema first so that circular references do not recurse infinitely.
         self.get_schemas_mut()
             .entry(name.to_string())
             .or_insert(schema);
+
+        for ty_str in &field_type_strings {
+            let ty_name = ListType::parse_inner(ty_str).unwrap_or_else(|| ty_str.clone());
+
+            // Try to pull in a registered type alias first.
+            if let Some(ty_def) = source.get_types_mut().remove(&ty_name) {
+                self.get_types_mut().entry(ty_name).or_insert(ty_def);
+                continue;
+            }
+
+            // If the inner type name refers to another schema, import it recursively
+            // so that nested schema validation (e.g. `list<Author>`) works correctly.
+            if source.get_schemas().contains_key(&ty_name)
+                && !self.get_schemas().contains_key(&ty_name)
+            {
+                self.import_schema(&ty_name, source)?;
+            }
+        }
+
         Ok(())
     }
 

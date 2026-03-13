@@ -45,3 +45,5 @@ callgrind.out.*
 flamegraph.svg
 
 build/
+
+Cargo.lock
