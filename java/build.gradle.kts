@@ -17,10 +17,17 @@ dependencies {
 
 sourceSets {
     main {
-        // Kotlin sources live in the project root alongside build.gradle.kts
-        kotlin { setSrcDirs(listOf(".")) }
+        kotlin {
+            setSrcDirs(listOf("."))
+            exclude("build/**", "out/**", ".gradle/**", ".idea/**")
+        }
         resources { setSrcDirs(listOf("src/main/resources")) }
     }
+}
+
+tasks.named<Jar>("sourcesJar") {
+    dependsOn(tasks.compileKotlin, tasks.processResources)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 java {
