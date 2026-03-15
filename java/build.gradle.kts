@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "rs.in.ininids"
-version = "1.4.0" // x-release-please-version
+version = "1.5.0" // x-release-please-version
 
 repositories {
     mavenCentral()
@@ -25,17 +25,21 @@ sourceSets {
     }
 }
 
-tasks.named<Jar>("sourcesJar") {
-    dependsOn(tasks.compileKotlin, tasks.processResources)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
-    withSourcesJar()
-    withJavadocJar()
+}
+
+val sourcesJar = tasks.register<Jar>("sourcesJar") {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    archiveClassifier.set("javadoc")
+    from(tasks.javadoc)
 }
 
 tasks.test {
@@ -46,6 +50,8 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
+            artifact(sourcesJar)
+            artifact(javadocJar)
 
             pom {
                 name.set("AAM-JV")
@@ -90,11 +96,13 @@ publishing {
     }
 }
 
+val signingKey = System.getenv("GPG_PRIVATE_KEY")
+val signingPassword = System.getenv("GPG_PASSPHRASE")
+
 signing {
-    val signingKey = System.getenv("GPG_PRIVATE_KEY")
-    val signingPassword = System.getenv("GPG_PASSPHRASE")
+    isRequired = signingKey != null
     if (signingKey != null) {
         useInMemoryPgpKeys(signingKey, signingPassword)
-        sign(publishing.publications["mavenJava"])
     }
+    sign(publishing.publications["mavenJava"])
 }
