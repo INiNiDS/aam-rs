@@ -387,6 +387,7 @@ jobs:
       - name: Download all JNI artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: jni-*
           path: jni-artifacts
           merge-multiple: true
 

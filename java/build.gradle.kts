@@ -33,6 +33,7 @@ java {
 
 val sourcesJar = tasks.register<Jar>("sourcesJar") {
     archiveClassifier.set("sources")
+    dependsOn("compileKotlin", "processResources")
     from(sourceSets.main.get().allSource)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
