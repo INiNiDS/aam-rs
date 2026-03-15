@@ -10,6 +10,7 @@ permissions:
   pull-requests: write
   id-token: write
   attestations: write
+  packages: write
 
 jobs:
   validate:
