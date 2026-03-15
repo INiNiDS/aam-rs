@@ -72,7 +72,3 @@ buildNumber.properties
 ### Kotlin ###
 *.kotlin_module
 .kotlin/
-
-gradle
-gradlew
-gradlew.bat

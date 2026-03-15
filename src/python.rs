@@ -1,4 +1,4 @@
-//! PyO3 bindings — exposes `AAML` to Python as `aam_rs.AAML`.
+//! PyO3 bindings — exposes `AAML` to Python as `aam_py.AAML`.
 //!
 //! Build with:
 //! ```sh
@@ -7,7 +7,7 @@
 //! ```
 //! Then in Python:
 //! ```python
-//! from aam_rs import AAML
+//! from aam_py import AAML
 //!
 //! cfg = AAML.parse("host = localhost\nport = 8080")
 //! print(cfg.find_obj("host"))   # "localhost"

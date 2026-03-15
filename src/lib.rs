@@ -37,7 +37,7 @@ pub mod jni;
 
 /// Python extension-module entry point, compiled only with `--features python`.
 ///
-/// In Python: `from aam_rs import AAML`
+/// In Python: `from aam_py import AAML`
 #[cfg(feature = "python")]
 #[pyo3::pymodule(name = "aam_py")]
 fn aam_py(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
