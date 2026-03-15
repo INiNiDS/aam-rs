@@ -83,9 +83,6 @@ publishing {
     }
 }
 
-val signingKey = System.getenv("GPG_PRIVATE_KEY")
-val signingPassword = System.getenv("GPG_PASSPHRASE")
-
 val signingKey = findProperty("signingInMemoryKey") as String?
 val signingPassword = findProperty("signingInMemoryKeyPassword") as String?
 
