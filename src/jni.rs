@@ -1,17 +1,18 @@
-use jni::JNIEnv;
+#![allow(improper_ctypes_definitions)]
+
+use jni::Env;
 use jni::objects::{JClass, JString, JValue};
+use jni::strings::JNIString;
 use jni::sys::{jlong, jobject, jobjectArray, jstring};
 
 use crate::aaml::AAML;
 
-fn throw_java_exception(env: &mut JNIEnv<'_>, class: &str, msg: impl ToString) {
-    let _ = env.throw_new(class, msg.to_string());
+fn throw_java_exception(env: &mut Env<'_>, class: &str, msg: impl ToString) {
+    let _ = env.throw_new(JNIString::from(class), JNIString::from(msg.to_string()));
 }
 
-fn java_string_to_rust(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<String, String> {
-    env.get_string(value)
-        .map(|v| v.into())
-        .map_err(|e| e.to_string())
+fn java_string_to_rust(env: &mut Env<'_>, value: &JString<'_>) -> Result<String, String> {
+    value.try_to_string(env).map_err(|e| e.to_string())
 }
 
 unsafe fn get_aaml<'a>(ptr: jlong) -> Option<&'a AAML> {
@@ -30,7 +31,7 @@ unsafe fn get_aaml_mut<'a>(ptr: jlong) -> Option<&'a mut AAML> {
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_parse<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     content: JString<'local>,
 ) -> jlong {
@@ -53,7 +54,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_parse<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_load<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     path: JString<'local>,
 ) -> jlong {
@@ -76,7 +77,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_load<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_merge<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     content: JString<'local>,
@@ -105,7 +106,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_merge<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_destroy<'local>(
-    _env: JNIEnv<'local>,
+    _env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
 ) {
@@ -116,7 +117,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_destroy<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findObj<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     key: JString<'local>,
@@ -139,7 +140,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObj<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findKey<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     value: JString<'local>,
@@ -162,7 +163,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findKey<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findDeep<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     path: JString<'local>,
@@ -185,7 +186,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findDeep<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     key: JString<'local>,
@@ -205,7 +206,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
         return std::ptr::null_mut();
     };
 
-    let class_string = match env.find_class("java/lang/String") {
+    let class_string = match env.find_class(jni::jni_str!("java/lang/String")) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
@@ -222,7 +223,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
         let Ok(js) = env.new_string(item) else {
             return std::ptr::null_mut();
         };
-        if env.set_object_array_element(&array, i as i32, js).is_err() {
+        if array.set_element(&mut env, i, js).is_err() {
             return std::ptr::null_mut();
         }
     }
@@ -232,7 +233,7 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
-    mut env: JNIEnv<'local>,
+    mut env: Env<'local>,
     _class: JClass<'local>,
     ptr: jlong,
     key: JString<'local>,
@@ -252,11 +253,13 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
         return std::ptr::null_mut();
     };
 
-    let class_hashmap = match env.find_class("java/util/HashMap") {
+    // Use macro for the class name
+    let class_hashmap = match env.find_class(jni::jni_str!("java/util/HashMap")) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
-    let hashmap = match env.new_object(&class_hashmap, "()V", &[]) {
+
+    let hashmap = match env.new_object(&class_hashmap, jni::jni_sig!("()V"), &[]) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
@@ -271,8 +274,8 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
         if env
             .call_method(
                 &hashmap,
-                "put",
-                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                jni::jni_str!("put"),
+                jni::jni_sig!("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"),
                 &[JValue::Object(&jk.into()), JValue::Object(&jv.into())],
             )
             .is_err()
