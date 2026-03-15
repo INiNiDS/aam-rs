@@ -65,6 +65,14 @@ publishing {
 
     repositories {
         maven {
+            name = "MavenCentral"
+            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            credentials {
+                username = findProperty("mavenCentralUsername") as String?
+                password = findProperty("mavenCentralPassword") as String?
+            }
+        }
+        maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/ininids/aam-rs")
             credentials {
@@ -77,6 +85,9 @@ publishing {
 
 val signingKey = System.getenv("GPG_PRIVATE_KEY")
 val signingPassword = System.getenv("GPG_PASSPHRASE")
+
+val signingKey = findProperty("signingInMemoryKey") as String?
+val signingPassword = findProperty("signingInMemoryKeyPassword") as String?
 
 signing {
     isRequired = signingKey != null
