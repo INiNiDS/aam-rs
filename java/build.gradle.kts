@@ -15,6 +15,14 @@ dependencies {
 
 }
 
+sourceSets {
+    main {
+        // Kotlin sources live in the project root alongside build.gradle.kts
+        kotlin { setSrcDirs(listOf(".")) }
+        resources { setSrcDirs(listOf("src/main/resources")) }
+    }
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))

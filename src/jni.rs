@@ -14,8 +14,18 @@ fn java_string_to_rust(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<Stri
         .map_err(|e| e.to_string())
 }
 
-unsafe fn get_aaml<'a>(ptr: jlong) -> &'a AAML {
-    unsafe { &*(ptr as *const AAML) }
+unsafe fn get_aaml<'a>(ptr: jlong) -> Option<&'a AAML> {
+    if ptr == 0 {
+        return None;
+    }
+    Some(unsafe { &*(ptr as *const AAML) })
+}
+
+unsafe fn get_aaml_mut<'a>(ptr: jlong) -> Option<&'a mut AAML> {
+    if ptr == 0 {
+        return None;
+    }
+    Some(unsafe { &mut *(ptr as *mut AAML) })
 }
 
 #[unsafe(no_mangle)]
@@ -42,6 +52,58 @@ pub extern "system" fn Java_com_aamrs_AamNative_parse<'local>(
 }
 
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_com_aamrs_AamNative_load<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    path: JString<'local>,
+) -> jlong {
+    let path = match java_string_to_rust(&mut env, &path) {
+        Ok(v) => v,
+        Err(e) => {
+            throw_java_exception(&mut env, "java/lang/IllegalArgumentException", e);
+            return 0;
+        }
+    };
+
+    match AAML::load(&path) {
+        Ok(aaml) => Box::into_raw(Box::new(aaml)) as jlong,
+        Err(e) => {
+            throw_java_exception(&mut env, "java/lang/IllegalStateException", e);
+            0
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_aamrs_AamNative_merge<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    ptr: jlong,
+    content: JString<'local>,
+) {
+    let content = match java_string_to_rust(&mut env, &content) {
+        Ok(v) => v,
+        Err(e) => {
+            throw_java_exception(&mut env, "java/lang/IllegalArgumentException", e);
+            return;
+        }
+    };
+
+    let Some(aaml) = (unsafe { get_aaml_mut(ptr) }) else {
+        throw_java_exception(
+            &mut env,
+            "java/lang/IllegalStateException",
+            "AamDocument is closed",
+        );
+        return;
+    };
+
+    if let Err(e) = aaml.merge_content(&content) {
+        throw_java_exception(&mut env, "java/lang/IllegalStateException", e);
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_destroy<'local>(
     _env: JNIEnv<'local>,
     _class: JClass<'local>,
@@ -59,16 +121,38 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObj<'local>(
     ptr: jlong,
     key: JString<'local>,
 ) -> jstring {
-    if ptr == 0 {
+    let Some(aaml) = (unsafe { get_aaml(ptr) }) else {
         return std::ptr::null_mut();
-    }
+    };
     let key = match java_string_to_rust(&mut env, &key) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let aaml = unsafe { get_aaml(ptr) };
     if let Some(found) = aaml.find_obj(&key) {
+        if let Ok(js) = env.new_string(found.as_str()) {
+            return js.into_raw();
+        }
+    }
+    std::ptr::null_mut()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_aamrs_AamNative_findKey<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    ptr: jlong,
+    value: JString<'local>,
+) -> jstring {
+    let Some(aaml) = (unsafe { get_aaml(ptr) }) else {
+        return std::ptr::null_mut();
+    };
+    let value = match java_string_to_rust(&mut env, &value) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    if let Some(found) = aaml.find_key(&value) {
         if let Ok(js) = env.new_string(found.as_str()) {
             return js.into_raw();
         }
@@ -83,15 +167,14 @@ pub extern "system" fn Java_com_aamrs_AamNative_findDeep<'local>(
     ptr: jlong,
     path: JString<'local>,
 ) -> jstring {
-    if ptr == 0 {
+    let Some(aaml) = (unsafe { get_aaml(ptr) }) else {
         return std::ptr::null_mut();
-    }
+    };
     let path = match java_string_to_rust(&mut env, &path) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let aaml = unsafe { get_aaml(ptr) };
     if let Some(found) = aaml.find_deep(&path) {
         if let Ok(js) = env.new_string(found.as_str()) {
             return js.into_raw();
@@ -107,15 +190,14 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
     ptr: jlong,
     key: JString<'local>,
 ) -> jobjectArray {
-    if ptr == 0 {
+    let Some(aaml) = (unsafe { get_aaml(ptr) }) else {
         return std::ptr::null_mut();
-    }
+    };
     let key = match java_string_to_rust(&mut env, &key) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let aaml = unsafe { get_aaml(ptr) };
     let Some(found) = aaml.find_obj(&key) else {
         return std::ptr::null_mut();
     };
@@ -123,15 +205,26 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
         return std::ptr::null_mut();
     };
 
-    let class_string = env.find_class("java/lang/String").unwrap();
-    let initial_str = env.new_string("").unwrap();
-    let array = env
-        .new_object_array(list.len() as i32, class_string, initial_str)
-        .unwrap();
+    let class_string = match env.find_class("java/lang/String") {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let initial_str = match env.new_string("") {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let array = match env.new_object_array(list.len() as i32, class_string, initial_str) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
 
     for (i, item) in list.iter().enumerate() {
-        let js = env.new_string(item).unwrap();
-        env.set_object_array_element(&array, i as i32, js).unwrap();
+        let Ok(js) = env.new_string(item) else {
+            return std::ptr::null_mut();
+        };
+        if env.set_object_array_element(&array, i as i32, js).is_err() {
+            return std::ptr::null_mut();
+        }
     }
 
     array.into_raw()
@@ -144,15 +237,14 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
     ptr: jlong,
     key: JString<'local>,
 ) -> jobject {
-    if ptr == 0 {
+    let Some(aaml) = (unsafe { get_aaml(ptr) }) else {
         return std::ptr::null_mut();
-    }
+    };
     let key = match java_string_to_rust(&mut env, &key) {
         Ok(v) => v,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let aaml = unsafe { get_aaml(ptr) };
     let Some(found) = aaml.find_obj(&key) else {
         return std::ptr::null_mut();
     };
@@ -160,19 +252,33 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
         return std::ptr::null_mut();
     };
 
-    let class_hashmap = env.find_class("java/util/HashMap").unwrap();
-    let hashmap = env.new_object(&class_hashmap, "()V", &[]).unwrap();
+    let class_hashmap = match env.find_class("java/util/HashMap") {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let hashmap = match env.new_object(&class_hashmap, "()V", &[]) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
 
     for (k, v) in map {
-        let jk = env.new_string(k).unwrap();
-        let jv = env.new_string(v).unwrap();
-        env.call_method(
-            &hashmap,
-            "put",
-            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
-            &[JValue::Object(&jk.into()), JValue::Object(&jv.into())],
-        )
-        .unwrap();
+        let Ok(jk) = env.new_string(k) else {
+            return std::ptr::null_mut();
+        };
+        let Ok(jv) = env.new_string(v) else {
+            return std::ptr::null_mut();
+        };
+        if env
+            .call_method(
+                &hashmap,
+                "put",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                &[JValue::Object(&jk.into()), JValue::Object(&jv.into())],
+            )
+            .is_err()
+        {
+            return std::ptr::null_mut();
+        }
     }
 
     hashmap.into_raw()

@@ -32,7 +32,21 @@ fn to_py(err: AamlError) -> PyErr {
 /// All methods that can fail raise `RuntimeError` with a descriptive message.
 #[pyclass(unsendable, name = "AAML")]
 pub struct PyAAML {
-    inner: AAML,
+    inner: Option<AAML>,
+}
+
+impl PyAAML {
+    fn inner_ref(&self) -> PyResult<&AAML> {
+        self.inner
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("AAML instance is closed"))
+    }
+
+    fn inner_mut(&mut self) -> PyResult<&mut AAML> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| PyRuntimeError::new_err("AAML instance is closed"))
+    }
 }
 
 #[pymethods]
@@ -42,7 +56,9 @@ impl PyAAML {
     /// Create an empty AAML instance.
     #[new]
     fn new() -> Self {
-        PyAAML { inner: AAML::new() }
+        PyAAML {
+            inner: Some(AAML::new()),
+        }
     }
 
     /// Parse an AAML string and return a new instance.
@@ -53,7 +69,7 @@ impl PyAAML {
     #[staticmethod]
     fn parse(content: &str) -> PyResult<Self> {
         AAML::parse(content)
-            .map(|inner| PyAAML { inner })
+            .map(|inner| PyAAML { inner: Some(inner) })
             .map_err(to_py)
     }
 
@@ -65,20 +81,25 @@ impl PyAAML {
     #[staticmethod]
     fn load(path: &str) -> PyResult<Self> {
         AAML::load(path)
-            .map(|inner| PyAAML { inner })
+            .map(|inner| PyAAML { inner: Some(inner) })
             .map_err(to_py)
     }
 
     // ── Mutation ─────────────────────────────────────────────────────────────
 
     /// Merge AAML text into this instance (modifies in-place).
+    fn merge(&mut self, content: &str) -> PyResult<()> {
+        self.inner_mut()?.merge_content(content).map_err(to_py)
+    }
+
+    /// Backward-compatible alias for `merge`.
     fn merge_content(&mut self, content: &str) -> PyResult<()> {
-        self.inner.merge_content(content).map_err(to_py)
+        self.merge(content)
     }
 
     /// Merge an AAML file into this instance (modifies in-place).
     fn merge_file(&mut self, path: &str) -> PyResult<()> {
-        self.inner.merge_file(path).map_err(to_py)
+        self.inner_mut()?.merge_file(path).map_err(to_py)
     }
 
     // ── Lookups ──────────────────────────────────────────────────────────────
@@ -88,43 +109,57 @@ impl PyAAML {
     /// Also performs a reverse lookup (find key whose value equals `key`)
     /// when no direct key is found.
     fn find_obj(&self, key: &str) -> Option<String> {
-        self.inner.find_obj(key).map(|v| v.as_str().to_string())
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_obj(key).map(|v| v.as_str().to_string()))
     }
 
     /// Reverse lookup: find the key whose value equals `value`, or `None`.
     fn find_key(&self, value: &str) -> Option<String> {
-        self.inner.find_key(value).map(|v| v.as_str().to_string())
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_key(value).map(|v| v.as_str().to_string()))
     }
 
     /// Deep lookup: follow key→value→key chains until a terminal or cycle.
     fn find_deep(&self, key: &str) -> Option<String> {
-        self.inner.find_deep(key).map(|v| v.as_str().to_string())
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_deep(key).map(|v| v.as_str().to_string()))
     }
 
     /// Look up `key` and parse its value as a list `[a, b, c]`.
     ///
     /// Returns `None` if the key is absent or the value is not a list literal.
     fn find_list(&self, key: &str) -> Option<Vec<String>> {
-        self.inner.find_obj(key).and_then(|v| v.as_list())
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_obj(key).and_then(|v| v.as_list()))
     }
 
     /// Look up `key` and parse its value as an inline object `{ k = v, ... }`.
     ///
     /// Returns `None` if the key is absent or the value is not an object literal.
     fn find_object(&self, key: &str) -> Option<HashMap<String, String>> {
-        self.inner.find_obj(key).and_then(|v| v.as_object())
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_obj(key).and_then(|v| v.as_object()))
     }
 
     // ── Map introspection ────────────────────────────────────────────────────
 
     /// Returns all keys stored in this instance.
     fn keys(&self) -> Vec<String> {
-        self.inner.keys().iter().map(|s| s.to_string()).collect()
+        match self.inner_ref() {
+            Ok(inner) => inner.keys().iter().map(|s| s.to_string()).collect(),
+            Err(_) => Vec::new(),
+        }
     }
 
     /// Returns a Python `dict` of all key-value pairs.
     fn to_dict(&self) -> HashMap<String, String> {
-        self.inner.to_map()
+        self.inner_ref()
+            .map_or_else(|_| HashMap::new(), |inner| inner.to_map())
     }
 
     // ── Type validation ──────────────────────────────────────────────────────
@@ -133,25 +168,42 @@ impl PyAAML {
     ///
     /// Raises `RuntimeError` on validation failure.
     fn validate_value(&self, type_name: &str, value: &str) -> PyResult<()> {
-        self.inner.validate_value(type_name, value).map_err(to_py)
+        self.inner_ref()?
+            .validate_value(type_name, value)
+            .map_err(to_py)
+    }
+
+    /// Explicitly releases the underlying Rust object.
+    fn close(&mut self) {
+        self.inner = None;
+    }
+
+    /// Returns `True` if `close()` has already been called.
+    fn is_closed(&self) -> bool {
+        self.inner.is_none()
     }
 
     // ── Dunder methods ───────────────────────────────────────────────────────
 
     fn __repr__(&self) -> String {
-        format!("AAML({} keys)", self.inner.keys().len())
+        match self.inner_ref() {
+            Ok(inner) => format!("AAML({} keys)", inner.keys().len()),
+            Err(_) => "AAML(closed)".to_string(),
+        }
     }
 
     fn __len__(&self) -> usize {
-        self.inner.keys().len()
+        self.inner_ref().map_or(0, |inner| inner.keys().len())
     }
 
     fn __contains__(&self, key: &str) -> bool {
-        self.inner.find_obj(key).is_some()
+        self.inner_ref()
+            .map(|inner| inner.find_obj(key).is_some())
+            .unwrap_or(false)
     }
 
     fn __getitem__(&self, key: &str) -> PyResult<String> {
-        self.inner
+        self.inner_ref()?
             .find_obj(key)
             .map(|v| v.as_str().to_string())
             .ok_or_else(|| PyRuntimeError::new_err(format!("Key not found: '{key}'")))

@@ -354,7 +354,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload JNI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact }}
           path: target/${{ matrix.target }}/release/${{ matrix.file }}
@@ -375,27 +375,29 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: jni-linux-x86_64
-          path: aam-jv/src/main/resources/natives/linux-x86_64
-      - uses: actions/download-artifact@v4
+          path: java/src/main/resources/natives/linux-x86_64
+      - uses: actions/download-artifact@v6
         with:
           name: jni-macos-x86_64
-          path: aam-jv/src/main/resources/natives/macos-x86_64
-      - uses: actions/download-artifact@v4
+          path: java/src/main/resources/natives/macos-x86_64
+      - uses: actions/download-artifact@v6
         with:
           name: jni-macos-aarch64
-          path: aam-jv/src/main/resources/natives/macos-aarch64
-      - uses: actions/download-artifact@v4
+          path: java/src/main/resources/natives/macos-aarch64
+      - uses: actions/download-artifact@v6
         with:
           name: jni-windows-x86_64
-          path: aam-jv/src/main/resources/natives/windows-x86_64
+          path: java/src/main/resources/natives/windows-x86_64
 
       - name: Build and Publish JAR
-        working-directory: ./aam-jv
+        working-directory: ./java
         run: ./gradlew build publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          # MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}

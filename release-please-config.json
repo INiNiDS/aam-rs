@@ -3,7 +3,10 @@
     ".": {
       "release-type": "rust",
       "extra-files": [
-        "java/build.gradle.kts"
+        {
+          "type": "generic",
+          "path": "java/build.gradle.kts"
+        }
       ]
     }
   }
