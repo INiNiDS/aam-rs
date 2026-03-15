@@ -34,6 +34,15 @@ java {
 val sourcesJar = tasks.register<Jar>("sourcesJar") {
     archiveClassifier.set("sources")
     dependsOn("compileKotlin", "processResources")
+
+    mustRunAfter(
+        "compileJava",
+        "javadoc",
+        "javadocJar",
+        "jar",
+        "generatePomFileForMavenJavaPublication"
+    )
+
     from(sourceSets.main.get().allSource)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

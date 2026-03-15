@@ -1,5 +1,5 @@
 #![allow(improper_ctypes_definitions)]
-
+#[allow(non_snake_case)]
 use jni::Env;
 use jni::objects::{JClass, JString, JValue};
 use jni::strings::JNIString;
