@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
+  attestations: write
 
 jobs:
   validate:
@@ -289,15 +291,30 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  upload-wheels-to-release:
+    name: Upload Python Wheels to Release
+    needs: [ release-please, linux, musllinux, windows, macos, sdist ]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v6
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: Upload Wheels and sdist to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: dist/*
+
   publish-pypi:
     name: Publish to PyPI
     needs: [ release-please, linux, musllinux, windows, macos, sdist ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-      attestations: write
     steps:
       - uses: actions/download-artifact@v6
         with:
@@ -326,22 +343,18 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact: jni-linux-x86_64
             file: libaam_rs.so
-            dest_folder: linux-x86_64
           - os: macos-15-intel
             target: x86_64-apple-darwin
             artifact: jni-macos-x86_64
             file: libaam_rs.dylib
-            dest_folder: macos-x86_64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: jni-macos-aarch64
             file: libaam_rs.dylib
-            dest_folder: macos-aarch64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: jni-windows-x86_64
             file: aam_rs.dll
-            dest_folder: windows-x86_64
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -361,7 +374,7 @@ jobs:
           retention-days: 1
 
   publish-java:
-    name: Publish Fat JAR to Maven/GitHub
+    name: Publish Fat JAR & Upload to Release
     needs: [ release-please, build-jni-libs ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
@@ -401,3 +414,9 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Upload JAR to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: java/build/libs/*.jar

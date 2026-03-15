@@ -19,7 +19,7 @@ jobs:
       tag_name: ${{ steps.get_tag.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch Latest Release Tag
         id: get_tag
@@ -37,7 +37,7 @@ jobs:
           echo "Found actual tag: $LATEST_TAG"
 
   build-c-libs:
-    name: Build & Upload
+    name: Build & Upload C Libs
     needs: get-latest-tag
     strategy:
       matrix:
@@ -57,7 +57,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -278,27 +278,108 @@ jobs:
           name: wheels-sdist
           path: dist
 
-  publish-pypi:
-    name: Publish to PyPI
-    needs: [ linux, musllinux, windows, macos, sdist ]
+  upload-wheels-to-release:
+    name: Upload Python Wheels to Release
+    needs: [ get-latest-tag, linux, musllinux, windows, macos, sdist ]
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-      attestations: write
     steps:
-      - uses: actions/download-artifact@v6
+      - name: Download all wheels
+        uses: actions/download-artifact@v6
         with:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+
+      - name: Upload Wheels and sdist to Release Artifact
+        uses: softprops/action-gh-release@v2
         with:
-          subject-path: 'dist/*'
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-      - name: Publish to PyPI
-        run: uv publish dist/*
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: dist/*
+
+  build-jni-libs:
+    name: Build JNI Native Libraries
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: jni-linux-x86_64
+            file: libaam_rs.so
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            artifact: jni-macos-x86_64
+            file: libaam_rs.dylib
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: jni-macos-aarch64
+            file: libaam_rs.dylib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: jni-windows-x86_64
+            file: aam_rs.dll
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build JNI release library
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload JNI artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/${{ matrix.file }}
+          retention-days: 1
+
+  publish-java:
+    name: Publish Fat JAR & Upload to Release
+    needs: [ get-latest-tag, build-jni-libs ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: jni-linux-x86_64
+          path: java/src/main/resources/natives/linux-x86_64
+      - uses: actions/download-artifact@v6
+        with:
+          name: jni-macos-x86_64
+          path: java/src/main/resources/natives/macos-x86_64
+      - uses: actions/download-artifact@v6
+        with:
+          name: jni-macos-aarch64
+          path: java/src/main/resources/natives/macos-aarch64
+      - uses: actions/download-artifact@v6
+        with:
+          name: jni-windows-x86_64
+          path: java/src/main/resources/natives/windows-x86_64
+
+      - name: Build and Publish JAR
+        working-directory: ./java
+        run: ./gradlew build publish
         env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Upload JAR to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: java/build/libs/*.jar
