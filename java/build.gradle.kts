@@ -15,41 +15,12 @@ dependencies {
 
 }
 
-sourceSets {
-    main {
-        kotlin {
-            setSrcDirs(listOf("."))
-            exclude("build/**", "out/**", ".gradle/**", ".idea/**")
-        }
-        resources { setSrcDirs(listOf("src/main/resources")) }
-    }
-}
-
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
-}
-
-val sourcesJar = tasks.register<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    dependsOn("compileKotlin", "processResources")
-
-    mustRunAfter(
-        "compileJava",
-        "javadoc",
-        "javadocJar",
-        "jar",
-        "generatePomFileForMavenJavaPublication"
-    )
-
-    from(sourceSets.main.get().allSource)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-val javadocJar = tasks.register<Jar>("javadocJar") {
-    archiveClassifier.set("javadoc")
-    from(tasks.javadoc)
+    withSourcesJar()
+    withJavadocJar()
 }
 
 tasks.test {
@@ -60,8 +31,6 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
-            artifact(sourcesJar)
-            artifact(javadocJar)
 
             pom {
                 name.set("AAM-JV")
