@@ -69,7 +69,7 @@ jobs:
         run: cargo binstall cbindgen -y
 
       - name: Build release library
-        run: cargo build --release --locked
+        run: cargo build --release
 
       - name: Prepare C/C++ Package Structure
         run: |
@@ -316,7 +316,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: jni-windows-x86_64
-            file: aam_py.dll
+            file: aam_rs.dll
 
     runs-on: ${{ matrix.os }}
     steps:
