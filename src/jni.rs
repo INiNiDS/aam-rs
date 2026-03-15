@@ -15,7 +15,7 @@ fn java_string_to_rust(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<Stri
 }
 
 unsafe fn get_aaml<'a>(ptr: jlong) -> &'a AAML {
-    &*(ptr as *const AAML)
+    unsafe { &*(ptr as *const AAML) }
 }
 
 #[unsafe(no_mangle)]

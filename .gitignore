@@ -2,9 +2,6 @@
 /target/
 **/*.rs.bk
 
-# If rustgames is purely a library (a crate others depend on), you normally 
-# ignore Cargo.lock. However, since you have examples and test binaries, 
-# it is highly recommended to track Cargo.lock to ensure reproducible CI builds.
 Cargo.lock 
 
 # OS generated files
@@ -46,4 +43,36 @@ flamegraph.svg
 
 build/
 
-Cargo.lock
+### JetBrains IDE (IntelliJ IDEA) ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/resources/
+!**/src/test/resources/
+
+### Gradle ###
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.restoreBackup
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+### Kotlin ###
+*.kotlin_module
+.kotlin/
+
+gradle
+gradlew
+gradlew.bat
