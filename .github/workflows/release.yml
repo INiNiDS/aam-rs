@@ -60,7 +60,7 @@ jobs:
         working-directory: ./go
         run: go test -v ./...
         env:
-          LD_LIBRARY_PATH: ${{ github.workspace }}/target/release1
+          LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
 
   release-please:
     needs: [ validate, validate-go ]
