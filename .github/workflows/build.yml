@@ -147,7 +147,7 @@ jobs:
           sccache: false
           manylinux: auto
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
@@ -185,7 +185,7 @@ jobs:
           sccache: false
           manylinux: musllinux_1_2
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: dist
@@ -227,7 +227,7 @@ jobs:
           args: --release --out dist -i python3.14t
           sccache: false
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
@@ -259,7 +259,7 @@ jobs:
           args: --release --out dist -i python3.14t
           sccache: false
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
@@ -274,7 +274,7 @@ jobs:
           command: sdist
           args: --out dist
       - name: Upload sdist
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist
@@ -285,7 +285,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all wheels
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
           merge-multiple: true
@@ -332,11 +332,89 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload JNI artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: target/${{ matrix.target }}/release/${{ matrix.file }}
           retention-days: 1
+
+  build-go-libs:
+    name: Build & Test Go Bindings
+    needs: get-latest-tag
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: aam-go-linux-x86_64
+            static_lib: libaam_rs.a
+            shared_lib: libaam_rs.so
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            artifact: aam-go-macos-x86_64
+            static_lib: libaam_rs.a
+            shared_lib: libaam_rs.dylib
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: aam-go-macos-aarch64
+            static_lib: libaam_rs.a
+            shared_lib: libaam_rs.dylib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: aam-go-windows-x86_64
+            static_lib: aam_rs.lib
+            shared_lib: aam_rs.dll
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Rust library with FFI (static + dynamic)
+        run: cargo build --release --features ffi --target ${{ matrix.target }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: go/go.sum
+
+      - name: Test Go bindings (Linux / macOS only)
+        if: runner.os != 'Windows'
+        working-directory: ./go
+        env:
+          CGO_CFLAGS: "-I${{ github.workspace }}/include"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/target/${{ matrix.target }}/release -laam_rs -ldl -lpthread -lm"
+        run: go test -v ./...
+
+      - name: Package Go bindings
+        run: |
+          mkdir -p go-pkg/lib go-pkg/include go-pkg/src
+          cp include/aam.h go-pkg/include/
+          cp -r go/ go-pkg/src/
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cp target/${{ matrix.target }}/release/aam_rs.dll     go-pkg/lib/ 2>/dev/null || true
+            cp target/${{ matrix.target }}/release/aam_rs.dll.lib go-pkg/lib/aam_rs.lib 2>/dev/null || true
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            cp target/${{ matrix.target }}/release/libaam_rs.a     go-pkg/lib/ 2>/dev/null || true
+            cp target/${{ matrix.target }}/release/libaam_rs.dylib go-pkg/lib/ 2>/dev/null || true
+          else
+            cp target/${{ matrix.target }}/release/libaam_rs.a  go-pkg/lib/ 2>/dev/null || true
+            cp target/${{ matrix.target }}/release/libaam_rs.so go-pkg/lib/ 2>/dev/null || true
+          fi
+          cd go-pkg && zip -r ../${{ matrix.artifact }}.zip ./*
+
+      - name: Upload Go package to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: ${{ matrix.artifact }}.zip
 
   publish-java:
     name: Publish Fat JAR & Upload to Release
@@ -346,25 +424,25 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: jni-linux-x86_64
           path: java/src/main/resources/natives/linux-x86_64
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: jni-macos-x86_64
           path: java/src/main/resources/natives/macos-x86_64
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: jni-macos-aarch64
           path: java/src/main/resources/natives/macos-aarch64
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: jni-windows-x86_64
           path: java/src/main/resources/natives/windows-x86_64

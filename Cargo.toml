@@ -53,4 +53,4 @@ name = "builder"
 serde_json = "1.0.149"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
