@@ -401,6 +401,8 @@ jobs:
           mkdir -p go-pkg/lib go-pkg/include go-pkg/src
           cp include/aam.h go-pkg/include/
           cp -r go/ go-pkg/src/
+
+          # Copy OS-specific binaries
           if [ "${{ runner.os }}" == "Windows" ]; then
             cp target/${{ matrix.target }}/release/aam_rs.dll     go-pkg/lib/ 2>/dev/null || true
             cp target/${{ matrix.target }}/release/aam_rs.dll.lib go-pkg/lib/aam_rs.lib 2>/dev/null || true
@@ -411,7 +413,14 @@ jobs:
             cp target/${{ matrix.target }}/release/libaam_rs.a  go-pkg/lib/ 2>/dev/null || true
             cp target/${{ matrix.target }}/release/libaam_rs.so go-pkg/lib/ 2>/dev/null || true
           fi
-          cd go-pkg && zip -r ../${{ matrix.artifact }}.zip ./*
+
+          # Archive using 7z for Windows, zip for others
+          cd go-pkg
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            7z a ../${{ matrix.artifact }}.zip ./*
+          else
+            zip -r ../${{ matrix.artifact }}.zip ./*
+          fi
 
       - name: Upload Go package to Release
         uses: softprops/action-gh-release@v2
@@ -476,7 +485,7 @@ jobs:
             -u "$CENTRAL_USERNAME:$CENTRAL_PASSWORD" \
             --header 'Accept: application/json' \
             --form bundle=@build/bundle.zip \
-            --fail # Чтобы Action падал, если curl вернет ошибку (например, 401 Unauthorized)
+            --fail
 
       - name: Upload JAR to Release
         uses: softprops/action-gh-release@v2

@@ -66,7 +66,7 @@ publishing {
     repositories {
         maven {
             name = "Staging"
-            url = layout.buildDirectory.dir("staging-repo")
+            url = uri(layout.buildDirectory.dir("staging-repo"))
         }
         maven {
             name = "GitHubPackages"
