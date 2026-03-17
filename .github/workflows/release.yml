@@ -228,8 +228,6 @@ jobs:
           npm publish ./npm/darwin-x64 --access public
           npm publish ./npm/darwin-arm64 --access public
           npm publish ./npm/win32-x64-msvc --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish main package
         working-directory: ./js
