@@ -2,6 +2,7 @@ use aam_rs::aaml::AAML;
 use aam_rs::error::AamlError;
 use napi::{Error, Result, Status};
 use napi_derive::napi;
+use std::collections::BTreeMap;
 
 fn to_napi_error(err: AamlError) -> Error {
     Error::new(Status::GenericFailure, err.to_string())
