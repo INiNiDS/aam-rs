@@ -43,6 +43,22 @@ flamegraph.svg
 
 build/
 
+# Node / npm
+js/node_modules/
+js/.npm/
+js/.pnpm-store/
+js/.yarn/
+js/.yarn-cache/
+js/npm/*/*.node
+js/aam_rs_node.*.node
+js/*.node
+js/index.js
+js/target/
+js/dist/
+node-artifacts/
+dist/
+*.tgz
+
 ### JetBrains IDE (IntelliJ IDEA) ###
 .idea/
 *.iws

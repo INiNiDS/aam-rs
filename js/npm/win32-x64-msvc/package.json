@@ -1,0 +1,16 @@
+{
+  "name": "aam-rs-win32-x64-msvc",
+  "version": "1.4.0",
+  "license": "MIT OR Apache-2.0",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "aam_rs_node.win32-x64-msvc.node",
+  "files": [
+    "aam_rs_node.win32-x64-msvc.node"
+  ]
+}
+

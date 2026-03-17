@@ -1,0 +1,19 @@
+{
+  "name": "aam-rs-linux-x64-gnu",
+  "version": "1.4.0",
+  "license": "MIT OR Apache-2.0",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "main": "aam_rs_node.linux-x64-gnu.node",
+  "files": [
+    "aam_rs_node.linux-x64-gnu.node"
+  ]
+}
+

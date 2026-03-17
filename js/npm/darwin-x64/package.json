@@ -1,0 +1,16 @@
+{
+  "name": "aam-rs-darwin-x64",
+  "version": "1.4.0",
+  "license": "MIT OR Apache-2.0",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "aam_rs_node.darwin-x64.node",
+  "files": [
+    "aam_rs_node.darwin-x64.node"
+  ]
+}
+

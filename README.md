@@ -26,6 +26,32 @@ Add the library to your `Cargo.toml`:
 aam-rs = "1.2.4"
 ```
 
+### Node.js / N-API
+
+Install the Node.js bindings from npm:
+
+```bash
+npm install aam-rs
+```
+
+The package ships prebuilt native addons for:
+
+- Linux x64 (GNU libc)
+- macOS x64
+- macOS arm64
+- Windows x64
+
+```js
+const {parse, AAML} = require('aam-rs')
+
+const cfg = parse('host = localhost\nport = 8080')
+console.log(cfg.findObj('host'))
+
+const empty = new AAML()
+empty.merge('theme = dark')
+console.log(empty.toMap())
+```
+
 ## Configuration syntax (.aam)
 
 The format is line-based. Whitespace around keys and values is trimmed. Strings can be quoted.

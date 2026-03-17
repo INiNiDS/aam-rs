@@ -7,10 +7,37 @@ on:
         description: 'Reason for manual build'
         required: false
         default: 'Force build and attach C libraries to latest release'
+      publish_npm:
+        description: 'Publish Node.js packages to npm'
+        required: false
+        default: false
+        type: boolean
+      publish_pypi:
+        description: 'Publish Python packages to PyPI'
+        required: false
+        default: false
+        type: boolean
+      publish_github_release:
+        description: 'Publish built artifacts to GitHub Release'
+        required: false
+        default: true
+        type: boolean
+      publish_cargo_crates:
+        description: 'Publish Rust crates to crates.io'
+        required: false
+        default: false
+        type: boolean
+      publish_maven_central:
+        description: 'Publish Java artifacts to Maven Central'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
 
 jobs:
   get-latest-tag:
@@ -37,6 +64,16 @@ jobs:
           echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
           echo "Found actual tag: $LATEST_TAG"
 
+  publish-cargo:
+    name: Publish to crates.io
+    needs: get-latest-tag
+    if: ${{ github.event.inputs.publish_cargo_crates == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --token ${{ secrets.CRATES_TOKEN }} --no-verify
+
   build-c-libs:
     name: Build & Upload C Libs
     needs: get-latest-tag
@@ -56,22 +93,16 @@ jobs:
     defaults:
       run:
         shell: bash
-
     steps:
       - uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main
-
       - name: Install cbindgen
         run: cargo binstall cbindgen -y
-
       - name: Build release library
         run: cargo build --release
-
       - name: Prepare C/C++ Package Structure
         run: |
           mkdir -p package/include package/lib/cmake/aam-c package/bin package/examples
@@ -87,14 +118,13 @@ jobs:
           cp aam-cConfig.cmake package/lib/cmake/aam-c/ 2>/dev/null || true
           
           if [ "${{ runner.os }}" == "Windows" ]; then
-            cp target/release/aam_rs.dll package/bin/aam_c.dll
-            cp target/release/aam_rs.dll.lib package/lib/aam_c.lib
+            cp target/release/aam_rs.dll package/bin/libaam_c.dll
+            cp target/release/aam_rs.dll.lib package/lib/libaam_c.lib
           elif [ "${{ runner.os }}" == "macOS" ]; then
             cp target/release/libaam_rs.dylib package/lib/libaam_c.dylib
           else
             cp target/release/libaam_rs.so package/lib/libaam_c.so
           fi
-
       - name: Zip Package
         run: |
           cd package
@@ -103,12 +133,120 @@ jobs:
           else
             zip -r ../${{ matrix.artifact_name }}.zip ./*
           fi
-
       - name: Upload Release Artifact
+        if: ${{ github.event.inputs.publish_github_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: ${{ matrix.artifact_name }}.zip
+
+  build-node-bindings:
+    name: Build Node.js Native Addons
+    needs: get-latest-tag
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: node-binding-linux-x64-gnu
+            binary: aam_rs_node.linux-x64-gnu.node
+          - os: macos-15-intel
+            artifact: node-binding-darwin-x64
+            binary: aam_rs_node.darwin-x64.node
+          - os: macos-latest
+            artifact: node-binding-darwin-arm64
+            binary: aam_rs_node.darwin-arm64.node
+          - os: windows-latest
+            artifact: node-binding-win32-x64-msvc
+            binary: aam_rs_node.win32-x64-msvc.node
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Install Node.js dependencies
+        working-directory: ./js
+        run: npm install
+      - name: Build release addon
+        working-directory: ./js
+        run: npm run build
+      - name: Upload addon artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: js/${{ matrix.binary }}
+          retention-days: 1
+
+  upload-node-to-release:
+    name: Upload Node.js Addons to Release
+    needs: [ get-latest-tag, build-node-bindings ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Node.js addon artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: node-binding-*
+          merge-multiple: true
+          path: node-artifacts
+      - name: Upload Node.js addons to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: node-artifacts/*.node
+
+  publish-npm:
+    name: Publish to npm
+    needs: [ build-node-bindings ]
+    if: ${{ github.event.inputs.publish_npm == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Download Node.js addon artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: node-binding-*
+          merge-multiple: true
+          path: node-artifacts
+      - name: Install Node.js dependencies
+        working-directory: ./js
+        run: npm install
+      - name: Populate platform packages
+        run: |
+          cp node-artifacts/aam_rs_node.linux-x64-gnu.node js/npm/linux-x64-gnu/
+          cp node-artifacts/aam_rs_node.darwin-x64.node js/npm/darwin-x64/
+          cp node-artifacts/aam_rs_node.darwin-arm64.node js/npm/darwin-arm64/
+          cp node-artifacts/aam_rs_node.win32-x64-msvc.node js/npm/win32-x64-msvc/
+      - name: Publish platform packages
+        working-directory: ./js
+        run: |
+          npm publish ./npm/linux-x64-gnu --access public
+          npm publish ./npm/darwin-x64 --access public
+          npm publish ./npm/darwin-arm64 --access public
+          npm publish ./npm/win32-x64-msvc --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish main package
+        working-directory: ./js
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   linux:
     runs-on: ${{ matrix.platform.runner }}
@@ -282,6 +420,7 @@ jobs:
   upload-wheels-to-release:
     name: Upload Python Wheels to Release
     needs: [ get-latest-tag, linux, musllinux, windows, macos, sdist ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all wheels
@@ -290,12 +429,33 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-
       - name: Upload Wheels and sdist to Release Artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: dist/*
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [ linux, musllinux, windows, macos, sdist ]
+    if: ${{ github.event.inputs.publish_pypi == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'dist/*'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Publish to PyPI
+        run: uv publish dist/*
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
   build-jni-libs:
     name: Build JNI Native Libraries
@@ -318,25 +478,105 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact: jni-windows-x86_64
             file: aam_rs.dll
-
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - name: Build JNI release library
         run: cargo build --release --target ${{ matrix.target }}
-
       - name: Upload JNI artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: target/${{ matrix.target }}/release/${{ matrix.file }}
           retention-days: 1
+
+  upload-jni-to-release:
+    name: Upload JNI to GitHub Release
+    needs: [ get-latest-tag, build-jni-libs ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Download all JNI artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: jni-*
+          path: jni-artifacts
+          merge-multiple: true
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.get-latest-tag.outputs.tag_name }}
+        run: |
+          gh release upload "$TAG_NAME" jni-artifacts/*
+
+  publish-java:
+    name: Publish Java Artifacts
+    needs: [ get-latest-tag, build-jni-libs ]
+    if: ${{ github.event.inputs.publish_maven_central == 'true' || github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      - uses: actions/download-artifact@v8
+        with:
+          name: jni-linux-x86_64
+          path: java/src/main/resources/natives/linux-x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: jni-macos-x86_64
+          path: java/src/main/resources/natives/macos-x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: jni-macos-aarch64
+          path: java/src/main/resources/natives/macos-aarch64
+      - uses: actions/download-artifact@v8
+        with:
+          name: jni-windows-x86_64
+          path: java/src/main/resources/natives/windows-x86_64
+      - name: Build and Publish locally
+        working-directory: ./java
+        run: ./gradlew build publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Create Zip Bundle for Central Portal
+        if: ${{ github.event.inputs.publish_maven_central == 'true' }}
+        working-directory: ./java
+        run: |
+          cd build/staging-repo 
+          zip -r ../bundle.zip .
+      - name: Upload Bundle to Maven Central
+        if: ${{ github.event.inputs.publish_maven_central == 'true' }}
+        working-directory: ./java
+        env:
+          CENTRAL_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: |
+          echo "Uploading bundle to Maven Central Portal..."
+          curl --request POST \
+            --url 'https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC' \
+            -u "$CENTRAL_USERNAME:$CENTRAL_PASSWORD" \
+            --header 'Accept: application/json' \
+            --form bundle=@build/bundle.zip \
+            --fail
+      - name: Upload JAR to Release
+        if: ${{ github.event.inputs.publish_github_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: java/build/libs/*.jar
 
   build-go-libs:
     name: Build & Test Go Bindings
@@ -370,21 +610,17 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - name: Build Rust library with FFI (static + dynamic)
         run: cargo build --release --features ffi --target ${{ matrix.target }}
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache-dependency-path: go/go.sum
-
       - name: Test Go bindings (Linux / macOS only)
         if: runner.os != 'Windows'
         working-directory: ./go
@@ -395,14 +631,12 @@ jobs:
           export LD_LIBRARY_PATH="${{ github.workspace }}/target/${{ matrix.target }}/release:$LD_LIBRARY_PATH"
           export DYLD_LIBRARY_PATH="${{ github.workspace }}/target/${{ matrix.target }}/release:$DYLD_LIBRARY_PATH"
           go test -v ./...
-
       - name: Package Go bindings
         run: |
           mkdir -p go-pkg/lib go-pkg/include go-pkg/src
           cp include/aam.h go-pkg/include/
           cp -r go/ go-pkg/src/
 
-          # Copy OS-specific binaries
           if [ "${{ runner.os }}" == "Windows" ]; then
             cp target/${{ matrix.target }}/release/aam_rs.dll     go-pkg/lib/ 2>/dev/null || true
             cp target/${{ matrix.target }}/release/aam_rs.dll.lib go-pkg/lib/aam_rs.lib 2>/dev/null || true
@@ -414,81 +648,15 @@ jobs:
             cp target/${{ matrix.target }}/release/libaam_rs.so go-pkg/lib/ 2>/dev/null || true
           fi
 
-          # Archive using 7z for Windows, zip for others
           cd go-pkg
           if [ "${{ runner.os }}" == "Windows" ]; then
             7z a ../${{ matrix.artifact }}.zip ./*
           else
             zip -r ../${{ matrix.artifact }}.zip ./*
           fi
-
       - name: Upload Go package to Release
+        if: ${{ github.event.inputs.publish_github_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: ${{ matrix.artifact }}.zip
-
-  publish-java:
-    name: Publish Fat JAR & Upload to Release
-    needs: [ get-latest-tag, build-jni-libs ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: jni-linux-x86_64
-          path: java/src/main/resources/natives/linux-x86_64
-      - uses: actions/download-artifact@v8
-        with:
-          name: jni-macos-x86_64
-          path: java/src/main/resources/natives/macos-x86_64
-      - uses: actions/download-artifact@v8
-        with:
-          name: jni-macos-aarch64
-          path: java/src/main/resources/natives/macos-aarch64
-      - uses: actions/download-artifact@v8
-        with:
-          name: jni-windows-x86_64
-          path: java/src/main/resources/natives/windows-x86_64
-
-      - name: Build and Publish locally
-        working-directory: ./java
-        run: ./gradlew build publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
-
-      - name: Create Zip Bundle for Central Portal
-        working-directory: ./java
-        run: |
-          cd build/staging-repo 
-          zip -r ../bundle.zip .
-
-      - name: Upload Bundle to Maven Central
-        working-directory: ./java
-        env:
-          CENTRAL_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: |
-          echo "Uploading bundle to Maven Central Portal..."
-          curl --request POST \
-            --url 'https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC' \
-            -u "$CENTRAL_USERNAME:$CENTRAL_PASSWORD" \
-            --header 'Accept: application/json' \
-            --form bundle=@build/bundle.zip \
-            --fail
-
-      - name: Upload JAR to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
-          files: java/build/libs/*.jar

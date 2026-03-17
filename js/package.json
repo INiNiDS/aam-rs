@@ -1,0 +1,43 @@
+{
+  "name": "aam-rs",
+  "version": "1.4.0",
+  "description": "Node.js bindings for the aam-rs AAML configuration parser",
+  "license": "MIT OR Apache-2.0",
+  "main": "loader.js",
+  "types": "index.d.ts",
+  "files": [
+    "loader.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "test": "node --test"
+  },
+  "optionalDependencies": {
+    "aam-rs-darwin-arm64": "1.4.0",
+    "aam-rs-darwin-x64": "1.4.0",
+    "aam-rs-linux-x64-gnu": "1.4.0",
+    "aam-rs-win32-x64-msvc": "1.4.0"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  },
+  "napi": {
+    "binaryName": "aam_rs_node",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ]
+  }
+}
+
+
+
+
