@@ -3,34 +3,13 @@
     ".": {
       "release-type": "rust",
       "extra-files": [
-        {
-          "type": "generic",
-          "path": "java/build.gradle.kts"
-        },
-        {
-          "type": "generic",
-          "path": "js/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "js/package.json"
-        },
-        {
-          "type": "generic",
-          "path": "js/npm/linux-x64-gnu/package.json"
-        },
-        {
-          "type": "generic",
-          "path": "js/npm/darwin-x64/package.json"
-        },
-        {
-          "type": "generic",
-          "path": "js/npm/darwin-arm64/package.json"
-        },
-        {
-          "type": "generic",
-          "path": "js/npm/win32-x64-msvc/package.json"
-        }
+        "java/build.gradle.kts",
+        "js/Cargo.toml",
+        "js/package.json",
+        "js/npm/linux-x64-gnu/package.json",
+        "js/npm/darwin-x64/package.json",
+        "js/npm/darwin-arm64/package.json",
+        "js/npm/win32-x64-msvc/package.json"
       ]
     }
   }
