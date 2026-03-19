@@ -122,7 +122,7 @@ jobs:
         run: dotnet build AamRs.sln --configuration Release --no-restore
 
       - name: Run C# tests
-        working-directory: ./csharp/tests
+        working-directory: ./csharp/
         run: dotnet test AamRs.sln --configuration Release --no-build -v normal
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
