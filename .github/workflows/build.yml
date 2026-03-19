@@ -579,7 +579,7 @@ jobs:
   publish-csharp:
     name: Publish C# package
     needs: [ get-latest-tag, build-csharp-libs ]
-    if: ${{ github.event.inputs.publish_nuget == 'true' && secrets.NUGET_API_KEY != '' }}
+    if: ${{ github.event.inputs.publish_nuget == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
