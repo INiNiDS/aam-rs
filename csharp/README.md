@@ -100,16 +100,38 @@ using var doc = AamDocument.Load("config.aam");
 
 ## Building and Testing
 
+### Solution Layout
+
+- `aam-rs.csproj` - class library (NuGet package)
+- `tests/AamRs.Tests.csproj` - test project
+- `examples/AamRs.Examples.csproj` - runnable examples
+- `apps/AamRs.Console/AamRs.Console.csproj` - console app
+- `AamRs.sln` - solution that includes all projects
+
 ### Build
 
 ```bash
-dotnet build
+dotnet build AamRs.sln
 ```
 
 ### Run Tests
 
 ```bash
-dotnet test
+dotnet test AamRs.sln
+```
+
+### Run Examples
+
+```bash
+dotnet run --project examples/AamRs.Examples.csproj -- basic
+dotnet run --project examples/AamRs.Examples.csproj -- load
+```
+
+### Run Console App
+
+```bash
+dotnet run --project apps/AamRs.Console/AamRs.Console.csproj -- parse "host = localhost"
+dotnet run --project apps/AamRs.Console/AamRs.Console.csproj -- load ./examples/config.aam
 ```
 
 Note: Some tests require the native library to be available. On CI systems without native artifacts, tests gracefully

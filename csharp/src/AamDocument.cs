@@ -2,15 +2,27 @@ using System;
 
 namespace AamRs;
 
-public sealed class AamDocument : IDisposable
+/// <summary>
+/// Represents an AAML document and provides operations for parsing, loading, querying, and merging data.
+/// </summary>
+public sealed unsafe class AamDocument : IDisposable
 {
     private SafeAamHandle? _handle;
 
+    /// <summary>
+    /// Initializes a new empty AAML document handle.
+    /// </summary>
     public AamDocument()
     {
         _handle = new SafeAamHandle();
     }
 
+    /// <summary>
+    /// Parses AAML content from a string and returns a new document instance.
+    /// </summary>
+    /// <param name="content">AAML text to parse.</param>
+    /// <returns>A new <see cref="AamDocument"/> instance containing parsed data.</returns>
+    /// <exception cref="AamException">Thrown when native parsing fails.</exception>
     public static AamDocument Parse(string content)
     {
         var document = new AamDocument();
@@ -26,6 +38,12 @@ public sealed class AamDocument : IDisposable
         }
     }
 
+    /// <summary>
+    /// Loads an AAML file from disk and returns a new document instance.
+    /// </summary>
+    /// <param name="path">Path to the AAML file.</param>
+    /// <returns>A new <see cref="AamDocument"/> instance containing loaded data.</returns>
+    /// <exception cref="AamException">Thrown when native loading fails.</exception>
     public static AamDocument Load(string path)
     {
         var document = new AamDocument();
@@ -41,28 +59,54 @@ public sealed class AamDocument : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets a value indicating whether the document has been disposed.
+    /// </summary>
     public bool IsClosed => _handle is null || _handle.IsClosed || _handle.IsInvalid;
 
+    /// <summary>
+    /// Merges AAML content into the current document.
+    /// </summary>
+    /// <param name="content">AAML text to merge.</param>
+    /// <exception cref="AamException">Thrown when native merge fails.</exception>
     public void Merge(string content)
     {
         CheckResult(AamNative.aam_merge(Handle, content));
     }
 
+    /// <summary>
+    /// Finds a value by key.
+    /// </summary>
+    /// <param name="key">Key to search for.</param>
+    /// <returns>The value for the key, or <see langword="null"/> if not found.</returns>
     public string? FindObj(string key)
     {
         return AamNative.TakeOwnedUtf8String(AamNative.aam_find_obj(Handle, key));
     }
 
+    /// <summary>
+    /// Finds a key by its value.
+    /// </summary>
+    /// <param name="value">Value to search for.</param>
+    /// <returns>The first matching key, or <see langword="null"/> if not found.</returns>
     public string? FindKey(string value)
     {
         return AamNative.TakeOwnedUtf8String(AamNative.aam_find_key(Handle, value));
     }
 
+    /// <summary>
+    /// Resolves a value through chained key lookups until a terminal value is reached.
+    /// </summary>
+    /// <param name="key">Starting key for deep resolution.</param>
+    /// <returns>The resolved terminal value, or <see langword="null"/> if resolution fails.</returns>
     public string? FindDeep(string key)
     {
         return AamNative.TakeOwnedUtf8String(AamNative.aam_find_deep(Handle, key));
     }
 
+    /// <summary>
+    /// Releases native resources associated with this document.
+    /// </summary>
     public void Dispose()
     {
         _handle?.Dispose();
@@ -95,4 +139,5 @@ public sealed class AamDocument : IDisposable
         throw new AamException(message);
     }
 }
+
 
