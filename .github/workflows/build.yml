@@ -587,7 +587,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - uses: actions/download-artifact@v8
         with:
@@ -616,7 +616,7 @@ jobs:
 
       - name: Pack NuGet
         working-directory: ./csharp
-        run: dotnet pack aam-rs.csproj -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
+        run: dotnet pack AamRs.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
 
       - name: Publish NuGet package
         working-directory: ./csharp

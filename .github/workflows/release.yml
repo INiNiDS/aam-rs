@@ -111,19 +111,19 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore C# dependencies
         working-directory: ./csharp
-        run: dotnet restore
+        run: dotnet restore AamRs.sln
 
       - name: Build C# project
         working-directory: ./csharp
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build AamRs.sln --configuration Release --no-restore
 
       - name: Run C# tests
         working-directory: ./csharp/tests
-        run: dotnet test --configuration Release --no-build -v normal
+        run: dotnet test AamRs.sln --configuration Release --no-build -v normal
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
 
@@ -786,7 +786,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - uses: actions/download-artifact@v8
         with:
@@ -815,7 +815,7 @@ jobs:
 
       - name: Pack NuGet package
         working-directory: ./csharp
-        run: dotnet pack aam-rs.csproj -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
+        run: dotnet pack AamRs.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
 
       - name: Publish NuGet package
         working-directory: ./csharp
