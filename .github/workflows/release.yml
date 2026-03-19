@@ -778,7 +778,7 @@ jobs:
   publish-csharp:
     name: Publish C# Package to NuGet
     needs: [ release-please, build-csharp-libs ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' && secrets.NUGET_API_KEY != '' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
