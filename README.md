@@ -52,6 +52,26 @@ empty.merge('theme = dark')
 console.log(empty.toMap())
 ```
 
+### C# / .NET
+
+Install the C# bindings from NuGet:
+
+```bash
+dotnet add package Aam.Rs
+```
+
+The binding uses the native `aam_rs` library via FFI.
+
+```сsharp
+using AamRs;
+
+using var cfg = AamDocument.Parse("host = localhost\nport = 8080");
+Console.WriteLine(cfg.FindObj("host"));
+
+cfg.Merge("theme = dark");
+Console.WriteLine(cfg.FindObj("theme"));
+```
+
 ## Configuration syntax (.aam)
 
 The format is line-based. Whitespace around keys and values is trimmed. Strings can be quoted.

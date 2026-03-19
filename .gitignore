@@ -43,6 +43,18 @@ flamegraph.svg
 
 build/
 
+# C# / .NET
+csharp/**/bin/
+csharp/**/obj/
+csharp/**/TestResults/
+csharp/artifacts/
+csharp/**/runtimes/
+csharp/src/AamNative.cs.generated
+*.nupkg
+*.snupkg
+*.dll
+*.lib
+
 # Node / npm
 js/node_modules/
 js/.npm/
