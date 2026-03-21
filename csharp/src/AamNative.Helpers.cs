@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
-namespace AamRs;
+namespace AamCsharp;
 
 internal sealed unsafe class SafeAamHandle : SafeHandleZeroOrMinusOneIsInvalid
 {

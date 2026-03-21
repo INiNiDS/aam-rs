@@ -115,15 +115,15 @@ jobs:
 
       - name: Restore C# dependencies
         working-directory: ./csharp
-        run: dotnet restore AamRs.sln
+        run: dotnet restore AamCsharp.sln
 
       - name: Build C# project
         working-directory: ./csharp
-        run: dotnet build AamRs.sln --configuration Release --no-restore
+        run: dotnet build AamCsharp.sln --configuration Release --no-restore
 
       - name: Run C# tests
         working-directory: ./csharp/
-        run: dotnet test AamRs.sln --configuration Release --no-build -v normal
+        run: dotnet test AamCsharp.sln --configuration Release --no-build -v normal
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
 
@@ -1153,7 +1153,7 @@ jobs:
 
       - name: Pack NuGet package
         working-directory: ./csharp
-        run: dotnet pack AamRs.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
+        run: dotnet pack AamCsharp.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
 
       - name: Publish NuGet package
         working-directory: ./csharp

@@ -8,7 +8,7 @@ using System;
 using System.Runtime.InteropServices;
 
 
-namespace AamRs
+namespace AamCsharp
 {
     internal static unsafe partial class AamNative
     {

@@ -92,7 +92,7 @@ Builder::default ()
 .input_extern_file("src/ffi.rs")
 .csharp_dll_name("aam_rs")
 .csharp_class_name("AamNative")
-.csharp_namespace("AamRs")
+.csharp_namespace("AamCsharp")
 // Add or modify configuration here
 .generate_csharp_file("csharp/src/AamNative.cs")
 .expect("Failed to generate C# bindings");
@@ -141,7 +141,7 @@ The package will be created in `csharp/artifacts/`.
 
 ### Version Management
 
-The version is automatically managed by `release-please`. The version is specified in `csharp/aam-rs.csproj`:
+The version is automatically managed by `release-please`. The version is specified in `csharp/aam-csharp.csproj`:
 
 ```xml
 

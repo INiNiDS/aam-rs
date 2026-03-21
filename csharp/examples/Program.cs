@@ -1,4 +1,4 @@
-using AamRs;
+using AamCsharp;
 
 var scenario = args.Length > 0 ? args[0].ToLowerInvariant() : "basic";
 

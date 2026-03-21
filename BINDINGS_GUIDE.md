@@ -21,7 +21,7 @@ This document provides a quick overview of all available language bindings for `
 dotnet add package aam-csharp
 
 # Use in your code
-using AamRs;
+using AamCsharp;
 using var doc = AamDocument.Parse("host = localhost\nport = 8080");
 Console.WriteLine(doc.FindObj("host"));
 ```
@@ -53,13 +53,13 @@ cd csharp && dotnet test
 ### Quick Start
 
 ```bash
-pip install aam-rs
+pip install aam-py
 ```
 
 ```python
-from aam_rs import AamDocument
+from aam_py import AAML
 
-doc = AamDocument.parse("host = localhost\nport = 8080")
+doc = AAML.parse("host = localhost\nport = 8080")
 print(doc.find_obj("host"))
 ```
 

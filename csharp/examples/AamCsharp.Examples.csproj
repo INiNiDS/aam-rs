@@ -13,7 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../aam-rs.csproj" />
+    <ProjectReference Include="../aam-csharp.csproj" />
   </ItemGroup>
 </Project>
+
+
 

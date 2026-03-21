@@ -17,7 +17,7 @@ cargo build --manifest-path ruby/ext/aam_rb/Cargo.toml --release
 ## Build gem
 
 ```bash
-cp ruby/ext/aam_rb/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
+cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
 gem build ruby/aam-ruby.gemspec
 ```
 

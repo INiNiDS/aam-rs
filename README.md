@@ -63,7 +63,7 @@ dotnet add package aam-csharp
 The binding uses the native `aam_rs` library via FFI.
 
 ```сsharp
-using AamRs;
+using AamCsharp;
 
 using var cfg = AamDocument.Parse("host = localhost\nport = 8080");
 Console.WriteLine(cfg.FindObj("host"));
@@ -238,7 +238,7 @@ This gives schema-checked assignments while still allowing modular config compos
 cargo test
 node --test js/test/*.test.js
 go test ./go/...
-dotnet test csharp/AamRs.sln
+dotnet test csharp/AamCsharp.sln
 ruby ruby/tests/test_aam_rs.rb
 php php/tests/smoke.php
 ```

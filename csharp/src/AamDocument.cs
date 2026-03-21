@@ -1,6 +1,6 @@
 using System;
 
-namespace AamRs;
+namespace AamCsharp;
 
 /// <summary>
 /// Represents an AAML document and provides operations for parsing, loading, querying, and merging data.

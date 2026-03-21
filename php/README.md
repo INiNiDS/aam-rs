@@ -53,7 +53,7 @@ var_dump($aam->parseFindObj("env = production", 'missing')); // null
 ## Tests
 
 ```bash
-AAM_PHP_LIB=target/release/libaam_rs.so php php/tests/smoke.php
+AAM_RS_LIB=target/release/libaam_rs.so php php/tests/smoke.php
 ```
 
 The smoke script includes multiple assertions for valid parsing, reverse lookup, missing keys, and invalid input errors.

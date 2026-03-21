@@ -461,7 +461,7 @@ jobs:
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
-          cp php/src/AamRs.php php-pkg/src/
+          cp php/src/AamPhp.php php-pkg/src/
           cp php/tests/smoke.php php-pkg/tests/
           cp php/README.md php-pkg/ 2>/dev/null || true
           
@@ -939,7 +939,7 @@ jobs:
 
       - name: Pack NuGet
         working-directory: ./csharp
-        run: dotnet pack AamRs.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
+        run: dotnet pack AamCsharp.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
 
       - name: Publish NuGet package
         working-directory: ./csharp

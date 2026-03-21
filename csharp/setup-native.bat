@@ -43,7 +43,7 @@ echo Setup complete! You can now run C# tests and examples:
 echo.
 echo   cd csharp
 echo   dotnet test
-echo   dotnet run --project examples/Basic.csproj
+echo   dotnet run --project examples/Basic/AamCsharp.Basic.csproj
 echo.
 
 endlocal

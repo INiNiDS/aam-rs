@@ -57,7 +57,7 @@ Then set the library path:
 ### Basic Parsing
 
 ```csharp
-using AamRs;
+using AamCsharp;
 
 // Parse AAML content
 using var doc = AamDocument.Parse("host = localhost\nport = 8080");
@@ -122,36 +122,36 @@ Console.WriteLine(doc.FindKey("production")); // env
 
 ### Solution Layout
 
-- `aam-rs.csproj` - class library (NuGet package)
-- `tests/AamRs.Tests.csproj` - test project
-- `examples/AamRs.Examples.csproj` - runnable examples
-- `apps/AamRs.Console/AamRs.Console.csproj` - console app
-- `AamRs.sln` - solution that includes all projects
+- `aam-csharp.csproj` - class library (NuGet package)
+- `tests/AamCsharp.Tests.csproj` - test project
+- `examples/AamCsharp.Examples.csproj` - runnable examples
+- `apps/AamCsharp.Console/AamCsharp.Console.csproj` - console app
+- `AamCsharp.sln` - solution that includes all projects
 
 ### Build
 
 ```bash
-dotnet build AamRs.sln
+dotnet build AamCsharp.sln
 ```
 
 ### Run Tests
 
 ```bash
-dotnet test AamRs.sln
+dotnet test AamCsharp.sln
 ```
 
 ### Run Examples
 
 ```bash
-dotnet run --project examples/AamRs.Examples.csproj -- basic
-dotnet run --project examples/AamRs.Examples.csproj -- load
+dotnet run --project examples/AamCsharp.Examples.csproj -- basic
+dotnet run --project examples/AamCsharp.Examples.csproj -- load
 ```
 
 ### Run Console App
 
 ```bash
-dotnet run --project apps/AamRs.Console/AamRs.Console.csproj -- parse "host = localhost"
-dotnet run --project apps/AamRs.Console/AamRs.Console.csproj -- load ./examples/config.aam
+dotnet run --project apps/AamCsharp.Console/AamCsharp.Console.csproj -- parse "host = localhost"
+dotnet run --project apps/AamCsharp.Console/AamCsharp.Console.csproj -- load ./examples/config.aam
 ```
 
 Note: Some tests require the native library to be available. On CI systems without native artifacts, tests gracefully

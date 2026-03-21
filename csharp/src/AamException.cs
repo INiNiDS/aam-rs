@@ -1,6 +1,6 @@
 using System;
 
-namespace AamRs;
+namespace AamCsharp;
 
 /// <summary>
 /// Represents an error returned by the native AAML engine.

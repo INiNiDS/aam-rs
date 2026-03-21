@@ -1,7 +1,7 @@
-using AamRs;
+using AamCsharp;
 using Xunit;
 
-namespace AamRs.Tests;
+namespace AamCsharp.Tests;
 
 public sealed class AamDocumentTests
 {

@@ -4,7 +4,7 @@
       "release-type": "rust",
       "extra-files": [
         "java/build.gradle.kts",
-        "csharp/aam-rs.csproj",
+        "csharp/aam-csharp.csproj",
         "ruby/aam-ruby.gemspec",
         "js/Cargo.toml",
         "js/package.json",

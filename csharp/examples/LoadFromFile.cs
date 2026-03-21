@@ -1,4 +1,4 @@
-using AamRs;
+using AamCsharp;
 
 Console.WriteLine("=== C# AAML Configuration Example ===\n");
 

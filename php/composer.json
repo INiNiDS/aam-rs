@@ -13,9 +13,9 @@
     }
   ],
   "autoload": {
-    "psr-4": {
-      "INiNiDS\\aam-php\\": "src/"
-    }
+    "classmap": [
+      "src/AamPhp.php"
+    ]
   },
   "require": {
     "php": ">=8.0"

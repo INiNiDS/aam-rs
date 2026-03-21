@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 aam-rs = { path = "../../.." }
-magnus = "0.9"
+magnus = { git = "https://github.com/m-dahms/magnus" }
 
 [dev-dependencies]
 serial_test = "3.2.0"
