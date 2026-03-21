@@ -42,6 +42,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_php:
+        description: 'Publish PHP package to separate mirror repo (for Packagist)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -458,7 +463,10 @@ jobs:
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
           cp php/src/AamRs.php php-pkg/src/
           cp php/tests/smoke.php php-pkg/tests/
-          cp php/README.md php-pkg/
+          cp php/README.md php-pkg/ 2>/dev/null || true
+          
+          cp php/composer.json php-pkg/ 2>/dev/null || true 
+          
           cp target/release/libaam_rs.so php-pkg/native/
           cd php-pkg
           zip -r ../aam-php-package.zip ./*
@@ -485,6 +493,43 @@ jobs:
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: aam-php-package.zip
+
+  publish-php-mirror:
+    name: Publish PHP Package to Mirror Repo (Packagist)
+    needs: [ get-latest-tag, build-php-bindings ]
+    if: ${{ github.event.inputs.publish_php == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download PHP package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: php-package
+          path: php-artifact
+
+      - name: Push to PHP Mirror Repository
+        env:
+          TAG_NAME: ${{ needs.get-latest-tag.outputs.tag_name }}
+
+          TARGET_REPO: "ininids/aam-php"
+          MIRROR_TOKEN: ${{ secrets.PHP_MIRROR_TOKEN }}
+        run: |
+          mkdir php-repo
+          cd php-repo
+          
+          unzip ../php-artifact/aam-php-package.zip
+          
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          git commit -m "Release $TAG_NAME"
+          git tag "$TAG_NAME"
+          
+          git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${TARGET_REPO}.git"
+          
+          git push origin main --force
+          git push origin "$TAG_NAME" --force
 
   linux:
     runs-on: ${{ matrix.platform.runner }}

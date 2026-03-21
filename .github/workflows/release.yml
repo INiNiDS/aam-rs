@@ -436,33 +436,75 @@ jobs:
         env:
           AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
         run: php php/tests/smoke.php
+      - name: Package PHP artifacts
+        run: |
+          mkdir -p php-pkg/src php-pkg/tests php-pkg/native
+          cp php/src/AamRs.php php-pkg/src/
+          cp php/tests/smoke.php php-pkg/tests/
+          cp php/README.md php-pkg/ 2>/dev/null || true
+          cp php/composer.json php-pkg/ 2>/dev/null || true 
+          cp target/release/libaam_rs.so php-pkg/native/
+          cd php-pkg
+          zip -r ../aam-php-package.zip ./*
       - name: Upload PHP artifact
         uses: actions/upload-artifact@v7
         with:
-          name: php-native
-          path: target/release/libaam_rs.so
+          name: php-package
+          path: aam-php-package.zip
           retention-days: 1
 
   upload-php-to-release:
-    name: Upload PHP Artifact to Release
+    name: Upload PHP Package to Release
     needs: [ release-please, build-php-bindings ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Download PHP artifact
+      - name: Download PHP package
         uses: actions/download-artifact@v8
         with:
-          name: php-native
-          path: php-artifacts
-      - name: Zip PHP artifact
-        run: |
-          cd php-artifacts
-          zip -r ../aam-php-native.zip ./*
+          name: php-package
+          path: .
       - name: Upload PHP package to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
-          files: aam-php-native.zip
+          files: aam-php-package.zip
+
+  publish-php-mirror:
+    name: Publish PHP Package to Mirror Repo (Packagist)
+    needs: [ release-please, build-php-bindings ]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download PHP package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: php-package
+          path: php-artifact
+
+      - name: Push to PHP Mirror Repository
+        env:
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          TARGET_REPO: "ininids/aam-php"
+          MIRROR_TOKEN: ${{ secrets.PHP_MIRROR_TOKEN }}
+        run: |
+          mkdir php-repo
+          cd php-repo
+          
+          unzip ../php-artifact/aam-php-package.zip
+          
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          git commit -m "Release $TAG_NAME"
+          git tag "$TAG_NAME"
+          
+          git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${TARGET_REPO}.git"
+          
+          git push origin main --force
+          git push origin "$TAG_NAME" --force
 
   publish-npm:
     name: Publish to npm
@@ -1132,4 +1174,3 @@ jobs:
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: csharp/artifacts/*.nupkg
-
