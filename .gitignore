@@ -71,6 +71,16 @@ node-artifacts/
 dist/
 *.tgz
 
+# WASM
+wasm/pkg/
+
+# Ruby
+ruby/ext/aam_rs/target/
+
+# PHP
+php-pkg/
+aam-php-package.zip
+
 ### JetBrains IDE (IntelliJ IDEA) ###
 .idea/
 *.iws
