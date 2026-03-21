@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../src/AamRs.php';
+require_once __DIR__ . '/../src/AamPhp.php';
 
 if (!class_exists('FFI')) {
     fwrite(STDOUT, "PHP FFI extension is not enabled; skipping smoke test" . PHP_EOL);
     exit(0);
 }
 
-$aam = new AamRs();
+$aam = new AamPhp();
 $value = $aam->parseFindObj("host = localhost\nport = 8080", 'host');
 
 if ($value !== 'localhost') {

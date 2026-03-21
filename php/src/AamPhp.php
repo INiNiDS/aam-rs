@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-final class AamRs
+final class AamPhp
 {
     /** @var object */
     private $ffi;

@@ -81,4 +81,26 @@ mod tests {
         let parser = parser.expect("Should parse quoted import path");
         assert_eq!(parser.find_obj("q_key").unwrap().as_str(), "q_val");
     }
+
+    #[test]
+    fn test_import_missing_file_returns_error() {
+        let content = "@import definitely_missing_file_123.aam";
+        let parser = AAML::parse(content);
+        assert!(parser.is_err());
+    }
+
+    #[test]
+    fn test_import_overwrites_existing_values() {
+        let sub_file = "overwrite_import.aam";
+        let mut b = AAMBuilder::new();
+        b.add_line("mode", "imported");
+        b.to_file(sub_file).unwrap();
+
+        let content = format!("mode = local\n@import {}", sub_file);
+        let parser = AAML::parse(&content);
+        let _ = fs::remove_file(sub_file);
+
+        let parser = parser.expect("Should parse import overwrite scenario");
+        assert_eq!(parser.find_obj("mode").unwrap().as_str(), "imported");
+    }
 }

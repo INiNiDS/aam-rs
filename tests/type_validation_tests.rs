@@ -72,3 +72,31 @@ fn test_apply_schema_manual() {
     data.insert("y".to_string(), "invalid".to_string());
     assert!(aaml.apply_schema("Point", &data).is_err());
 }
+
+#[test]
+fn test_list_builtin_validation() {
+    let aaml = AAML::new();
+
+    assert!(aaml.validate_value("list<i32>", "[1, 2, 3]").is_ok());
+    assert!(
+        aaml.validate_value("list<bool>", "[true, false, true]")
+            .is_ok()
+    );
+    assert!(aaml.validate_value("list<i32>", "[1, nope, 3]").is_err());
+}
+
+#[test]
+fn test_schema_optional_fields_are_allowed_to_be_missing() {
+    let config = r#"
+    @schema Server {
+        host: string
+        port*: i32
+    }
+
+    host = localhost
+    "#;
+
+    let aaml = AAML::parse(config).expect("Should parse when optional field is absent");
+    aaml.validate_schemas_completeness()
+        .expect("Optional field should not be required");
+}

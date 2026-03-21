@@ -1,26 +1,44 @@
 # aam-wasm
 
-Minimal WebAssembly wrapper for `aam-rs` built with `wasm-bindgen` and `wasm-pack`.
+WebAssembly bindings for `aam-rs` powered by `wasm-bindgen` and `wasm-pack`.
 
-## Build
+## Build package
 
 ```bash
+cd wasm
 wasm-pack build --release --target nodejs --out-dir pkg
 ```
 
-## Test
+## Run tests
 
 ```bash
 cargo test --manifest-path wasm/Cargo.toml
 wasm-pack test --node wasm
 ```
 
-## JavaScript usage
+## Basic usage
 
-```js
-const wasm = require('./pkg/aam_wasm.js');
+```javascript
+const wasm = require('./pkg/aam_wasm.js')
 
-const doc = new wasm.AamDocument('host = localhost\nport = 8080');
-console.log(doc.findObj('host')); // localhost
+const doc = new wasm.AamDocument('host = localhost\nport = 8080')
+console.log(doc.findObj('host'))
 ```
+
+## More examples
+
+```javascript
+const wasm = require('./pkg/aam_wasm.js')
+
+const doc = new wasm.AamDocument('a = b\nb = c\nc = done')
+console.log(doc.findDeep('a')) // done
+
+doc.merge('env = production\nrole = api')
+console.log(doc.findKey('api')) // role
+```
+
+## Notes
+
+- The package is published to npm as `aam-wasm`.
+- Generated JS and `.wasm` files are emitted to `wasm/pkg/`.
 

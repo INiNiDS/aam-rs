@@ -76,7 +76,7 @@ wasm/pkg/
 wasm/node_modules/
 
 # Ruby
-ruby/ext/aam_rs/target/
+ruby/ext/aam_rb/target/
 ruby/*.gem
 ruby/.bundle/
 

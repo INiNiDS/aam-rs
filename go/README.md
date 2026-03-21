@@ -1,4 +1,4 @@
-# aam-rs Go bindings
+# aam-go
 
 CGo bindings for the [aam-rs](https://github.com/INiNiDS/aam-rs) AAML parser.
 
@@ -57,6 +57,28 @@ func main() {
 }
 ```
 
+## More examples
+
+```go
+doc, err := aam.Parse("a = b\nb = c\nc = done\n")
+if err != nil {
+    panic(err)
+}
+defer doc.Close()
+
+if v, ok := doc.FindDeep("a"); ok {
+    fmt.Println(v) // done
+}
+
+if err := doc.Merge("env = production\nrole = api\n"); err != nil {
+    panic(err)
+}
+
+if k, ok := doc.FindObj("production"); ok {
+    fmt.Println(k) // env (reverse lookup fallback)
+}
+```
+
 ## API
 
 | Function / Method                              | Description                            |
@@ -81,4 +103,7 @@ cargo build --release --features ffi
 cd go
 go test -v ./...
 ```
+
+The test suite includes parse/load, merge semantics, deep resolution, reverse lookup fallback, and closed-handle
+behavior.
 

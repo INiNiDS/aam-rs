@@ -37,6 +37,33 @@ runtime.merge('theme = dark')
 console.log(runtime.toMap())
 ```
 
+## More examples
+
+```js
+const {parse} = require('aam-nodejs')
+
+const cfg = parse(`
+root = /srv/app
+active = root
+roles = [api, worker]
+meta = { owner = team-a, region = eu }
+`)
+
+console.log(cfg.findDeep('active'))   // /srv/app
+console.log(cfg.findList('roles'))    // ['api', 'worker']
+console.log(cfg.findObject('meta'))   // { owner: 'team-a', region: 'eu' }
+console.log(cfg.findObj('team-a'))    // owner (reverse lookup fallback)
+```
+
+## Local build & test
+
+```bash
+cd js
+npm install
+npm run build
+npm test
+```
+
 ## API
 
 ### `new AAML()`

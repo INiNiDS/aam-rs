@@ -15,6 +15,20 @@ mod tests {
     }
 
     #[test]
+    fn hash_without_spacing_is_not_comment() {
+        assert_eq!(strip_comment("key=value#tail"), "key=value#tail");
+        assert_eq!(strip_comment("key = value#tail"), "key = value#tail");
+    }
+
+    #[test]
+    fn multiple_hashes_strip_from_first_valid_comment_marker() {
+        assert_eq!(
+            strip_comment("key = value # comment # second").trim(),
+            "key = value"
+        );
+    }
+
+    #[test]
     fn quoted_hash_preserved() {
         assert_eq!(
             strip_comment(r#"key = "val # not comment""#),
@@ -34,6 +48,7 @@ mod tests {
     fn inline_object_colon_separator() {
         let result = parse_inline_object("{ name: Alice, score: 100 }").unwrap();
         assert!(result.iter().any(|(k, v)| k == "name" && v == "Alice"));
+        assert!(result.iter().any(|(k, v)| k == "score" && v == "100"));
     }
 
     #[test]
@@ -65,5 +80,24 @@ mod tests {
         assert_eq!(result.len(), 2);
         let tags = result.iter().find(|(k, _)| k == "tags").unwrap();
         assert_eq!(tags.1, "[a, b, c]");
+    }
+
+    #[test]
+    fn inline_object_empty_is_valid() {
+        let result = parse_inline_object("{ } ").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn inline_object_malformed_returns_error() {
+        let result = parse_inline_object("{ x = 1, broken }");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn inline_object_trims_keys_and_values() {
+        let result = parse_inline_object("{  name   =   Alice  , role = admin   }").unwrap();
+        assert!(result.iter().any(|(k, v)| k == "name" && v == "Alice"));
+        assert!(result.iter().any(|(k, v)| k == "role" && v == "admin"));
     }
 }

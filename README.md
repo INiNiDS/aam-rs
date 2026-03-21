@@ -214,6 +214,35 @@ value.remove(" World");
 assert_eq!(value.as_str(), "Hello");
 ```
 
+### 7) Directives example (`@type`, `@schema`, `@import`)
+
+```aam
+@type port_t = i32
+
+@schema Service {
+    host: string
+    port: port_t
+}
+
+@import service_defaults.aam
+
+host = localhost
+port = 8080
+```
+
+This gives schema-checked assignments while still allowing modular config composition.
+
+## Quick verification commands
+
+```bash
+cargo test
+node --test js/test/*.test.js
+go test ./go/...
+dotnet test csharp/AamRs.sln
+ruby ruby/tests/test_aam_rs.rb
+php php/tests/smoke.php
+```
+
 ## API reference
 
 ### AAML

@@ -78,6 +78,22 @@ func TestFindObj_ClosedHandle(t *testing.T) {
 	}
 }
 
+func TestFindObj_ReverseLookupFallback(t *testing.T) {
+	doc, err := aam.Parse("username = alice\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+
+	val, ok := doc.FindObj("alice")
+	if !ok {
+		t.Fatal("FindObj(alice): not found")
+	}
+	if val != "username" {
+		t.Fatalf("FindObj(alice) = %q; want %q", val, "username")
+	}
+}
+
 // ── FindKey ───────────────────────────────────────────────────────────────────
 
 func TestFindKey_Found(t *testing.T) {
@@ -155,6 +171,22 @@ func TestFindDeep_NotFound(t *testing.T) {
 	}
 }
 
+func TestFindDeep_Cycle(t *testing.T) {
+	doc, err := aam.Parse("a = b\nb = c\nc = a\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+
+	val, ok := doc.FindDeep("a")
+	if !ok {
+		t.Fatal("FindDeep(a): not found")
+	}
+	if val != "c" {
+		t.Fatalf("FindDeep(a) = %q; want %q", val, "c")
+	}
+}
+
 // ── Merge ────────────────────────────────────────────────────────────────────
 
 func TestMerge_AddsNewKeys(t *testing.T) {
@@ -181,6 +213,32 @@ func TestMerge_ClosedHandle(t *testing.T) {
 
 	if err := doc.Merge("z = 3\n"); err == nil {
 		t.Error("Merge on closed handle: expected error, got nil")
+	}
+}
+
+func TestMerge_OverwritesExistingKey(t *testing.T) {
+	doc, err := aam.Parse("mode = base\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+
+	if err := doc.Merge("mode = override\n"); err != nil {
+		t.Fatalf("Merge() error: %v", err)
+	}
+
+	assertFindObj(t, doc, "mode", "override")
+}
+
+func TestMerge_InvalidContentReturnsError(t *testing.T) {
+	doc, err := aam.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+
+	if err := doc.Merge("invalid_line_without_equals"); err == nil {
+		t.Fatal("Merge(invalid): expected error, got nil")
 	}
 }
 

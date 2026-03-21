@@ -10,7 +10,7 @@ fn parse_find_obj(content: String, key: String) -> Result<Option<String>, Error>
 
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
-    let module = ruby.define_module("AamRs")?;
+    let module = ruby.define_module("AamRb")?;
     module.define_singleton_method("parse_find_obj", function!(parse_find_obj, 2))?;
     Ok(())
 }

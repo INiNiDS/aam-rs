@@ -98,6 +98,26 @@ string key = doc.FindKey("postgres"); // "database"
 using var doc = AamDocument.Load("config.aam");
 ```
 
+### Deep Lookup / Aliases
+
+```csharp
+using var doc = AamDocument.Parse(@"
+root = /srv/app
+active = root
+");
+
+Console.WriteLine(doc.FindDeep("active")); // /srv/app
+```
+
+### Reverse Lookup Fallback
+
+```csharp
+using var doc = AamDocument.Parse("env = production");
+
+Console.WriteLine(doc.FindObj("production")); // env
+Console.WriteLine(doc.FindKey("production")); // env
+```
+
 ## Building and Testing
 
 ### Solution Layout

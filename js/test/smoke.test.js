@@ -34,4 +34,25 @@ test('mutable instance lifecycle', () => {
     assert.equal(cfg.findObj('theme'), null)
 })
 
+test('findDeep resolves chained aliases', () => {
+    const cfg = parse(`
+root = /srv/app
+active = root
+current = active
+`)
+
+    assert.equal(cfg.findDeep('current'), '/srv/app')
+})
+
+test('findObj supports reverse lookup fallback', () => {
+    const cfg = parse('username = admin')
+
+    assert.equal(cfg.findObj('username'), 'admin')
+    assert.equal(cfg.findObj('admin'), 'username')
+})
+
+test('parse throws on invalid assignment syntax', () => {
+    assert.throws(() => parse('invalid_line_without_equals'))
+})
+
 
