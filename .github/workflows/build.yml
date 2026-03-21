@@ -208,6 +208,157 @@ jobs:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: node-artifacts/*.node
 
+  build-wasm-bindings:
+    name: Build & Test WASM Bindings
+    needs: get-latest-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+      - name: Build WASM package
+        working-directory: ./wasm
+        run: wasm-pack build --release --target nodejs --out-dir pkg
+      - name: Run WASM tests
+        working-directory: ./wasm
+        run: |
+          cargo test
+          wasm-pack test --node
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-pkg
+          path: wasm/pkg
+          retention-days: 1
+
+  upload-wasm-to-release:
+    name: Upload WASM Package to Release
+    needs: [ get-latest-tag, build-wasm-bindings ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download WASM package
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-pkg
+          path: wasm-pkg
+      - name: Zip WASM package
+        run: |
+          cd wasm-pkg
+          zip -r ../aam-wasm-package.zip ./*
+      - name: Upload WASM package to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: aam-wasm-package.zip
+
+  build-ruby-bindings:
+    name: Build & Test Ruby Bindings
+    needs: get-latest-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Ruby extension
+        run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
+      - name: Run Rust tests for Ruby extension
+        run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
+      - name: Run Ruby smoke test
+        run: ruby ruby/tests/test_aam_rs.rb
+      - name: Package Ruby artifacts
+        run: |
+          mkdir -p ruby-pkg/lib ruby-pkg/ext
+          cp -r ruby/lib ruby-pkg/
+          cp -r ruby/tests ruby-pkg/
+          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.* ruby-pkg/ext/ 2>/dev/null || true
+          cd ruby-pkg
+          zip -r ../aam-ruby-package.zip ./*
+      - name: Upload Ruby artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ruby-package
+          path: aam-ruby-package.zip
+          retention-days: 1
+
+  upload-ruby-to-release:
+    name: Upload Ruby Package to Release
+    needs: [ get-latest-tag, build-ruby-bindings ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ruby package
+        uses: actions/download-artifact@v8
+        with:
+          name: ruby-package
+          path: .
+      - name: Upload Ruby package to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: aam-ruby-package.zip
+
+  build-php-bindings:
+    name: Build & Test PHP Bindings
+    needs: get-latest-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          ini-values: ffi.enable=1
+      - name: Build native library for PHP FFI
+        run: cargo build --release --features ffi
+      - name: Run PHP smoke test
+        env:
+          AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
+        run: php php/tests/smoke.php
+      - name: Package PHP artifacts
+        run: |
+          mkdir -p php-pkg/src php-pkg/tests php-pkg/native
+          cp php/src/AamRs.php php-pkg/src/
+          cp php/tests/smoke.php php-pkg/tests/
+          cp php/README.md php-pkg/
+          cp target/release/libaam_rs.so php-pkg/native/
+          cd php-pkg
+          zip -r ../aam-php-package.zip ./*
+      - name: Upload PHP artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: php-package
+          path: aam-php-package.zip
+          retention-days: 1
+
+  upload-php-to-release:
+    name: Upload PHP Package to Release
+    needs: [ get-latest-tag, build-php-bindings ]
+    if: ${{ github.event.inputs.publish_github_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download PHP package
+        uses: actions/download-artifact@v8
+        with:
+          name: php-package
+          path: .
+      - name: Upload PHP package to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
+          files: aam-php-package.zip
+
   linux:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
