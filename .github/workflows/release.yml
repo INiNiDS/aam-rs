@@ -363,15 +363,19 @@ jobs:
         run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
       - name: Run Ruby smoke test
         run: ruby ruby/tests/test_aam_rs.rb
+      - name: Prepare Ruby gem payload
+        run: |
+          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
+          gem build ruby/aam-ruby.gemspec --output aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ruby-extension
-          path: ruby/ext/aam_rs/target/release/libaam_rs_ruby.*
+          name: ruby-gem
+          path: aam-ruby.gem
           retention-days: 1
 
   upload-ruby-to-release:
-    name: Upload Ruby Extension to Release
+    name: Upload Ruby Gem to Release
     needs: [ release-please, build-ruby-bindings ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
@@ -379,17 +383,37 @@ jobs:
       - name: Download Ruby artifact
         uses: actions/download-artifact@v8
         with:
-          name: ruby-extension
+          name: ruby-gem
           path: ruby-artifacts
-      - name: Zip Ruby artifact
-        run: |
-          cd ruby-artifacts
-          zip -r ../aam-ruby-extension.zip ./*
       - name: Upload Ruby package to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
-          files: aam-ruby-extension.zip
+          files: ruby-artifacts/aam-ruby.gem
+
+  publish-ruby:
+    name: Publish Ruby Gem (RubyGems + GitHub Packages)
+    needs: [ release-please, build-ruby-bindings ]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ruby artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ruby-gem
+          path: ruby-artifacts
+
+      - name: Publish to RubyGems
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBY_GEMS_TOKEN }}
+        run: gem push ruby-artifacts/aam-ruby.gem
+
+      - name: Publish to GitHub Packages (RubyGems)
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          gem push --host "https://rubygems.pkg.github.com/$OWNER" ruby-artifacts/aam-ruby.gem
 
   build-php-bindings:
     name: Build & Test PHP Bindings
@@ -477,6 +501,8 @@ jobs:
 
       - name: Publish platform packages
         working-directory: ./js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish ./npm/linux-x64-gnu --access public
           npm publish ./npm/darwin-x64 --access public
@@ -488,6 +514,57 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-npm-github:
+    name: Publish Node package to GitHub Packages
+    needs: [ release-please, build-node-bindings ]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+
+      - name: Install Node.js dependencies
+        working-directory: ./js
+        run: npm install
+
+      - name: Publish scoped package to GitHub Packages
+        working-directory: ./js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          npm pkg set name="@${OWNER}/aam-nodejs"
+          npm publish
+
+  publish-wasm-npm:
+    name: Publish WASM package to npm
+    needs: [ release-please, build-wasm-bindings ]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download WASM package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-pkg
+          path: wasm-pkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish WASM package to npm
+        working-directory: ./wasm-pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
   build-c-libs:
     needs: release-please
@@ -1039,6 +1116,16 @@ jobs:
       - name: Publish NuGet package
         working-directory: ./csharp
         run: dotnet nuget push "artifacts/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
+
+      - name: Publish NuGet package to GitHub Packages
+        working-directory: ./csharp
+        run: |
+          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --name github \
+            --username "${{ github.repository_owner }}" \
+            --password "${{ secrets.GITHUB_TOKEN }}" \
+            --store-password-in-clear-text
+          dotnet nuget push "artifacts/*.nupkg" --source github --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
 
       - name: Upload NuGet package to Release
         uses: softprops/action-gh-release@v2

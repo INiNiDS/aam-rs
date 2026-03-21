@@ -1,10 +1,11 @@
-use aam_rs::AAML;
+use aam_rs::aaml::AAML;
 use magnus::{Error, Ruby, exception, function, prelude::*};
 
 fn parse_find_obj(content: String, key: String) -> Result<Option<String>, Error> {
-    let doc =
-        AAML::parse(&content).map_err(|e| Error::new(exception::runtime_error(), e.to_string()))?;
-    Ok(doc.find_obj(&key).map(|v| v.to_string()))
+    let doc = AAML::parse(&content)
+        .map_err(|err| Error::new(exception::runtime_error(), err.to_string()))?;
+    let value = doc.find_obj(&key).map(|found| found.to_string());
+    Ok(value)
 }
 
 #[magnus::init]

@@ -1,11 +1,11 @@
-# aam-rs for Node.js
+# aam-nodejs
 
 Node.js bindings for the `aam-rs` AAML parser, powered by N-API.
 
 ## Installation
 
 ```bash
-npm install aam-rs
+npm install aam-nodejs
 ```
 
 Prebuilt binaries are published for:
@@ -18,7 +18,7 @@ Prebuilt binaries are published for:
 ## Usage
 
 ```js
-const { AAML, parse, version } = require('aam-rs')
+const {AAML, parse, version} = require('aam-nodejs')
 
 const cfg = parse(`
 host = localhost

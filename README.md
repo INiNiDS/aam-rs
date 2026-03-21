@@ -23,7 +23,7 @@ Add the library to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aam-rs = "1.2.4"
+aam-rs = "1.4.0" 
 ```
 
 ### Node.js / N-API
@@ -31,7 +31,7 @@ aam-rs = "1.2.4"
 Install the Node.js bindings from npm:
 
 ```bash
-npm install aam-rs
+npm install aam-nodejs
 ```
 
 The package ships prebuilt native addons for:
@@ -42,7 +42,7 @@ The package ships prebuilt native addons for:
 - Windows x64
 
 ```js
-const {parse, AAML} = require('aam-rs')
+const {parse, AAML} = require('aam-nodejs')
 
 const cfg = parse('host = localhost\nport = 8080')
 console.log(cfg.findObj('host'))
@@ -57,7 +57,7 @@ console.log(empty.toMap())
 Install the C# bindings from NuGet:
 
 ```bash
-dotnet add package Aam.Rs
+dotnet add package aam-csharp
 ```
 
 The binding uses the native `aam_rs` library via FFI.

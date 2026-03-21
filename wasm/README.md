@@ -1,4 +1,4 @@
-# aam-rs WebAssembly bindings
+# aam-wasm
 
 Minimal WebAssembly wrapper for `aam-rs` built with `wasm-bindgen` and `wasm-pack`.
 
@@ -18,7 +18,7 @@ wasm-pack test --node wasm
 ## JavaScript usage
 
 ```js
-const wasm = require('./pkg/aam_rs_wasm.js');
+const wasm = require('./pkg/aam_wasm.js');
 
 const doc = new wasm.AamDocument('host = localhost\nport = 8080');
 console.log(doc.findObj('host')); // localhost

@@ -1,5 +1,5 @@
 {
-  "name": "aam-rs",
+  "name": "aam-nodejs",
   "version": "1.4.0",
   "description": "Node.js bindings for the aam-rs AAML configuration parser",
   "license": "MIT OR Apache-2.0",
@@ -19,10 +19,10 @@
     "test": "node --test"
   },
   "optionalDependencies": {
-    "aam-rs-darwin-arm64": "1.4.0",
-    "aam-rs-darwin-x64": "1.4.0",
-    "aam-rs-linux-x64-gnu": "1.4.0",
-    "aam-rs-win32-x64-msvc": "1.4.0"
+    "aam-nodejs-darwin-arm64": "1.4.0",
+    "aam-nodejs-darwin-x64": "1.4.0",
+    "aam-nodejs-linux-x64-gnu": "1.4.0",
+    "aam-nodejs-win32-x64-msvc": "1.4.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.0.0"

@@ -5,12 +5,14 @@
       "extra-files": [
         "java/build.gradle.kts",
         "csharp/aam-rs.csproj",
+        "ruby/aam-ruby.gemspec",
         "js/Cargo.toml",
         "js/package.json",
         "js/npm/linux-x64-gnu/package.json",
         "js/npm/darwin-x64/package.json",
         "js/npm/darwin-arm64/package.json",
-        "js/npm/win32-x64-msvc/package.json"
+        "js/npm/win32-x64-msvc/package.json",
+        "wasm/Cargo.toml"
       ]
     }
   }

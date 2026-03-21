@@ -73,9 +73,12 @@ dist/
 
 # WASM
 wasm/pkg/
+wasm/node_modules/
 
 # Ruby
 ruby/ext/aam_rs/target/
+ruby/*.gem
+ruby/.bundle/
 
 # PHP
 php-pkg/

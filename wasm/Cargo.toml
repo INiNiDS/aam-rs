@@ -1,5 +1,5 @@
 [package]
-name = "aam-rs-wasm"
+name = "aam-wasm"
 description = "Wasm bindings for the AAM framework implemented in Rust."
 repository = "https://github.com/ininids/aam-rs/tree/main/wasm"
 version = "0.1.0"

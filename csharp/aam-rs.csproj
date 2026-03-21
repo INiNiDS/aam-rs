@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <PackageId>Aam.Rs</PackageId>
+    <PackageId>aam-csharp</PackageId>
     <Version>1.4.0</Version> <!-- x-release-please-version -->
     <Authors>INiNiDS</Authors>
     <Description>C# bindings for aam-rs AAML parser</Description>

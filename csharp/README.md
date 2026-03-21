@@ -15,13 +15,13 @@ C# bindings for the `aam-rs` AAML parser using the stable C FFI.
 ### Via NuGet
 
 ```bash
-dotnet add package Aam.Rs
+dotnet add package aam-csharp
 ```
 
 Or via Package Manager:
 
 ```powershell
-Install-Package Aam.Rs
+Install-Package aam-csharp
 ```
 
 ## Prerequisites

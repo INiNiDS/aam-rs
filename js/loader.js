@@ -20,23 +20,23 @@ function resolveTarget() {
 
     if (platform === 'linux' && arch === 'x64') {
         return isMusl()
-            ? ['linux-x64-musl', 'aam-rs-linux-x64-musl']
-            : ['linux-x64-gnu', 'aam-rs-linux-x64-gnu']
+            ? ['linux-x64-musl', 'aam-nodejs-linux-x64-musl']
+            : ['linux-x64-gnu', 'aam-nodejs-linux-x64-gnu']
     }
 
     if (platform === 'darwin' && arch === 'x64') {
-        return ['darwin-x64', 'aam-rs-darwin-x64']
+        return ['darwin-x64', 'aam-nodejs-darwin-x64']
     }
 
     if (platform === 'darwin' && arch === 'arm64') {
-        return ['darwin-arm64', 'aam-rs-darwin-arm64']
+        return ['darwin-arm64', 'aam-nodejs-darwin-arm64']
     }
 
     if (platform === 'win32' && arch === 'x64') {
-        return ['win32-x64-msvc', 'aam-rs-win32-x64-msvc']
+        return ['win32-x64-msvc', 'aam-nodejs-win32-x64-msvc']
     }
 
-    throw new Error(`Unsupported platform for aam-rs: ${platform} ${arch}`)
+    throw new Error(`Unsupported platform for aam-nodejs: ${platform} ${arch}`)
 }
 
 const [targetSuffix, packageName] = resolveTarget()

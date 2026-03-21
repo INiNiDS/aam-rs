@@ -1,6 +1,6 @@
 use wasm_bindgen_test::*;
 
-use aam_rs_wasm::AamDocument;
+use aam_wasm::AamDocument;
 
 wasm_bindgen_test_configure!(run_in_node_experimental);
 

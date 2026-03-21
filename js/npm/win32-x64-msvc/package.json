@@ -1,5 +1,5 @@
 {
-  "name": "aam-rs-win32-x64-msvc",
+  "name": "aam-nodejs-win32-x64-msvc",
   "version": "1.4.0",
   "license": "MIT OR Apache-2.0",
   "os": [

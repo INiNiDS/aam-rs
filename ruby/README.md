@@ -1,4 +1,4 @@
-# aam-rs Ruby bindings
+# aam-ruby
 
 Minimal Ruby extension built with `magnus`.
 
@@ -6,6 +6,7 @@ Minimal Ruby extension built with `magnus`.
 
 ```bash
 cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
+gem build ruby/aam-ruby.gemspec
 ```
 
 ## Run tests

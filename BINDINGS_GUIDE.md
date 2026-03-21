@@ -18,7 +18,7 @@ This document provides a quick overview of all available language bindings for `
 
 ```bash
 # Install via NuGet
-dotnet add package Aam.Rs
+dotnet add package aam-csharp
 
 # Use in your code
 using AamRs;
@@ -74,11 +74,11 @@ print(doc.find_obj("host"))
 ### Quick Start
 
 ```bash
-npm install aam-rs
+npm install aam-nodejs
 ```
 
 ```javascript
-const aam = require('aam-rs');
+const aam = require('aam-nodejs');
 
 const doc = aam.parse("host = localhost\nport = 8080");
 console.log(doc.findObj("host"));

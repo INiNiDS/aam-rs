@@ -37,6 +37,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_ruby:
+        description: 'Publish Ruby gem to RubyGems and GitHub Packages'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -208,6 +213,84 @@ jobs:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: node-artifacts/*.node
 
+  publish-npm:
+    name: Publish Node package to npm
+    needs: [ get-latest-tag, build-node-bindings ]
+    if: ${{ github.event.inputs.publish_npm == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Download Node.js addon artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: node-binding-*
+          merge-multiple: true
+          path: node-artifacts
+
+      - name: Install Node.js dependencies
+        working-directory: ./js
+        run: npm install
+
+      - name: Populate platform packages
+        run: |
+          cp node-artifacts/aam_rs_node.linux-x64-gnu.node js/npm/linux-x64-gnu/
+          cp node-artifacts/aam_rs_node.darwin-x64.node js/npm/darwin-x64/
+          cp node-artifacts/aam_rs_node.darwin-arm64.node js/npm/darwin-arm64/
+          cp node-artifacts/aam_rs_node.win32-x64-msvc.node js/npm/win32-x64-msvc/
+
+      - name: Publish platform packages
+        working-directory: ./js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish ./npm/linux-x64-gnu --access public
+          npm publish ./npm/darwin-x64 --access public
+          npm publish ./npm/darwin-arm64 --access public
+          npm publish ./npm/win32-x64-msvc --access public
+
+      - name: Publish main package
+        working-directory: ./js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+  publish-npm-github:
+    name: Publish Node package to GitHub Packages
+    needs: [ get-latest-tag, build-node-bindings ]
+    if: ${{ github.event.inputs.publish_npm == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+
+      - name: Install Node.js dependencies
+        working-directory: ./js
+        run: npm install
+
+      - name: Publish scoped package to GitHub Packages
+        working-directory: ./js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          npm pkg set name="@${OWNER}/aam-nodejs"
+          npm publish
+
   build-wasm-bindings:
     name: Build & Test WASM Bindings
     needs: get-latest-tag
@@ -256,6 +339,30 @@ jobs:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
           files: aam-wasm-package.zip
 
+  publish-wasm-npm:
+    name: Publish WASM package to npm
+    needs: [ get-latest-tag, build-wasm-bindings ]
+    if: ${{ github.event.inputs.publish_npm == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download WASM package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-pkg
+          path: wasm-pkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish WASM package to npm
+        working-directory: ./wasm-pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
   build-ruby-bindings:
     name: Build & Test Ruby Bindings
     needs: get-latest-tag
@@ -274,23 +381,19 @@ jobs:
         run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
       - name: Run Ruby smoke test
         run: ruby ruby/tests/test_aam_rs.rb
-      - name: Package Ruby artifacts
+      - name: Package Ruby gem
         run: |
-          mkdir -p ruby-pkg/lib ruby-pkg/ext
-          cp -r ruby/lib ruby-pkg/
-          cp -r ruby/tests ruby-pkg/
-          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.* ruby-pkg/ext/ 2>/dev/null || true
-          cd ruby-pkg
-          zip -r ../aam-ruby-package.zip ./*
+          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
+          gem build ruby/aam-ruby.gemspec --output aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ruby-package
-          path: aam-ruby-package.zip
+          name: ruby-gem
+          path: aam-ruby.gem
           retention-days: 1
 
   upload-ruby-to-release:
-    name: Upload Ruby Package to Release
+    name: Upload Ruby Gem to Release
     needs: [ get-latest-tag, build-ruby-bindings ]
     if: ${{ github.event.inputs.publish_github_release == 'true' }}
     runs-on: ubuntu-latest
@@ -298,13 +401,37 @@ jobs:
       - name: Download Ruby package
         uses: actions/download-artifact@v8
         with:
-          name: ruby-package
-          path: .
+          name: ruby-gem
+          path: ruby-artifacts
       - name: Upload Ruby package to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
-          files: aam-ruby-package.zip
+          files: ruby-artifacts/aam-ruby.gem
+
+  publish-ruby:
+    name: Publish Ruby Gem (RubyGems + GitHub Packages)
+    needs: [ get-latest-tag, build-ruby-bindings ]
+    if: ${{ github.event.inputs.publish_ruby == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ruby gem artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ruby-gem
+          path: ruby-artifacts
+
+      - name: Publish to RubyGems
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: gem push ruby-artifacts/aam-ruby.gem
+
+      - name: Publish to GitHub Packages (RubyGems)
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          gem push --host "https://rubygems.pkg.github.com/$OWNER" ruby-artifacts/aam-ruby.gem
 
   build-php-bindings:
     name: Build & Test PHP Bindings
@@ -772,6 +899,16 @@ jobs:
       - name: Publish NuGet package
         working-directory: ./csharp
         run: dotnet nuget push "artifacts/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
+
+      - name: Publish NuGet package to GitHub Packages
+        working-directory: ./csharp
+        run: |
+          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --name github \
+            --username "${{ github.repository_owner }}" \
+            --password "${{ secrets.GITHUB_TOKEN }}" \
+            --store-password-in-clear-text
+          dotnet nuget push "artifacts/*.nupkg" --source github --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
 
       - name: Upload NuGet package to Release
         if: ${{ github.event.inputs.publish_github_release == 'true' }}
