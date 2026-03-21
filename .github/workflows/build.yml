@@ -382,6 +382,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build Ruby extension
         run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
       - name: Run Rust tests for Ruby extension
         run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
       - name: Run Ruby smoke test
@@ -519,6 +522,8 @@ jobs:
           unzip ../php-artifact/aam-php-package.zip
           
           git init
+          git branch -M main
+          
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
