@@ -50,6 +50,8 @@ impl AamDocument {
 
 #[cfg(test)]
 mod tests {
+    use crate::AamDocument;
+
     #[test]
     fn parse_and_lookup_smoke() {
         let doc = AamDocument::new("host = localhost\nport = 8080").expect("should parse");

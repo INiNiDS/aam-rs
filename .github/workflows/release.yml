@@ -53,7 +53,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: 'stable'
+          go-version: "stable"
           cache-dependency-path: go/go.sum
 
       - name: Test Go bindings
@@ -111,7 +111,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Restore C# dependencies
         working-directory: ./csharp
@@ -165,7 +165,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: "3.3"
 
       - name: Build Ruby extension
         run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
@@ -191,7 +191,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           coverage: none
           ini-values: ffi.enable=1
 
@@ -204,7 +204,16 @@ jobs:
         run: php php/tests/smoke.php
 
   release-please:
-    needs: [ validate, validate-go, validate-js, validate-csharp, validate-wasm, validate-ruby, validate-php ]
+    needs:
+      [
+        validate,
+        validate-go,
+        validate-js,
+        validate-csharp,
+        validate-wasm,
+        validate-ruby,
+        validate-php,
+      ]
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -267,6 +276,11 @@ jobs:
         working-directory: ./js
         run: npm install
 
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Build release addon
         working-directory: ./js
         run: npm run build
@@ -318,6 +332,11 @@ jobs:
         run: |
           cargo test
           wasm-pack test --node
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html wasm/pkg/
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v7
         with:
@@ -356,7 +375,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: "3.3"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build Ruby extension
@@ -365,6 +384,11 @@ jobs:
         run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
       - name: Run Ruby smoke test
         run: ruby ruby/tests/test_aam_rs.rb
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html ruby/
       - name: Prepare Ruby gem payload
         run: |
           cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
@@ -429,7 +453,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           coverage: none
           ini-values: ffi.enable=1
       - name: Build native library for PHP FFI
@@ -438,6 +462,12 @@ jobs:
         env:
           AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
         run: php php/tests/smoke.php
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          mkdir -p php-pkg
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html php-pkg/
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
@@ -492,21 +522,21 @@ jobs:
         run: |
           mkdir php-repo
           cd php-repo
-          
+
           unzip ../php-artifact/aam-php-package.zip
-          
+
           git init 
           git branch -M main
-          
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
+
           git add .
           git commit -m "Release $TAG_NAME"
           git tag "$TAG_NAME"
-          
+
           git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${TARGET_REPO}.git"
-          
+
           git push origin main --force
           git push origin "$TAG_NAME" --force
 
@@ -538,6 +568,13 @@ jobs:
         working-directory: ./js
         run: npm install
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Populate platform packages
         run: |
           cp node-artifacts/aam_rs_node.linux-x64-gnu.node js/npm/linux-x64-gnu/
@@ -579,6 +616,13 @@ jobs:
         working-directory: ./js
         run: npm install
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Publish scoped package to GitHub Packages
         working-directory: ./js
         env:
@@ -659,6 +703,11 @@ jobs:
           else
             cp target/release/libaam_rs.so package/lib/libaam-c.so
           fi
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html package/
       - name: Zip Package
         run: |
           cd package
@@ -734,6 +783,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
+      - name: Generate CREDITS.html
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -774,6 +827,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
+      - name: Generate CREDITS.html
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -816,6 +873,10 @@ jobs:
         with:
           python-version: 3.13
           architecture: ${{ matrix.platform.python_arch }}
+      - name: Generate CREDITS.html
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -854,6 +915,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
+      - name: Generate CREDITS.html
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -878,6 +943,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Generate CREDITS.html
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -922,7 +991,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: 'dist/*'
+          subject-path: "dist/*"
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Publish to PyPI
@@ -1028,6 +1097,12 @@ jobs:
       - name: Build Rust library with FFI (static + dynamic)
         run: cargo build --release --features ffi --target ${{ matrix.target }}
 
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          mkdir -p go-pkg
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html go-pkg/
       - name: Package Go bindings
         run: |
           mkdir -p go-pkg/lib go-pkg/include go-pkg/src
@@ -1062,9 +1137,9 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
 
       - uses: actions/download-artifact@v8
         with:
@@ -1083,6 +1158,14 @@ jobs:
           name: jni-windows-x86_64
           path: java/src/main/resources/natives/windows-x86_64
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          mkdir -p java/src/main/resources/META-INF
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html java/src/main/resources/META-INF/
       - name: Build and Publish locally
         working-directory: ./java
         run: ./gradlew build publish
@@ -1128,7 +1211,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - uses: actions/download-artifact@v8
         with:
@@ -1155,6 +1238,13 @@ jobs:
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate and copy licenses
+        run: |
+          cargo binstall cargo-about -y
+          cargo about generate about.hbs > CREDITS.html
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html csharp/
       - name: Pack NuGet package
         working-directory: ./csharp
         run: dotnet pack AamCsharp.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts

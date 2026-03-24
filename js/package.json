@@ -8,7 +8,10 @@
   "files": [
     "loader.js",
     "index.d.ts",
-    "README.md"
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "CREDITS.html"
   ],
   "engines": {
     "node": ">=18"

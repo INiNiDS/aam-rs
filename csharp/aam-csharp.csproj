@@ -19,6 +19,9 @@
   <ItemGroup>
     <Compile Include="src/**/*.cs" />
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="LICENSE-MIT" Pack="true" PackagePath="/" />
+    <None Include="LICENSE-APACHE" Pack="true" PackagePath="/" />
+    <None Include="CREDITS.html" Pack="true" PackagePath="/" />
     <None Include="runtimes/**/*.*" Pack="true" PackagePath="%(Identity)" Visible="false" />
   </ItemGroup>
 </Project>

@@ -11,6 +11,7 @@ categories = [
     "parsing",
     "config",
 ]
+authors = ["Nikita Goncharov <ininids@ininids.in.rs>"]
 
 [dependencies]
 ahash = { version = "0.8.12", optional = true }

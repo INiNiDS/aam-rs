@@ -8,6 +8,7 @@ allow = [
     "BSD-2-Clause",
     "Apache-2.0 WITH LLVM-exception",
     "LGPL-2.1-or-later",
+    "MPL-2.0",
 ]
 
 [advisories]

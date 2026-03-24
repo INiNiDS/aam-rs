@@ -21,6 +21,9 @@ Gem::Specification.new do |spec|
   spec.files = Dir.chdir(__dir__) do
     Dir[
       'README.md',
+      'LICENSE-MIT',
+      'LICENSE-APACHE',
+      'CREDITS.html',
       'lib/**/*.rb',
       'lib/aam_rs_ruby.*',
       'tests/**/*.rb',
