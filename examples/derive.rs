@@ -198,6 +198,7 @@ fn match_result<T, E: std::fmt::Debug + std::fmt::Display>(result: Result<T, Aam
             field,
             type_name,
             details,
+            ..
         }) => {
             println!(
                 "   ✔ Got expected error — schema: '{schema}', field: '{field}' \

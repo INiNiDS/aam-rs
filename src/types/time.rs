@@ -1,5 +1,5 @@
 use crate::aaml::AAML;
-use crate::error::AamlError;
+use crate::error::{AamlError, ErrorDiagnostics};
 use crate::types::Type;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -27,19 +27,33 @@ fn validate_date_part(date: &str) -> bool {
 /// Validates an ISO 8601 date (`YYYY-MM-DD`) or datetime (`YYYY-MM-DDTHH:MM:SS`) string.
 fn validate_datetime(value: &str) -> Result<(), AamlError> {
     if value.len() < 10 || !validate_date_part(&value[..10]) {
-        return Err(AamlError::InvalidValue(format!(
-            "Invalid DateTime '{}': expected ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
-            value
-        )));
+        return Err(AamlError::InvalidValue {
+            details: format!("'{}' is not a valid ISO 8601 date/time", value),
+            expected: "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS format".to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Invalid datetime format",
+                format!("DateTime '{}' does not match ISO 8601 format", value),
+                "Use format: 2024-03-24 or 2024-03-24T14:30:00",
+            )),
+        });
     }
     Ok(())
 }
 
 /// Validates that `value` parses as a finite `f64` number.
 fn validate_numeric(value: &str, label: &str) -> Result<(), AamlError> {
-    value.parse::<f64>().map(|_| ()).map_err(|_| {
-        AamlError::InvalidValue(format!("Invalid {} '{}': expected a number", label, value))
-    })
+    value
+        .parse::<f64>()
+        .map(|_| ())
+        .map_err(|_| AamlError::InvalidValue {
+            details: format!("'{}' is not a valid number", value),
+            expected: "floating-point number".to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                &format!("Invalid {}", label),
+                format!("Value '{}' cannot be parsed as a number", value),
+                "Use numeric notation: 10.5, 3, -2.5, etc.",
+            )),
+        })
 }
 
 impl Type for TimeTypes {
@@ -54,7 +68,15 @@ impl Type for TimeTypes {
             "day" => Ok(TimeTypes::Day),
             "hour" => Ok(TimeTypes::Hour),
             "minute" => Ok(TimeTypes::Minute),
-            _ => Err(AamlError::NotFound(name.to_string())),
+            _ => Err(AamlError::NotFound {
+                key: name.to_string(),
+                context: "time types".to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Unknown time type",
+                    format!("Time type '{}' is not recognized", name),
+                    "Valid types: datetime, duration, year, day, hour, minute",
+                )),
+            }),
         }
     }
 

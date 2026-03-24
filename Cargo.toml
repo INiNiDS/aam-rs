@@ -17,6 +17,7 @@ ahash = { version = "0.8.12", optional = true }
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 pyo3 = { version = "0.28", features = ["extension-module", "abi3-py38"], optional = true }
 jni = { version = "0.22.3", optional = true }
+colored = "3.1.1"
 
 [build-dependencies]
 csbindgen = { version = "1.9.7", optional = true }

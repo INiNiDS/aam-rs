@@ -9,7 +9,7 @@
 
 use crate::commands::schema::SchemaDef;
 use crate::commands::{self, Command};
-use crate::error::AamlError;
+use crate::error::{AamlError, ErrorDiagnostics};
 use crate::types::list::ListType;
 use crate::types::{Type, resolve_builtin};
 use std::collections::HashMap;
@@ -132,7 +132,15 @@ impl AAML {
     pub fn check_type(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
         self.types
             .get(type_name)
-            .ok_or_else(|| AamlError::NotFound(type_name.to_string()))?
+            .ok_or_else(|| AamlError::NotFound {
+                key: type_name.to_string(),
+                context: "type registry".to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Type not found",
+                    format!("Type '{}' is not registered", type_name),
+                    "Check your @type directives or use a built-in type",
+                )),
+            })?
             .validate(value, self)
     }
 
@@ -142,6 +150,8 @@ impl AAML {
         let make_err = |e: AamlError| AamlError::InvalidType {
             type_name: type_name.to_string(),
             details: e.to_string(),
+            provided: value.to_string(),
+            diagnostics: None,
         };
 
         if let Some(type_def) = self.types.get(type_name) {
@@ -149,7 +159,18 @@ impl AAML {
         }
 
         resolve_builtin(type_name)
-            .map_err(|_| AamlError::NotFound(type_name.to_string()))?
+            .map_err(|_| AamlError::NotFound {
+                key: type_name.to_string(),
+                context: "builtin type registry".to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Type not found",
+                    format!(
+                        "Type '{}' is neither registered nor a built-in type",
+                        type_name
+                    ),
+                    "Check the type name or register a custom type with @type",
+                )),
+            })?
             .validate(value, self)
             .map_err(make_err)
     }
@@ -246,9 +267,19 @@ impl AAML {
             return Ok(());
         }
 
-        let schema = source.get_schemas_mut().remove(name).ok_or_else(|| {
-            AamlError::DirectiveError("derive".into(), format!("Schema '{name}' not found"))
-        })?;
+        let schema =
+            source
+                .get_schemas_mut()
+                .remove(name)
+                .ok_or_else(|| AamlError::DirectiveError {
+                    directive: "derive".to_string(),
+                    message: format!("Schema '{}' not found", name),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "Schema not found for inheritance",
+                        format!("Cannot derive from schema '{}': it does not exist", name),
+                        "Ensure the schema is defined before using @derive",
+                    )),
+                })?;
 
         // Collect field type strings before `schema` is moved into the map.
         let field_type_strings: Vec<String> = schema.fields.values().cloned().collect();
@@ -329,11 +360,27 @@ impl AAML {
                 self.map.insert(Box::from(key), Box::from(value));
                 Ok(())
             }
-            Err(details) => Err(AamlError::ParseError {
-                line: line_num,
-                content: line.to_string(),
-                details: details.to_string(),
-            }),
+            Err(mut err) => {
+                if let AamlError::MalformedLiteral { diagnostics, .. } = &mut err {
+                    if diagnostics.is_none() {
+                        *diagnostics = Some(ErrorDiagnostics::new(
+                            "Failed to parse assignment",
+                            format!("Line {}: '{}'", line_num, line),
+                            "Check the format: key = value",
+                        ));
+                    }
+                }
+                if let AamlError::InvalidValue { diagnostics, .. } = &mut err {
+                    if diagnostics.is_none() {
+                        *diagnostics = Some(ErrorDiagnostics::new(
+                            "Invalid assignment value",
+                            format!("Line {}: '{}'", line_num, line),
+                            "Ensure key and value are properly formatted",
+                        ));
+                    }
+                }
+                Err(err)
+            }
         }
     }
 
@@ -347,6 +394,11 @@ impl AAML {
                 line: line_num,
                 content: content.to_string(),
                 details: "Empty directive".to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Empty directive",
+                    "Directive name is missing after '@'",
+                    "Use format: @directive_name args",
+                )),
             });
         }
 
@@ -357,6 +409,11 @@ impl AAML {
                 line: line_num,
                 content: content.to_string(),
                 details: format!("Unknown directive: @{}", command_name),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Unknown directive",
+                    format!("Directive '@{}' is not recognized", command_name),
+                    "Known directives: @import, @derive, @schema, @type",
+                )),
             }),
         }
     }

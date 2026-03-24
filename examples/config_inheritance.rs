@@ -187,7 +187,11 @@ fn section_5_error_cases() {
     // 5a. Derive non-existent schema
     println!("   5a. @derive config_base.aam::PhantomSchema → DirectiveError");
     match AAML::parse("@derive config_base.aam::PhantomSchema\n") {
-        Err(AamlError::DirectiveError(cmd, msg)) => println!("       ✔ @{cmd}: {msg}"),
+        Err(AamlError::DirectiveError {
+            directive: cmd,
+            message: msg,
+            ..
+        }) => println!("       ✔ @{cmd}: {msg}"),
         other => eprintln!("       ✘ Unexpected: {other:?}"),
     }
 
@@ -200,6 +204,7 @@ fn section_5_error_cases() {
             field,
             type_name,
             details,
+            ..
         }) => println!("       ✔ schema '{schema}', field '{field}' ({type_name}): {details}"),
         other => eprintln!("       ✘ Unexpected: {other:?}"),
     }

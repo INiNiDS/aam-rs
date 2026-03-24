@@ -68,6 +68,14 @@ pub fn resolve_builtin(path: &str) -> Result<Box<dyn Type>, AamlError> {
         ["time", name] => Ok(Box::new(time::TimeTypes::from_name(name)?)),
         ["physics", name] => Ok(Box::new(physics::PhysicsTypes::from_name(name)?)),
         [name] => Ok(Box::new(PrimitiveType::from_name(name)?)),
-        _ => Err(AamlError::NotFound(path.to_string())),
+        _ => Err(AamlError::NotFound {
+            key: path.to_string(),
+            context: "builtin types".to_string(),
+            diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                "Unknown builtin type",
+                format!("Type path '{}' does not match any builtin type", path),
+                "Valid formats: math::vector3, time::datetime, physics::kilogram, i32, list<i32>, etc.",
+            )),
+        }),
     }
 }

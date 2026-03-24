@@ -290,7 +290,15 @@ impl Type for PhysicsTypes {
             "nauticalmile" => Ok(PhysicsTypes::NauticalMile),
             "horsepower" => Ok(PhysicsTypes::Horsepower),
 
-            _ => Err(AamlError::NotFound(name.to_string())),
+            _ => Err(AamlError::NotFound {
+                key: name.to_string(),
+                context: "physics types".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Unknown physics type",
+                    format!("Physics type '{}' is not recognized", name),
+                    "Check the type name or use a built-in physics unit",
+                )),
+            }),
         }
     }
 
@@ -308,25 +316,37 @@ impl Type for PhysicsTypes {
     fn validate(&self, value: &str, _aaml: &AAML) -> Result<(), AamlError> {
         match self.base_type() {
             PrimitiveType::I32 => {
-                value.parse::<i32>().map_err(|_| {
-                    AamlError::InvalidValue(format!(
-                        "Expected integer for unit {self}, got '{value}'"
-                    ))
+                value.parse::<i32>().map_err(|_| AamlError::InvalidValue {
+                    details: format!("'{}' is not a valid integer", value),
+                    expected: "integer value".to_string(),
+                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                        "Invalid unit value",
+                        format!("Unit {} requires an integer, got '{}'", self, value),
+                        "Use integer notation: 42, -100, etc.",
+                    )),
                 })?;
             }
             PrimitiveType::F64 => {
-                value.parse::<f64>().map_err(|_| {
-                    AamlError::InvalidValue(format!(
-                        "Expected number for unit {}, got '{}'",
-                        self, value
-                    ))
+                value.parse::<f64>().map_err(|_| AamlError::InvalidValue {
+                    details: format!("'{}' is not a valid number", value),
+                    expected: "floating-point number".to_string(),
+                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                        "Invalid unit value",
+                        format!("Unit {} requires a number, got '{}'", self, value),
+                        "Use numeric notation: 3.14, 2.0, -1.5, etc.",
+                    )),
                 })?;
             }
             _ => {
-                return Err(AamlError::InvalidValue(format!(
-                    "Unsupported base type for unit {}",
-                    self
-                )));
+                return Err(AamlError::InvalidValue {
+                    details: format!("Unit {} has unsupported base type", self),
+                    expected: "i32 or f64".to_string(),
+                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                        "Unsupported unit type",
+                        format!("Cannot validate unit {} with current base type", self),
+                        "Check the unit definition",
+                    )),
+                });
             }
         }
         Ok(())

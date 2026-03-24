@@ -107,9 +107,11 @@ impl Type for ListType {
     where
         Self: Sized,
     {
-        Err(AamlError::NotFound(
-            "ListType::from_name — use ListType::new instead".to_string(),
-        ))
+        Err(AamlError::NotFound {
+            key: "ListType".to_string(),
+            context: "ListType::from_name is not supported — use ListType::new instead".to_string(),
+            diagnostics: None,
+        })
     }
 
     fn base_type(&self) -> PrimitiveType {
@@ -119,11 +121,14 @@ impl Type for ListType {
     /// Validates the list literal `[item, item, ...]` where each item must
     /// satisfy the inner type.
     fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
-        let items = ListType::parse_items(value).ok_or_else(|| {
-            AamlError::InvalidValue(format!(
-                "Expected a list literal in the form [item, item, ...], got '{}'",
-                value
-            ))
+        let items = ListType::parse_items(value).ok_or_else(|| AamlError::InvalidValue {
+            details: format!("'{}' is not a valid list literal", value),
+            expected: "[item, item, ...] format".to_string(),
+            diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                "Malformed list literal",
+                format!("List must be wrapped in square brackets: [item1, item2, ...]"),
+                "Use format: [value1, value2, value3]",
+            )),
         })?;
 
         for item in &items {
@@ -133,11 +138,21 @@ impl Type for ListType {
                 &format!("list<{}>", self.inner_type),
                 "list_item",
             )
-            .map_err(|e| {
-                AamlError::InvalidValue(format!(
-                    "List item '{}' failed validation for type '{}': {}",
-                    item, self.inner_type, e
-                ))
+            .map_err(|e| AamlError::InvalidValue {
+                details: format!("'{}' does not match type '{}'", item, self.inner_type),
+                expected: format!("value of type {}", self.inner_type),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Invalid list item",
+                    format!(
+                        "List item '{}' failed type validation: {}",
+                        item,
+                        e.short_message()
+                    ),
+                    format!(
+                        "Ensure all items match the list type: list<{}>",
+                        self.inner_type
+                    ),
+                )),
             })?;
         }
 

@@ -219,7 +219,11 @@ fn demo_derive_nonexistent_schema() {
     println!("   @derive advanced_base.aam::NonExistentSchema\n");
 
     match AAML::parse("@derive advanced_base.aam::NonExistentSchema\n") {
-        Err(AamlError::DirectiveError(cmd, msg)) => println!("   ✔ @{cmd}: {msg}"),
+        Err(AamlError::DirectiveError {
+            directive: cmd,
+            message: msg,
+            ..
+        }) => println!("   ✔ @{cmd}: {msg}"),
         other => eprintln!("   ✘ Unexpected result: {other:?}"),
     }
 }

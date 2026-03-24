@@ -574,7 +574,10 @@ mod tests {
             result.is_err(),
             "must fail for non-existent schema selector"
         );
-        assert!(matches!(result.unwrap_err(), AamlError::DirectiveError(..)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AamlError::DirectiveError { .. }
+        ));
     }
 
     #[test]

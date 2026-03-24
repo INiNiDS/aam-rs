@@ -1,5 +1,7 @@
 //! Parsing helpers: comment stripping, assignment parsing, multi-line block accumulation.
 
+use crate::error::{AamlError, ErrorDiagnostics};
+
 /// Strips an inline `#` comment from a raw source line, respecting quoted strings.
 ///
 /// A `#` is a comment start only when it is preceded by whitespace (or at line start),
@@ -28,13 +30,13 @@ pub fn strip_comment(line: &str) -> &str {
 
 /// Parses a `key = value` assignment and returns trimmed (key, value) slices.
 ///
-/// The split point is the **first `=`** that appears outside of any
+/// The split point is the **first `=`** that appears outside any
 /// `{ ... }` or `[ ... ]` nesting.  This allows values like
 /// `pos = { x = 1.0, y = 2.0 }` or `tags = [a, b, c]` to be parsed
 /// correctly.  Surrounding quotes are stripped from the value via
 /// [`unwrap_quotes`], but `{...}` and `[...]` literals are returned as-is.
-pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), &'static str> {
-    // Find the first '=' outside of nesting
+pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), AamlError> {
+    // Find the first '=' outside nesting
     let mut depth: i32 = 0;
     let mut eq_pos: Option<usize> = None;
     for (i, ch) in line.char_indices() {
@@ -49,13 +51,31 @@ pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), &'static str>
         }
     }
 
-    let pos = eq_pos.ok_or("Missing assignment operator '='")?;
+    let pos = eq_pos.ok_or_else(|| AamlError::MalformedLiteral {
+        literal_type: "assignment".to_string(),
+        content: line.to_string(),
+        diagnostics: Some(ErrorDiagnostics::new(
+            "Missing assignment operator",
+            format!("Line '{}' does not contain '=' separator", line),
+            "Use format: key = value",
+        )),
+    })?;
     let key = line[..pos].trim();
     let raw_val = line[pos + 1..].trim();
 
     if key.is_empty() {
-        return Err("Key cannot be empty");
+        return Err(AamlError::InvalidValue {
+            details: "Key is empty".to_string(),
+            expected: "non-empty key name".to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Empty key in assignment",
+                format!("Line '{}' has no key before '='", line),
+                "Provide a valid key name before the '=' operator",
+            )),
+        });
     }
+
+    validate_balanced_delimiters(raw_val, line)?;
 
     // Do NOT unwrap quotes when the value is an inline object or list literal
     let val = if raw_val.starts_with('{') || raw_val.starts_with('[') {
@@ -65,6 +85,91 @@ pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), &'static str>
     };
 
     Ok((key, val))
+}
+
+/// Ensures `{}` and `[]` are balanced in `value`, ignoring bracket-like chars in quotes.
+fn validate_balanced_delimiters(value: &str, line: &str) -> Result<(), AamlError> {
+    let mut stack: Vec<char> = Vec::new();
+    let mut quote_state: Option<char> = None;
+    let mut escaped = false;
+
+    for ch in value.chars() {
+        if let Some(q) = quote_state {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == q {
+                quote_state = None;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' | '\'' => quote_state = Some(ch),
+            '{' | '[' => stack.push(ch),
+            '}' => {
+                if stack.pop() != Some('{') {
+                    return Err(AamlError::MalformedLiteral {
+                        literal_type: "assignment".to_string(),
+                        content: line.to_string(),
+                        diagnostics: Some(ErrorDiagnostics::new(
+                            "Mismatched delimiters",
+                            format!("Assignment '{}' has an unmatched '}}'", line),
+                            "Ensure inline objects and lists use balanced braces/brackets",
+                        )),
+                    });
+                }
+            }
+            ']' => {
+                if stack.pop() != Some('[') {
+                    return Err(AamlError::MalformedLiteral {
+                        literal_type: "assignment".to_string(),
+                        content: line.to_string(),
+                        diagnostics: Some(ErrorDiagnostics::new(
+                            "Mismatched delimiters",
+                            format!("Assignment '{}' has an unmatched ']'", line),
+                            "Ensure inline objects and lists use balanced braces/brackets",
+                        )),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if quote_state.is_some() {
+        return Err(AamlError::MalformedLiteral {
+            literal_type: "assignment".to_string(),
+            content: line.to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Unterminated quote",
+                format!(
+                    "Assignment '{}' contains an unterminated quoted value",
+                    line
+                ),
+                "Close the opening quote in the assignment value",
+            )),
+        });
+    }
+
+    if !stack.is_empty() {
+        return Err(AamlError::MalformedLiteral {
+            literal_type: "assignment".to_string(),
+            content: line.to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Unclosed delimiters",
+                format!("Assignment '{}' has unclosed '{{' or '['", line),
+                "Ensure inline objects and lists use balanced braces/brackets",
+            )),
+        });
+    }
+
+    Ok(())
 }
 
 /// Strips a matching pair of surrounding `"…"` or `'…'` quotes from `s`.
@@ -111,12 +216,20 @@ pub fn is_inline_object(value: &str) -> bool {
 ///
 /// Field separators are commas respecting `{}` / `[]` nesting, so values like
 /// `{ base = { x = 1, y = 2 }, z = 3 }` are parsed correctly.
-pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, String> {
+pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, AamlError> {
     let inner = value
         .trim()
         .strip_prefix('{')
         .and_then(|s| s.strip_suffix('}'))
-        .ok_or_else(|| format!("Inline object must be wrapped in '{{}}', got: '{value}'"))?;
+        .ok_or_else(|| AamlError::MalformedLiteral {
+            literal_type: "inline object".to_string(),
+            content: value.to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Malformed inline object",
+                format!("Inline object must be wrapped in '{{}}', got: '{}'", value),
+                "Wrap your object with curly braces: { key = value }",
+            )),
+        })?;
 
     split_top_level_fields(inner)
         .into_iter()
@@ -127,7 +240,15 @@ pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, String>
             let k = k.trim();
 
             if k.is_empty() {
-                return Err(format!("Empty key in inline object field '{entry}'"));
+                return Err(AamlError::InvalidValue {
+                    details: format!("Empty key in field '{}'", entry),
+                    expected: "non-empty field name".to_string(),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "Empty field name in inline object",
+                        format!("Field entry '{}' has no valid key", entry),
+                        "Provide a valid key name before '=' or ':'",
+                    )),
+                });
             }
 
             let v = v.trim();
@@ -166,7 +287,7 @@ fn split_top_level_fields(s: &str) -> Vec<&str> {
 }
 
 /// Splits `"key = val"` or `"key: val"` on the first `=` or `:` at depth 0.
-fn split_field_pair(entry: &str) -> Result<(&str, &str), String> {
+fn split_field_pair(entry: &str) -> Result<(&str, &str), AamlError> {
     let mut depth: i32 = 0;
     for (i, ch) in entry.char_indices() {
         match ch {
@@ -176,7 +297,13 @@ fn split_field_pair(entry: &str) -> Result<(&str, &str), String> {
             _ => {}
         }
     }
-    Err(format!(
-        "Inline object field '{entry}' has no '=' or ':' separator"
-    ))
+    Err(AamlError::MalformedLiteral {
+        literal_type: "field pair".to_string(),
+        content: entry.to_string(),
+        diagnostics: Some(ErrorDiagnostics::new(
+            "Missing field separator",
+            format!("Field entry '{}' has no '=' or ':' separator", entry),
+            "Use format: key = value or key: value",
+        )),
+    })
 }

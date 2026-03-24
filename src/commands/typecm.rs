@@ -46,9 +46,11 @@ impl Type for TypeDefinition {
     where
         Self: Sized,
     {
-        Err(AamlError::NotFound(
-            "TypeDefinition::from_name not supported".to_string(),
-        ))
+        Err(AamlError::NotFound {
+            key: "TypeDefinition".to_string(),
+            context: "TypeDefinition::from_name is not supported".to_string(),
+            diagnostics: None,
+        })
     }
 
     /// Returns the underlying [`PrimitiveType`] that best represents this type.
@@ -97,27 +99,42 @@ impl Command for TypeCommand {
     /// # Errors
     /// [`AamlError::ParseError`] if the format is invalid or name/definition is empty.
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
-        let (name, definition) = args.split_once('=').ok_or_else(|| AamlError::ParseError {
-            line: 0,
-            content: args.to_string(),
-            details: "Type definition must be in the format 'name = definition'".to_string(),
-        })?;
+        let (name, definition) =
+            args.split_once('=')
+                .ok_or_else(|| AamlError::DirectiveSyntaxError {
+                    directive: "type".to_string(),
+                    provided_syntax: args.to_string(),
+                    expected_syntax: "name = definition".to_string(),
+                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                        "Invalid @type syntax",
+                        "Type definition must have an '=' sign",
+                        "Use format: @type name = primitive_type or @type name = module::type",
+                    )),
+                })?;
 
         let name = name.trim();
         let definition = definition.trim();
 
         if name.is_empty() {
-            return Err(AamlError::ParseError {
-                line: 0,
-                content: args.to_string(),
-                details: "Type name cannot be empty".to_string(),
+            return Err(AamlError::InvalidValue {
+                details: "Type name is empty".to_string(),
+                expected: "non-empty type name".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Empty type name",
+                    "Type name cannot be empty before '='",
+                    "Provide a type name: @type myType = ...",
+                )),
             });
         }
         if definition.is_empty() {
-            return Err(AamlError::ParseError {
-                line: 0,
-                content: args.to_string(),
-                details: "Type definition cannot be empty".to_string(),
+            return Err(AamlError::InvalidValue {
+                details: "Type definition is empty".to_string(),
+                expected: "type definition (primitive or module path)".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Empty type definition",
+                    "Type definition cannot be empty after '='",
+                    "Provide a type: @type myType = i32, f64, string, etc.",
+                )),
             });
         }
 

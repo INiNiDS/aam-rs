@@ -37,6 +37,11 @@ impl Command for ImportCommand {
                 line: 0,
                 content: args.to_string(),
                 details: "Import path cannot be empty".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Missing import path",
+                    "@import directive requires a file path",
+                    "Use format: @import \"path/to/file.aam\"",
+                )),
             });
         }
 

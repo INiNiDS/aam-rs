@@ -42,6 +42,7 @@ impl AAML {
             field: field.to_string(),
             type_name: type_name.to_string(),
             details,
+            diagnostics: None,
         };
 
         // 1. Registered custom type alias
@@ -81,18 +82,24 @@ impl AAML {
         schema_fields: &HashMap<String, String>,
     ) -> Result<(), AamlError> {
         if !parsing::is_inline_object(value) {
-            return Err(AamlError::InvalidValue(format!(
-                "Field typed as schema '{}' must be an inline object '{{ k = v, ... }}', got: '{}'",
-                schema_name, value
-            )));
+            return Err(AamlError::InvalidValue {
+                details: format!(
+                    "Field typed as schema '{}' must be an inline object '{{ k = v, ... }}'",
+                    schema_name
+                ),
+                expected: "inline object format: { key = value, ... }".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Schema field must be an object",
+                    format!(
+                        "Expected inline object for schema '{}', got: '{}'",
+                        schema_name, value
+                    ),
+                    "Use format: { key1 = value1, key2 = value2 }",
+                )),
+            });
         }
 
-        let pairs = parsing::parse_inline_object(value).map_err(|e| {
-            AamlError::InvalidValue(format!(
-                "Failed to parse inline object for schema '{}': {}",
-                schema_name, e
-            ))
-        })?;
+        let pairs = parsing::parse_inline_object(value)?;
 
         let pair_map: HashMap<&str, &str> = pairs
             .iter()
@@ -119,6 +126,14 @@ impl AAML {
                                 "Missing field '{}' in inline object for schema '{}'",
                                 field, schema_name
                             ),
+                            diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                                "Missing required field",
+                                format!(
+                                    "Field '{}' is required in schema '{}' but not provided",
+                                    field, schema_name
+                                ),
+                                format!("Add field: {} = <value>", field),
+                            )),
                         });
                     }
                 }
@@ -159,6 +174,17 @@ impl AAML {
                         field: field.clone(),
                         type_name: type_name.clone(),
                         details: format!("Missing required field '{field}'"),
+                        diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                            "Missing required field in schema",
+                            format!(
+                                "Schema '{}' requires field '{}' of type '{}'",
+                                name, field, type_name
+                            ),
+                            format!(
+                                "Define the field in your configuration: {} = <value>",
+                                field
+                            ),
+                        )),
                     });
                 }
             }
@@ -182,7 +208,15 @@ impl AAML {
         let schema = self
             .schemas
             .get(schema_name)
-            .ok_or_else(|| AamlError::NotFound(format!("Schema '{}' not found", schema_name)))?;
+            .ok_or_else(|| AamlError::NotFound {
+                key: schema_name.to_string(),
+                context: "schema registry".to_string(),
+                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    "Schema not found",
+                    format!("Schema '{}' does not exist", schema_name),
+                    "Check your @schema definitions",
+                )),
+            })?;
 
         for (field, type_name) in &schema.fields {
             match data.get(field) {
@@ -193,6 +227,7 @@ impl AAML {
                             field: field.clone(),
                             type_name: type_name.clone(),
                             details: format!("Missing required field '{}'", field),
+                            diagnostics: None,
                         });
                     }
                 }
