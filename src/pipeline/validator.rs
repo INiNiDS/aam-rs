@@ -1,0 +1,254 @@
+//! Validator stage: generates validation tasks from AST.
+//!
+//! The Validator analyzes AST nodes and generates declarative ValidationTask items.
+//! These tasks are later executed by ValidateExecutor, enabling lazy evaluation,
+//! error aggregation (critical for LSP), and potential parallel execution.
+
+use crate::error::{AamlError, ErrorDiagnostics};
+use crate::pipeline::parser::{AstNode, ValueNode};
+use crate::pipeline::tasks::ValidationTask;
+
+/// Trait for task-based semantic validation.
+///
+/// Instead of directly validating, the Validator generates ValidationTask items.
+/// This enables deferred execution and better error handling for LSP integration.
+pub trait Validator: Send + Sync {
+    /// Analyzes an AST and generates validation tasks.
+    ///
+    /// This method performs static analysis on the AST and produces a list of
+    /// validation tasks that will be executed later by a ValidateExecutor.
+    /// It does NOT mutate state or execute validations directly.
+    ///
+    /// # Arguments
+    /// - `ast`: AST nodes to analyze
+    ///
+    /// # Returns
+    /// - `Ok(Vec<ValidationTask>)` containing all validation tasks to be executed
+    /// - `Err(AamlError)` if AST analysis itself fails (e.g., syntax errors)
+    fn validate(&self, ast: &[AstNode]) -> Result<Vec<ValidationTask>, AamlError>;
+
+    /// Performs quick syntactic checks that don't require deferred validation.
+    ///
+    /// This is called immediately during parsing to catch obvious issues early.
+    fn check_syntax(&self, ast: &[AstNode]) -> Result<(), AamlError>;
+}
+
+/// Default implementation of the Validator stage.
+///
+/// This validator performs syntactic checks immediately and generates
+/// semantic validation tasks for deferred execution.
+pub struct DefaultValidator;
+
+impl DefaultValidator {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Generates validation tasks for an assignment node.
+    fn generate_assignment_tasks(
+        key: &str,
+        value: &ValueNode,
+        line: usize,
+    ) -> Vec<ValidationTask> {
+        let mut tasks = Vec::new();
+
+        match value {
+            ValueNode::Literal(_s) => {
+                // Literals might be matched against schemas or generic type validation in execution
+                // We don't know the expected type here, so we defer those tasks
+            }
+            ValueNode::Object(pairs) => {
+                tasks.push(ValidationTask::ValidateObjectStructure {
+                    key: key.to_string(),
+                    pairs: pairs.clone(),
+                    line,
+                });
+            }
+            ValueNode::List(items) => {
+                tasks.push(ValidationTask::ValidateListElements {
+                    key: key.to_string(),
+                    items: items.clone(),
+                    element_type: "string".to_string(), // Could be determined from context
+                    line,
+                });
+            }
+        }
+
+        // Check for circular references
+        tasks.push(ValidationTask::CheckNoCircularReference {
+            key: key.to_string(),
+            line,
+        });
+
+        tasks
+    }
+
+    /// Generates validation tasks for a directive node.
+    fn generate_directive_tasks(
+        name: &str,
+        args: &str,
+        line: usize,
+    ) -> Vec<ValidationTask> {
+        let mut tasks = Vec::new();
+
+        match name {
+            "import" => {
+                if !args.is_empty() {
+                    tasks.push(ValidationTask::VerifyFileExists {
+                        path: args.to_string(),
+                        line,
+                    });
+                }
+            }
+            "derive" => {
+                tasks.push(ValidationTask::CheckDeriveCompleteness {
+                    derive_path: args.to_string(),
+                    current_key: "".to_string(), // AAM v2 check aam.ininids.in.rs
+                    line,
+                });
+            }
+            "schema" | "type" => {
+                // Nothing need to validate
+            }
+            _ => {
+                // Unknown directive - execution stage will handle it
+            }
+        }
+
+        tasks
+    }
+}
+
+impl Default for DefaultValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Validator for DefaultValidator {
+    fn validate(&self, ast: &[AstNode]) -> Result<Vec<ValidationTask>, AamlError> {
+        // First, perform syntactic checks
+        self.check_syntax(ast)?;
+
+        // Now generate validation tasks for deferred execution
+        let mut tasks = Vec::new();
+
+        for node in ast {
+            match node {
+                AstNode::Assignment { key, value, line } => {
+                    let node_tasks = Self::generate_assignment_tasks(key, value, *line);
+                    tasks.extend(node_tasks);
+                }
+                AstNode::Directive { name, args, line, body: _ } => {
+                    let node_tasks = Self::generate_directive_tasks(name, args, *line);
+                    tasks.extend(node_tasks);
+                }
+            }
+        }
+
+        Ok(tasks)
+    }
+
+    fn check_syntax(&self, ast: &[AstNode]) -> Result<(), AamlError> {
+        for node in ast {
+            match node {
+                AstNode::Assignment { key, value, line } => {
+                    if key.is_empty() {
+                        return Err(AamlError::ParseError {
+                            line: *line,
+                            content: format!("= {}", value.to_string()),
+                            details: "Empty key in assignment".to_string(),
+                            diagnostics: Some(ErrorDiagnostics::new(
+                                "Empty key",
+                                "Assignment keys must be non-empty".to_string(),
+                                "Provide a valid key name".to_string(),
+                            )),
+                        });
+                    }
+                }
+                AstNode::Directive { name, args: _, line, body: _ } => {
+                    if name.is_empty() {
+                        return Err(AamlError::ParseError {
+                            line: *line,
+                            content: "@".to_string(),
+                            details: "Empty directive name".to_string(),
+                            diagnostics: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_simple_assignment() {
+        let node = AstNode::Assignment {
+            key: "host".to_string().into(),
+            value: ValueNode::Literal("localhost".to_string().into()),
+            line: 1,
+        };
+        let validator = DefaultValidator::new();
+        let tasks = validator.validate(&[node]).unwrap();
+        assert!(!tasks.is_empty()); // Should generate validation tasks
+    }
+
+    #[test]
+    fn test_validate_empty_key() {
+        let node = AstNode::Assignment {
+            key: "".to_string().into(),
+            value: ValueNode::Literal("value".to_string().into()),
+            line: 1,
+        };
+        let validator = DefaultValidator::new();
+        assert!(validator.check_syntax(&[node]).is_err());
+    }
+
+    #[test]
+    fn test_generate_tasks_for_list_value() {
+        let node = AstNode::Assignment {
+            key: "items".to_string().into(),
+            value: ValueNode::List(vec![
+                ValueNode::Literal("a".to_string().into()),
+                ValueNode::Literal("b".to_string().into())
+            ].into()),
+            line: 1,
+        };
+        let validator = DefaultValidator::new();
+        let tasks = validator.validate(&[node]).unwrap();
+
+        // Should have generated ValidateListElements task among others
+        let has_list_task = tasks.iter().any(|t| {
+            matches!(t, ValidationTask::ValidateListElements { .. })
+        });
+        assert!(has_list_task);
+    }
+
+    #[test]
+    fn test_generate_tasks_for_object_value() {
+        let node = AstNode::Assignment {
+            key: "config".to_string().into(),
+            value: ValueNode::Object(vec![
+                ("foo".to_string().into(), ValueNode::Literal("bar".to_string().into()))
+            ].into()),
+            line: 1,
+        };
+        let validator = DefaultValidator::new();
+        let tasks = validator.validate(&[node]).unwrap();
+
+        // Should have generated ValidateObjectStructure task among others
+        let has_object_task = tasks.iter().any(|t| {
+            matches!(t, ValidationTask::ValidateObjectStructure { .. })
+        });
+        assert!(has_object_task);
+    }
+}
+
+
+

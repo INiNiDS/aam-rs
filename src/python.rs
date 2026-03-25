@@ -1,154 +1,101 @@
-//! PyO3 bindings — exposes `AAML` to Python as `aam_py.AAML`.
-//!
-//! Build with:
-//! ```sh
-//! pip install maturin
-//! maturin develop --features python
-//! ```
-//! Then in Python:
-//! ```python
-//! from aam_py import AAML
-//!
-//! cfg = AAML.parse("host = localhost\nport = 8080")
-//! print(cfg.find_obj("host"))   # "localhost"
-//! ```
+//! PyO3 bindings — exposes `AAM` to Python as `aam_py.AAM`.
 
-use crate::aaml::AAML;
-use crate::error::AamlError;
+use crate::aam::AAM;
+use crate::error::AamError;
+use crate::pipeline::formatter::FormatterRules;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
 // ── Error conversion ─────────────────────────────────────────────────────────
 
-fn to_py(err: AamlError) -> PyErr {
+fn to_py(err: AamError) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
-// ── PyAAML class ─────────────────────────────────────────────────────────────
+// ── PyAAM class ──────────────────────────────────────────────────────────────
 
-/// Python-facing wrapper around the Rust `AAML` parser.
-///
-/// All methods that can fail raise `RuntimeError` with a descriptive message.
-#[pyclass(unsendable, name = "AAML")]
-pub struct PyAAML {
-    inner: Option<AAML>,
+#[pyclass(unsendable, name = "AAM")]
+pub struct PyAam {
+    inner: Option<AAM>,
 }
 
-impl PyAAML {
-    fn inner_ref(&self) -> PyResult<&AAML> {
+impl PyAam {
+    fn inner_ref(&self) -> PyResult<&AAM> {
         self.inner
             .as_ref()
-            .ok_or_else(|| PyRuntimeError::new_err("AAML instance is closed"))
+            .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
     }
 
-    fn inner_mut(&mut self) -> PyResult<&mut AAML> {
+    fn inner_mut(&mut self) -> PyResult<&mut AAM> {
         self.inner
             .as_mut()
-            .ok_or_else(|| PyRuntimeError::new_err("AAML instance is closed"))
+            .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
     }
 }
 
 #[pymethods]
-impl PyAAML {
-    // ── Constructors ─────────────────────────────────────────────────────────
-
-    /// Create an empty AAML instance.
+impl PyAam {
     #[new]
     fn new() -> Self {
-        PyAAML {
-            inner: Some(AAML::new()),
+        PyAam {
+            inner: Some(AAM::new()),
         }
     }
 
-    /// Parse an AAML string and return a new instance.
-    ///
-    /// ```python
-    /// cfg = AAML.parse("host = localhost\nport = 8080")
-    /// ```
     #[staticmethod]
     fn parse(content: &str) -> PyResult<Self> {
-        AAML::parse(content)
-            .map(|inner| PyAAML { inner: Some(inner) })
+        AAM::parse(content)
+            .map(|inner| PyAam { inner: Some(inner) })
             .map_err(to_py)
     }
 
-    /// Load an AAML file from disk and return a new instance.
-    ///
-    /// ```python
-    /// cfg = AAML.load("config.aam")
-    /// ```
     #[staticmethod]
     fn load(path: &str) -> PyResult<Self> {
-        AAML::load(path)
-            .map(|inner| PyAAML { inner: Some(inner) })
+        AAM::load(path)
+            .map(|inner| PyAam { inner: Some(inner) })
             .map_err(to_py)
     }
 
-    // ── Mutation ─────────────────────────────────────────────────────────────
+    fn format(&self, content: &str) -> PyResult<String> {
+        let rules = FormatterRules::default();
+        self.inner_ref()?
+            .format(content, &rules)
+            .map_err(to_py)
+    }
 
-    /// Merge AAML text into this instance (modifies in-place).
     fn merge(&mut self, content: &str) -> PyResult<()> {
         self.inner_mut()?.merge_content(content).map_err(to_py)
     }
 
-    /// Backward-compatible alias for `merge`.
     fn merge_content(&mut self, content: &str) -> PyResult<()> {
         self.merge(content)
     }
 
-    /// Merge an AAML file into this instance (modifies in-place).
     fn merge_file(&mut self, path: &str) -> PyResult<()> {
         self.inner_mut()?.merge_file(path).map_err(to_py)
     }
 
-    // ── Lookups ──────────────────────────────────────────────────────────────
-
-    /// Forward lookup: returns the value for `key`, or `None`.
-    ///
-    /// Also performs a reverse lookup (find key whose value equals `key`)
-    /// when no direct key is found.
     fn find_obj(&self, key: &str) -> Option<String> {
-        self.inner_ref()
-            .ok()
-            .and_then(|inner| inner.find_obj(key).map(|v| v.as_str().to_string()))
+        self.inner_ref().ok().and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
     }
 
-    /// Reverse lookup: find the key whose value equals `value`, or `None`.
     fn find_key(&self, value: &str) -> Option<String> {
-        self.inner_ref()
-            .ok()
-            .and_then(|inner| inner.find_key(value).map(|v| v.as_str().to_string()))
+        self.inner_ref().ok().and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
     }
 
-    /// Deep lookup: follow key→value→key chains until a terminal or cycle.
     fn find_deep(&self, key: &str) -> Option<String> {
-        self.inner_ref()
-            .ok()
-            .and_then(|inner| inner.find_deep(key).map(|v| v.as_str().to_string()))
+        self.inner_ref().ok().and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
     }
 
-    /// Look up `key` and parse its value as a list `[a, b, c]`.
-    ///
-    /// Returns `None` if the key is absent or the value is not a list literal.
     fn find_list(&self, key: &str) -> Option<Vec<String>> {
-        self.inner_ref()
-            .ok()
-            .and_then(|inner| inner.find_obj(key).and_then(|v| v.as_list()))
+        self.inner_ref().ok().and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
     }
 
-    /// Look up `key` and parse its value as an inline object `{ k = v, ... }`.
-    ///
-    /// Returns `None` if the key is absent or the value is not an object literal.
     fn find_object(&self, key: &str) -> Option<HashMap<String, String>> {
-        self.inner_ref()
-            .ok()
-            .and_then(|inner| inner.find_obj(key).and_then(|v| v.as_object()))
+        self.inner_ref().ok().and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
     }
 
-    // ── Map introspection ────────────────────────────────────────────────────
-
-    /// Returns all keys stored in this instance.
     fn keys(&self) -> Vec<String> {
         match self.inner_ref() {
             Ok(inner) => inner.keys().iter().map(|s| s.to_string()).collect(),
@@ -156,50 +103,35 @@ impl PyAAML {
         }
     }
 
-    /// Returns a Python `dict` of all key-value pairs.
     fn to_dict(&self) -> HashMap<String, String> {
-        self.inner_ref()
-            .map_or_else(|_| HashMap::new(), |inner| inner.to_map())
+        self.inner_ref().map_or_else(|_| HashMap::new(), |i| i.to_map())
     }
 
-    // ── Type validation ──────────────────────────────────────────────────────
-
-    /// Validate `value` against a built-in or registered type name.
-    ///
-    /// Raises `RuntimeError` on validation failure.
     fn validate_value(&self, type_name: &str, value: &str) -> PyResult<()> {
-        self.inner_ref()?
-            .validate_value(type_name, value)
-            .map_err(to_py)
+        self.inner_ref()?.validate_value(type_name, value).map_err(to_py)
     }
 
-    /// Explicitly releases the underlying Rust object.
     fn close(&mut self) {
         self.inner = None;
     }
 
-    /// Returns `True` if `close()` has already been called.
     fn is_closed(&self) -> bool {
         self.inner.is_none()
     }
 
-    // ── Dunder methods ───────────────────────────────────────────────────────
-
     fn __repr__(&self) -> String {
         match self.inner_ref() {
-            Ok(inner) => format!("AAML({} keys)", inner.keys().len()),
-            Err(_) => "AAML(closed)".to_string(),
+            Ok(inner) => format!("AAM({} keys)", inner.keys().len()),
+            Err(_) => "AAM(closed)".to_string(),
         }
     }
 
     fn __len__(&self) -> usize {
-        self.inner_ref().map_or(0, |inner| inner.keys().len())
+        self.inner_ref().map_or(0, |i| i.keys().len())
     }
 
     fn __contains__(&self, key: &str) -> bool {
-        self.inner_ref()
-            .map(|inner| inner.find_obj(key).is_some())
-            .unwrap_or(false)
+        self.inner_ref().map(|i| i.find_obj(key).is_some()).unwrap_or(false)
     }
 
     fn __getitem__(&self, key: &str) -> PyResult<String> {
@@ -210,11 +142,42 @@ impl PyAAML {
     }
 }
 
-/// Register all Python-facing items into `m`.
-///
-/// Called from the crate-root `#[pymodule]` in `lib.rs`.
+// ── Deprecated PyAAML class ──────────────────────────────────────────────────
+
+#[pyclass(unsendable, name = "AAML")]
+pub struct PyAaml {
+    inner: PyAam,
+}
+
+#[pymethods]
+impl PyAaml {
+    #[new]
+    #[pyo3(signature = ())]
+    fn new() -> Self {
+        PyAaml { inner: PyAam::new() }
+    }
+
+    #[staticmethod]
+    fn parse(content: &str) -> PyResult<Self> {
+        PyAam::parse(content).map(|inner| PyAaml { inner })
+    }
+
+    #[staticmethod]
+    fn load(path: &str) -> PyResult<Self> {
+        PyAam::load(path).map(|inner| PyAaml { inner })
+    }
+
+    fn find_obj(&self, key: &str) -> Option<String> {
+        self.inner.find_obj(key)
+    }
+    
+    // Pass-through other commonly used methods...
+    fn merge(&mut self, content: &str) -> PyResult<()> { self.inner.merge(content) }
+}
+
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
-    m.add_class::<PyAAML>()?;
+    m.add_class::<PyAam>()?;
+    m.add_class::<PyAaml>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

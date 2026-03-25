@@ -19,12 +19,21 @@
 //! println!("{}", cfg.find_obj("host").unwrap());
 //! ```
 
+#[cfg(feature = "legacy")]
+#[allow(deprecated)]
 pub mod aaml;
+
 pub mod builder;
 pub mod commands;
 pub mod error;
+#[cfg(feature = "legacy")]
 pub mod found_value;
+pub mod pipeline;
+#[cfg(feature = "legacy")]
+#[allow(deprecated)]
 mod types;
+
+mod types_aam;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
@@ -34,6 +43,7 @@ pub mod python;
 
 #[cfg(feature = "jni")]
 pub mod jni;
+pub mod aam_value;
 
 /// Python extension-module entry point, compiled only with `--features python`.
 ///

@@ -1,31 +1,39 @@
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
+use aam_rs::pipeline::formatter::FormatterRules;
 use wasm_bindgen::prelude::*;
 
-/// JavaScript-facing document wrapper for AAML parsing and lookups.
+/// JavaScript-facing document wrapper for AAM parsing and lookups.
 #[wasm_bindgen]
 pub struct AamDocument {
-    inner: AAML,
+    inner: AAM,
 }
 
 #[wasm_bindgen]
 impl AamDocument {
-    /// Parses AAML text and returns a new document instance.
+    /// Parses AAM text and returns a new document instance.
     #[wasm_bindgen(constructor)]
     pub fn new(content: &str) -> Result<AamDocument, JsValue> {
-        let inner = AAML::parse(content).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let inner = AAM::parse(content).map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(Self { inner })
     }
 
     /// Loads and parses content into the current document, replacing existing state.
     pub fn parse(&mut self, content: &str) -> Result<(), JsValue> {
-        self.inner = AAML::parse(content).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.inner = AAM::parse(content).map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(())
     }
 
-    /// Merges additional AAML text into the current document.
+    /// Merges additional AAM text into the current document.
     pub fn merge(&mut self, content: &str) -> Result<(), JsValue> {
         self.inner
             .merge_content(content)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+    
+    /// Formats an AAM string to standardized style.
+    pub fn format(&self, content: &str) -> Result<String, JsValue> {
+        let rules = FormatterRules::default();
+        self.inner.format(content, &rules)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
@@ -45,6 +53,26 @@ impl AamDocument {
     #[wasm_bindgen(js_name = findDeep)]
     pub fn find_deep(&self, key: &str) -> Option<String> {
         self.inner.find_deep(key).map(|v| v.to_string())
+    }
+}
+
+// Deprecated AAML wrapper
+#[wasm_bindgen]
+pub struct AamlDocument {
+    inner: AamDocument,
+}
+
+#[wasm_bindgen]
+impl AamlDocument {
+    #[wasm_bindgen(constructor)]
+    pub fn new(content: &str) -> Result<AamlDocument, JsValue> {
+        let inner = AamDocument::new(content)?;
+        Ok(Self { inner })
+    }
+    
+    #[wasm_bindgen(js_name = findObj)]
+    pub fn find_obj(&self, key: &str) -> Option<String> {
+        self.inner.find_obj(key)
     }
 }
 

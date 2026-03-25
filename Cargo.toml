@@ -24,12 +24,13 @@ colored = "3.1.1"
 csbindgen = { version = "1.9.7", optional = true }
 
 [features]
-default = []
+default = ["legacy"]
 perf-hash = ["ahash"]
 ffi = []
 python = ["pyo3"]
 jni = ["dep:jni"]
 csharp = ["dep:csbindgen", "ffi"]
+legacy = []
 
 [[example]]
 name = "standard"

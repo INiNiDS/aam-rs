@@ -16,13 +16,14 @@ final class AamPhp
         $lib = $libPath ?? getenv('AAM_RS_LIB') ?: __DIR__ . '/../../target/release/libaam_rs.so';
 
         $this->ffi = \FFI::cdef(<<<'CDEF'
-            typedef struct AamlHandle AamlHandle;
-            AamlHandle* aam_new(void);
-            void aam_free(AamlHandle* handle);
-            int aam_parse(AamlHandle* handle, const char* content);
-            char* aam_find_obj(AamlHandle* handle, const char* key);
+            typedef struct AamHandle AamHandle;
+            AamHandle* aam_new(void);
+            void aam_free(AamHandle* handle);
+            int aam_parse(AamHandle* handle, const char* content);
+            char* aam_format(AamHandle* handle, const char* content);
+            char* aam_find_obj(AamHandle* handle, const char* key);
             void aam_string_free(char* s);
-            const char* aam_last_error(AamlHandle* handle);
+            const char* aam_last_error(AamHandle* handle);
         CDEF, $lib);
     }
 
@@ -30,7 +31,7 @@ final class AamPhp
     {
         $handle = $this->ffi->aam_new();
         if ($handle === null) {
-            throw new RuntimeException('Failed to allocate AAML handle');
+            throw new RuntimeException('Failed to allocate AAM handle');
         }
 
         try {
@@ -55,6 +56,29 @@ final class AamPhp
             $this->ffi->aam_free($handle);
         }
     }
+
+    public function format(string $content): string
+    {
+        $handle = $this->ffi->aam_new();
+        if ($handle === null) {
+            throw new RuntimeException('Failed to allocate AAM handle');
+        }
+
+        try {
+            $formattedPtr = $this->ffi->aam_format($handle, $content);
+            if ($formattedPtr === null) {
+                $err = $this->ffi->aam_last_error($handle);
+                $msg = $err !== null ? \FFI::string($err) : 'Native format failed';
+                throw new RuntimeException($msg);
+            }
+
+            try {
+                return \FFI::string($formattedPtr);
+            } finally {
+                $this->ffi->aam_string_free($formattedPtr);
+            }
+        } finally {
+            $this->ffi->aam_free($handle);
+        }
+    }
 }
-
-
