@@ -44,16 +44,16 @@ type Hasher = std::collections::hash_map::RandomState;
 type AamlString = Box<str>;
 
 /// Output produced by the full pipeline after all stages complete successfully.
-pub struct PipelineOutput {
+pub struct PipelineOutput<'a> {
     /// Final key-value map with all directives executed
     pub map: HashMap<AamlString, AamlString, Hasher>,
     /// Registered schema definitions
-    pub schemas: HashMap<String, SchemaInfo, Hasher>,
+    pub schemas: HashMap<std::borrow::Cow<'a, str>, SchemaInfo<'a>, Hasher>,
     /// Registered custom types
-    pub types: HashMap<String, TypeInfo, Hasher>,
+    pub types: HashMap<std::borrow::Cow<'a, str>, TypeInfo<'a>, Hasher>,
 }
 
-impl std::fmt::Debug for PipelineOutput {
+impl<'a> std::fmt::Debug for PipelineOutput<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PipelineOutput")
             .field("map", &self.map)
@@ -63,7 +63,7 @@ impl std::fmt::Debug for PipelineOutput {
     }
 }
 
-impl PipelineOutput {
+impl<'a> PipelineOutput<'a> {
     /// Creates a new empty pipeline output
     pub fn new() -> Self {
         Self {
@@ -74,7 +74,7 @@ impl PipelineOutput {
     }
 }
 
-impl Default for PipelineOutput {
+impl<'a> Default for PipelineOutput<'a> {
     fn default() -> Self {
         Self::new()
     }
@@ -135,7 +135,7 @@ impl Pipeline {
     /// # Note
     /// The Executer never instantiates an AAML struct. All execution is
     /// task-based and stateless beyond the ExecutionDescriptor.
-    pub fn process(&self, content: &str) -> Result<PipelineOutput, Vec<AamlError>> {
+    pub fn process<'a>(&self, content: &'a str) -> Result<PipelineOutput<'a>, Vec<AamlError>> {
         let mut all_errors = Vec::new();
 
         // Stage 1: Lexer
@@ -148,7 +148,7 @@ impl Pipeline {
         };
 
         // Stage 2: Parser
-        let ast = match self.parser.parse(tokens) {
+        let ast = match self.parser.parse(&tokens) {
             Ok(a) => a,
             Err(e) => {
                 all_errors.push(e);

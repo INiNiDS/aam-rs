@@ -43,7 +43,7 @@ pub fn validate_inline_object_against_schema(
     }
 
     for (field, (type_name, is_optional)) in &schema_info.fields {
-        match pair_map.get(field.as_str()) {
+        match pair_map.get(field.as_ref()) {
             None => {
                 if !is_optional {
                     return Err(format!(

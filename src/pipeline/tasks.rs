@@ -11,7 +11,7 @@ use crate::pipeline::parser::ValueNode;
 /// Validation tasks represent specific checks that need to be performed on AST nodes.
 /// They are generated during the validation phase and executed by `ValidateExecutor`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidationTask {
+pub enum ValidationTask<'a> {
     /// Check if a value matches a registered type's constraints.
     ///
     /// # Fields
@@ -20,9 +20,9 @@ pub enum ValidationTask {
     /// - `type_name`: Name of the type to validate against (e.g., "i32", "string", "vector2")
     /// - `line`: Source line number for diagnostics
     CheckTypeMatch {
-        key: String,
-        value: String,
-        type_name: String,
+        key: std::borrow::Cow<'a, str>,
+        value: std::borrow::Cow<'a, str>,
+        type_name: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -32,7 +32,7 @@ pub enum ValidationTask {
     /// - `schema_name`: Name of the schema to check
     /// - `line`: Source line number
     VerifySchemaExists {
-        schema_name: String,
+        schema_name: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -42,7 +42,7 @@ pub enum ValidationTask {
     /// - `path`: Path to the file
     /// - `line`: Source line number
     VerifyFileExists {
-        path: String,
+        path: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -54,9 +54,9 @@ pub enum ValidationTask {
     /// - `value`: Value being validated
     /// - `line`: Source line number
     ValidateAgainstSchema {
-        schema_name: String,
-        key: String,
-        value: String,
+        schema_name: std::borrow::Cow<'a, str>,
+        key: std::borrow::Cow<'a, str>,
+        value: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -67,8 +67,8 @@ pub enum ValidationTask {
     /// - `missing_fields`: Required fields not found
     /// - `line`: Source line number
     CheckSchemaCompleteness {
-        schema_name: String,
-        missing_fields: Vec<String>,
+        schema_name: std::borrow::Cow<'a, str>,
+        missing_fields: Vec<std::borrow::Cow<'a, str>>,
         line: usize,
     },
 
@@ -78,7 +78,7 @@ pub enum ValidationTask {
     /// - `key`: Key being looked up
     /// - `line`: Source line number
     CheckNoCircularReference {
-        key: String,
+        key: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -89,8 +89,8 @@ pub enum ValidationTask {
     /// - `current_key`: The context key doing the derivation
     /// - `line`: Source line number
     CheckDeriveCompleteness {
-        derive_path: String,
-        current_key: String,
+        derive_path: std::borrow::Cow<'a, str>,
+        current_key: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -102,9 +102,9 @@ pub enum ValidationTask {
     /// - `element_type`: Expected type of each element
     /// - `line`: Source line number
     ValidateListElements {
-        key: String,
-        items: std::sync::Arc<[ValueNode]>,
-        element_type: String,
+        key: std::borrow::Cow<'a, str>,
+        items: std::sync::Arc<[ValueNode<'a>]>,
+        element_type: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -115,13 +115,13 @@ pub enum ValidationTask {
     /// - `pairs`: Key-value pairs in the object
     /// - `line`: Source line number
     ValidateObjectStructure {
-        key: String,
-        pairs: std::sync::Arc<[(std::sync::Arc<str>, ValueNode)]>,
+        key: std::borrow::Cow<'a, str>,
+        pairs: std::sync::Arc<[(std::borrow::Cow<'a, str>, ValueNode<'a>)]>,
         line: usize,
     },
 }
 
-impl ValidationTask {
+impl<'a> ValidationTask<'a> {
     /// Returns the line number associated with this task for error reporting.
     pub fn line(&self) -> usize {
         match self {
@@ -176,7 +176,7 @@ impl ValidationTask {
 /// Parse tasks represent operations that need to be performed on parsed modules,
 /// variables, and scopes. They enable deferred processing and analysis.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseTask {
+pub enum ParseTask<'a> {
     /// Resolve a module reference in a scope.
     ///
     /// # Fields
@@ -184,8 +184,8 @@ pub enum ParseTask {
     /// - `scope`: Current scope path
     /// - `line`: Source line number
     ResolveModuleReference {
-        module_name: String,
-        scope: String,
+        module_name: std::borrow::Cow<'a, str>,
+        scope: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -195,7 +195,7 @@ pub enum ParseTask {
     /// - `derive_path`: Raw derive path (e.g. file.aam::SchemaName)
     /// - `line`: Source line number
     ResolveDeriveImport {
-        derive_path: String,
+        derive_path: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -207,9 +207,9 @@ pub enum ParseTask {
     /// - `scope`: Scope path
     /// - `line`: Source line number
     ProcessVariable {
-        variable_name: String,
-        value: String,
-        scope: String,
+        variable_name: std::borrow::Cow<'a, str>,
+        value: std::borrow::Cow<'a, str>,
+        scope: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -220,7 +220,7 @@ pub enum ParseTask {
     /// - `is_entry`: true for scope entry, false for exit
     /// - `line`: Source line number
     ManageScope {
-        scope: String,
+        scope: std::borrow::Cow<'a, str>,
         is_entry: bool,
         line: usize,
     },
@@ -232,8 +232,8 @@ pub enum ParseTask {
     /// - `arguments`: Directive arguments
     /// - `line`: Source line number
     ExecuteDirective {
-        directive_name: String,
-        arguments: String,
+        directive_name: std::borrow::Cow<'a, str>,
+        arguments: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -244,8 +244,8 @@ pub enum ParseTask {
     /// - `type_spec`: Type specification
     /// - `line`: Source line number
     RegisterType {
-        type_name: String,
-        type_spec: String,
+        type_name: std::borrow::Cow<'a, str>,
+        type_spec: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -256,13 +256,13 @@ pub enum ParseTask {
     /// - `fields`: Field definitions
     /// - `line`: Source line number
     RegisterSchema {
-        schema_name: String,
-        fields: String,
+        schema_name: std::borrow::Cow<'a, str>,
+        fields: std::borrow::Cow<'a, str>,
         line: usize,
     },
 }
 
-impl ParseTask {
+impl<'a> ParseTask<'a> {
     /// Returns the line number associated with this task.
     pub fn line(&self) -> usize {
         match self {
@@ -310,7 +310,7 @@ impl ParseTask {
 /// Execution tasks represent the final operations to be performed to materialize
 /// the configuration, independent of AAML struct manipulation.
 #[derive(Debug, Clone)]
-pub enum ExecutionTask {
+pub enum ExecutionTask<'a> {
     /// Set a configuration value in the output.
     ///
     /// # Fields
@@ -318,8 +318,8 @@ pub enum ExecutionTask {
     /// - `value`: Value to set
     /// - `line`: Source line number
     SetValue {
-        key: String,
-        value: String,
+        key: std::borrow::Cow<'a, str>,
+        value: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -330,8 +330,8 @@ pub enum ExecutionTask {
     /// - `value`: Value to merge in
     /// - `line`: Source line number
     MergeValue {
-        key: String,
-        value: String,
+        key: std::borrow::Cow<'a, str>,
+        value: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -342,8 +342,8 @@ pub enum ExecutionTask {
     /// - `root_keys`: Keys that are part of this schema
     /// - `line`: Source line number
     ApplySchema {
-        schema_name: String,
-        root_keys: Vec<String>,
+        schema_name: std::borrow::Cow<'a, str>,
+        root_keys: Vec<std::borrow::Cow<'a, str>>,
         line: usize,
     },
 
@@ -354,8 +354,8 @@ pub enum ExecutionTask {
     /// - `child_key`: Child configuration key
     /// - `line`: Source line number
     ExecuteInheritance {
-        derive_path: String,
-        child_key: String,
+        derive_path: std::borrow::Cow<'a, str>,
+        child_key: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -366,8 +366,8 @@ pub enum ExecutionTask {
     /// - `merge_strategy`: How to merge ("override" or "merge")
     /// - `line`: Source line number
     ImportFile {
-        file_path: String,
-        merge_strategy: String,
+        file_path: std::borrow::Cow<'a, str>,
+        merge_strategy: std::borrow::Cow<'a, str>,
         line: usize,
     },
 
@@ -378,13 +378,13 @@ pub enum ExecutionTask {
     /// - `target_key`: Key being referenced
     /// - `line`: Source line number
     ResolveReference {
-        source_key: String,
-        target_key: String,
+        source_key: std::borrow::Cow<'a, str>,
+        target_key: std::borrow::Cow<'a, str>,
         line: usize,
     },
 }
 
-impl ExecutionTask {
+impl<'a> ExecutionTask<'a> {
     /// Returns the line number associated with this task.
     pub fn line(&self) -> usize {
         match self {

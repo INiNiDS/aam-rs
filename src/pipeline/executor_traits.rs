@@ -97,10 +97,10 @@ pub trait ParserExecutor: Send + Sync {
     /// # Returns
     /// - `Ok(())` if parsing succeeded
     /// - `Err(AamlError)` if parsing failed
-    fn execute_parse(
+    fn execute_parse<'a>(
         &self,
-        task: &ParseTask,
-        context: &mut ExecutionContext,
+        task: &ParseTask<'a>,
+        context: &mut ExecutionContext<'a>,
     ) -> Result<(), AamlError>;
 
     /// Executes multiple parsing tasks in sequence.
@@ -111,10 +111,10 @@ pub trait ParserExecutor: Send + Sync {
     ///
     /// # Returns
     /// - `TaskExecutionResult` with aggregated results
-    fn execute_batch(
+    fn execute_batch<'a>(
         &self,
-        tasks: &[ParseTask],
-        context: &mut ExecutionContext,
+        tasks: &[ParseTask<'a>],
+        context: &mut ExecutionContext<'a>,
     ) -> TaskExecutionResult {
         let mut errors = Vec::new();
         let mut successful = 0;
@@ -207,9 +207,9 @@ impl ValidateExecutor for DefaultValidateExecutor {
             } => {
                 if !self.type_exists(context, type_name) {
                     return Err(AamlError::InvalidType {
-                        type_name: type_name.clone(),
+                        type_name: type_name.to_string(),
                         details: format!("Type not found in registry for key '{}'", key),
-                        provided: value.clone(),
+                        provided: value.to_string(),
                         diagnostics: Some(ErrorDiagnostics::new(
                             "Unknown type",
                             format!("Type '{}' is not registered", type_name),
@@ -220,9 +220,9 @@ impl ValidateExecutor for DefaultValidateExecutor {
 
                 if let Err(e) = self.validate_type_value(value, type_name, context) {
                     return Err(AamlError::InvalidType {
-                        type_name: type_name.clone(),
+                        type_name: type_name.to_string(),
                         details: format!("Validation failed for key '{}'", key),
-                        provided: value.clone(),
+                        provided: value.to_string(),
                         diagnostics: Some(ErrorDiagnostics::new(
                             "Type validation failed",
                             e,
@@ -239,7 +239,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
                     Ok(true)
                 } else {
                     Err(AamlError::NotFound {
-                        key: schema_name.clone(),
+                        key: schema_name.to_string(),
                         context: "Schema not found in registry".to_string(),
                         diagnostics: Some(ErrorDiagnostics::new(
                             "Schema not defined",
@@ -251,7 +251,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
             }
 
             ValidationTask::VerifyFileExists { path, line } => {
-                if std::path::Path::new(path).exists() {
+                if std::path::Path::new(path.as_ref()).exists() {
                     Ok(true)
                 } else {
                     Err(AamlError::IoError {
@@ -315,7 +315,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
                     for (field, (type_name, is_optional)) in &schema.fields {
                         if !is_optional {
                             let full_key = if current_key.is_empty() {
-                                field.clone()
+                                field.to_string()
                             } else {
                                 format!("{}.{}", current_key, field)
                             };
@@ -329,8 +329,8 @@ impl ValidateExecutor for DefaultValidateExecutor {
                             if !context.map.contains_key(full_key.as_str()) {
                                 return Err(AamlError::SchemaValidationError {
                                     schema: schema_name.to_string(),
-                                    field: field.clone(),
-                                    type_name: type_name.clone(),
+                                    field: field.to_string(),
+                                    type_name: type_name.to_string(),
                                     details: format!("Missing required field '{}' from derived schema '{}'", field, schema_name),
                                     diagnostics: Some(ErrorDiagnostics::new(
                                         "Incomplete derivation",
@@ -348,8 +348,8 @@ impl ValidateExecutor for DefaultValidateExecutor {
             ValidationTask::ValidateAgainstSchema { schema_name, key, value, line: _ } => {
                 let schema_info = context.schemas.get(schema_name).ok_or_else(|| {
                     AamlError::SchemaValidationError {
-                        schema: schema_name.clone(),
-                        field: key.clone(),
+                        schema: schema_name.to_string(),
+                        field: key.to_string(),
                         type_name: "schema".to_string(),
                         details: format!("Schema '{}' not found", schema_name),
                         diagnostics: None,
@@ -358,8 +358,8 @@ impl ValidateExecutor for DefaultValidateExecutor {
 
                 if let Err(e) = crate::pipeline::utils::validate_inline_object_against_schema(value, schema_info, context) {
                     return Err(AamlError::SchemaValidationError {
-                        schema: schema_name.clone(),
-                        field: key.clone(),
+                        schema: schema_name.to_string(),
+                        field: key.to_string(),
                         type_name: "schema".to_string(),
                         details: e,
                         diagnostics: None,
@@ -377,13 +377,14 @@ impl ValidateExecutor for DefaultValidateExecutor {
                 if missing_fields.is_empty() {
                     Ok(true)
                 } else {
+                    let missing_str = missing_fields.iter().map(|s| s.as_ref()).collect::<Vec<_>>().join(", ");
                     Err(AamlError::SchemaValidationError {
-                        schema: schema_name.clone(),
-                        field: missing_fields.join(", "),
+                        schema: schema_name.to_string(),
+                        field: missing_str.clone(),
                         type_name: "required".to_string(),
                         details: format!(
                             "Schema incomplete: missing required fields: {}",
-                            missing_fields.join(", ")
+                            missing_str
                         ),
                         diagnostics: None,
                     })
@@ -400,7 +401,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
                     if let Err(e) = self.validate_type_value(&item.to_string(), element_type, context) {
                         all_valid = false;
                         return Err(AamlError::InvalidType {
-                            type_name: element_type.clone(),
+                            type_name: element_type.to_string(),
                             details: format!("List element invalid in '{}'", key),
                             provided: item.to_string(),
                             diagnostics: Some(ErrorDiagnostics::new(
@@ -453,10 +454,10 @@ impl Default for DefaultParserExecutor {
 
 impl ParserExecutor for DefaultParserExecutor {
     // High Complexity
-    fn execute_parse(
+    fn execute_parse<'a>(
         &self,
-        task: &ParseTask,
-        context: &mut ExecutionContext,
+        task: &ParseTask<'a>,
+        context: &mut ExecutionContext<'a>,
     ) -> Result<(), AamlError> {
         match task {
             ParseTask::ProcessVariable {
@@ -484,7 +485,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 arguments,
                 line,
             } => {
-                match directive_name.as_str() {
+                match directive_name.as_ref() {
                     "import" | "derive" => {
                         // Handled in Execution Phase
                         Ok(())
@@ -530,11 +531,11 @@ impl ParserExecutor for DefaultParserExecutor {
                         let type_name = parts[1].trim().to_string();
                         let is_optional = field_name.ends_with('*');
                         let clean_name = if is_optional {
-                            field_name.trim_end_matches('*').to_string()
+                            field_name.trim_end_matches('*').trim().to_string()
                         } else {
                             field_name
                         };
-                        schema_fields.insert(clean_name, (type_name, is_optional));
+                        schema_fields.insert(clean_name.into(), (type_name.into(), is_optional));
                     }
                 }
 
@@ -558,7 +559,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 
                 let file_path = parts[0].to_string();
                 if !context.is_imported(&file_path) {
-                    let content = std::fs::read_to_string(&file_path).map_err(|e| {
+                    let content_string = std::fs::read_to_string(&file_path).map_err(|e| {
                         AamlError::IoError {
                             details: format!("Failed to read imported file '{}': {}", file_path, e),
                             diagnostics: Some(ErrorDiagnostics::new(
@@ -568,13 +569,15 @@ impl ParserExecutor for DefaultParserExecutor {
                             )),
                         }
                     })?;
+                    // Leak the imported content so it lives for 'static (and thus 'a)
+                    let content: &'a str = Box::leak(content_string.into_boxed_str());
 
                     // Run localized parsing on imported content
                     let lexer = crate::pipeline::lexer::DefaultLexer::new();
                     let parser = crate::pipeline::parser::DefaultParser::new();
                     
-                    let tokens = lexer.tokenize(&content)?;
-                    let ast = parser.parse(tokens)?;
+                    let tokens = lexer.tokenize(content)?;
+                    let ast = parser.parse(&tokens)?;
                     let sub_tasks = parser.generate_parse_tasks(&ast);
                     
                     // Note: We're executing these tasks in the same context to merge types/schemas.
@@ -598,7 +601,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 // If it's a known module (cached import), ok, otherwise report not found
                 if !context.imported_files.contains(module_name) && !context.schemas.contains_key(module_name) {
                     return Err(AamlError::NotFound {
-                        key: module_name.clone(),
+                        key: module_name.to_string(),
                         context: format!("module reference in scope '{}'", scope),
                         diagnostics: Some(ErrorDiagnostics::new(
                             "Module not found",

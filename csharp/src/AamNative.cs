@@ -14,8 +14,15 @@ namespace AamCsharp
     {
         const string __DllName = "aam_rs";
 
+
+
+
+
         [DllImport(__DllName, EntryPoint = "aam_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern AamHandle* aam_new();
+
+        [DllImport(__DllName, EntryPoint = "aaml_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern AamHandle* aaml_new();
 
         [DllImport(__DllName, EntryPoint = "aam_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern void aam_free(AamHandle* handle);
@@ -46,10 +53,18 @@ namespace AamCsharp
 
         [DllImport(__DllName, EntryPoint = "aam_last_error", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_last_error(AamHandle* handle);
+
+
     }
 
+    /// <summary>
+    ///  Opaque handle to an AAM parser instance.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal unsafe partial struct AamHandle
     {
     }
+
+
+
 }

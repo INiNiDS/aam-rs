@@ -25,12 +25,12 @@ pub trait Validator: Send + Sync {
     /// # Returns
     /// - `Ok(Vec<ValidationTask>)` containing all validation tasks to be executed
     /// - `Err(AamlError)` if AST analysis itself fails (e.g., syntax errors)
-    fn validate(&self, ast: &[AstNode]) -> Result<Vec<ValidationTask>, AamlError>;
+    fn validate<'a>(&self, ast: &[AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError>;
 
     /// Performs quick syntactic checks that don't require deferred validation.
     ///
     /// This is called immediately during parsing to catch obvious issues early.
-    fn check_syntax(&self, ast: &[AstNode]) -> Result<(), AamlError>;
+    fn check_syntax<'a>(&self, ast: &[AstNode<'a>]) -> Result<(), AamlError>;
 }
 
 /// Default implementation of the Validator stage.
@@ -45,11 +45,11 @@ impl DefaultValidator {
     }
 
     /// Generates validation tasks for an assignment node.
-    fn generate_assignment_tasks(
-        key: &str,
-        value: &ValueNode,
+    fn generate_assignment_tasks<'a>(
+        key: std::borrow::Cow<'a, str>,
+        value: &ValueNode<'a>,
         line: usize,
-    ) -> Vec<ValidationTask> {
+    ) -> Vec<ValidationTask<'a>> {
         let mut tasks = Vec::new();
 
         match value {
@@ -59,16 +59,16 @@ impl DefaultValidator {
             }
             ValueNode::Object(pairs) => {
                 tasks.push(ValidationTask::ValidateObjectStructure {
-                    key: key.to_string(),
+                    key: key.to_string().into(),
                     pairs: pairs.clone(),
                     line,
                 });
             }
             ValueNode::List(items) => {
                 tasks.push(ValidationTask::ValidateListElements {
-                    key: key.to_string(),
+                    key: key.to_string().into(),
                     items: items.clone(),
-                    element_type: "string".to_string(), // Could be determined from context
+                    element_type: std::borrow::Cow::Borrowed("string"), // Could be determined from context
                     line,
                 });
             }
@@ -76,7 +76,7 @@ impl DefaultValidator {
 
         // Check for circular references
         tasks.push(ValidationTask::CheckNoCircularReference {
-            key: key.to_string(),
+            key: key.to_string().into(),
             line,
         });
 
@@ -84,26 +84,26 @@ impl DefaultValidator {
     }
 
     /// Generates validation tasks for a directive node.
-    fn generate_directive_tasks(
-        name: &str,
-        args: &str,
+    fn generate_directive_tasks<'a>(
+        name: std::borrow::Cow<'a, str>,
+        args: std::borrow::Cow<'a, str>,
         line: usize,
-    ) -> Vec<ValidationTask> {
+    ) -> Vec<ValidationTask<'a>> {
         let mut tasks = Vec::new();
 
-        match name {
+        match name.as_ref() {
             "import" => {
                 if !args.is_empty() {
                     tasks.push(ValidationTask::VerifyFileExists {
-                        path: args.to_string(),
+                        path: args.to_string().into(),
                         line,
                     });
                 }
             }
             "derive" => {
                 tasks.push(ValidationTask::CheckDeriveCompleteness {
-                    derive_path: args.to_string(),
-                    current_key: "".to_string(), // AAM v2 check aam.ininids.in.rs
+                    derive_path: args.to_string().into(),
+                    current_key: std::borrow::Cow::Borrowed(""), // AAM v2 check aam.ininids.in.rs
                     line,
                 });
             }
@@ -126,7 +126,7 @@ impl Default for DefaultValidator {
 }
 
 impl Validator for DefaultValidator {
-    fn validate(&self, ast: &[AstNode]) -> Result<Vec<ValidationTask>, AamlError> {
+    fn validate<'a>(&self, ast: &[AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError> {
         // First, perform syntactic checks
         self.check_syntax(ast)?;
 
@@ -136,11 +136,11 @@ impl Validator for DefaultValidator {
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
-                    let node_tasks = Self::generate_assignment_tasks(key, value, *line);
+                    let node_tasks = Self::generate_assignment_tasks(key.clone(), value, *line);
                     tasks.extend(node_tasks);
                 }
                 AstNode::Directive { name, args, line, body: _ } => {
-                    let node_tasks = Self::generate_directive_tasks(name, args, *line);
+                    let node_tasks = Self::generate_directive_tasks(name.clone(), args.clone(), *line);
                     tasks.extend(node_tasks);
                 }
             }
@@ -149,7 +149,7 @@ impl Validator for DefaultValidator {
         Ok(tasks)
     }
 
-    fn check_syntax(&self, ast: &[AstNode]) -> Result<(), AamlError> {
+    fn check_syntax<'a>(&self, ast: &[AstNode<'a>]) -> Result<(), AamlError> {
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {

@@ -69,8 +69,8 @@ impl DefaultExecuter {
             ExecutionTask::SetValue { key, value, .. } => {
                 // Set or overwrite a key-value pair
                 output_map.insert(
-                    key.clone().into_boxed_str(),
-                    value.clone().into_boxed_str(),
+                    key.clone().into_owned().into_boxed_str(),
+                    value.clone().into_owned().into_boxed_str(),
                 );
                 Ok(())
             }
@@ -78,20 +78,20 @@ impl DefaultExecuter {
             ExecutionTask::MergeValue { key, value, .. } => {
                 // Merge a value with existing entry (e.g., for lists/objects)
                 let existing = output_map
-                    .get(key.as_str())
+                    .get(key.as_ref())
                     .map(|v| v.to_string())
                     .unwrap_or_default();
 
                 // Simple merge strategy: concatenate with separator
-                let merged = if existing.is_empty() {
+                let merged: std::borrow::Cow<'_, str> = if existing.is_empty() {
                     value.clone()
                 } else {
-                    format!("{} {}", existing, value)
+                    format!("{} {}", existing, value).into()
                 };
 
                 output_map.insert(
-                    key.clone().into_boxed_str(),
-                    merged.into_boxed_str(),
+                    key.clone().into_owned().into_boxed_str(),
+                    merged.into_owned().into_boxed_str(),
                 );
                 Ok(())
             }
@@ -103,7 +103,7 @@ impl DefaultExecuter {
             } => {
                 let schema = context.schemas.get(schema_name).ok_or_else(|| {
                     AamlError::NotFound {
-                        key: schema_name.clone(),
+                        key: schema_name.to_string(),
                         context: "schema registry".to_string(),
                         diagnostics: Some(crate::error::ErrorDiagnostics::new(
                             "Schema not found",
@@ -116,7 +116,7 @@ impl DefaultExecuter {
                 for key in root_keys {
                     for (field, (type_name, is_optional)) in &schema.fields {
                         let full_key = if key.is_empty() {
-                            field.clone()
+                            field.to_string()
                         } else {
                             format!("{}.{}", key, field)
                         };
@@ -124,9 +124,9 @@ impl DefaultExecuter {
                         if !output_map.contains_key(full_key.as_str()) {
                             if !is_optional {
                                 return Err(AamlError::SchemaValidationError {
-                                    schema: schema_name.clone(),
-                                    field: field.clone(),
-                                    type_name: type_name.clone(),
+                                    schema: schema_name.to_string(),
+                                    field: field.to_string(),
+                                    type_name: type_name.to_string(),
                                     details: format!("Missing required field '{}'", field),
                                     diagnostics: None,
                                 });
@@ -135,9 +135,9 @@ impl DefaultExecuter {
                             let value = output_map.get(full_key.as_str()).unwrap().to_string();
                             if let Err(err_msg) = crate::pipeline::utils::validate_type_value(&value, type_name, context) {
                                 return Err(AamlError::SchemaValidationError {
-                                    schema: schema_name.clone(),
-                                    field: field.clone(),
-                                    type_name: type_name.clone(),
+                                    schema: schema_name.to_string(),
+                                    field: field.to_string(),
+                                    type_name: type_name.to_string(),
                                     details: format!("Type mismatch for field '{}': {}", field, err_msg),
                                     diagnostics: None,
                                 });
@@ -164,7 +164,7 @@ impl DefaultExecuter {
                     if let Some(schema) = context.schemas.get(*schema_name) {
                         for (field, (type_name, _is_optional)) in &schema.fields {
                             let full_child_key = if child_key.is_empty() {
-                                field.clone()
+                                field.to_string()
                             } else {
                                 format!("{}.{}", child_key, field)
                             };
@@ -174,7 +174,7 @@ impl DefaultExecuter {
                             if !output_map.contains_key(full_child_key.as_str()) {
                                 // Provide a default representation for the inherited field based on its type
                                 // In a full implementation, we'd look up the default value from the schema or parent context
-                                let default_val = match type_name.as_str() {
+                                let default_val = match type_name.as_ref() {
                                     "i32" | "f64" => "0",
                                     "bool" => "false",
                                     "string" => "\"\"",
@@ -187,7 +187,7 @@ impl DefaultExecuter {
                                     "datetime" => "1970-01-01T00:00:00Z",
                                     list_type if list_type.starts_with("list<") => "[]",
                                     _ => {
-                                        if context.schemas.contains_key(type_name) {
+                                        if context.schemas.contains_key(type_name.as_ref()) {
                                             "{}"
                                         } else {
                                             "\"\""
@@ -211,7 +211,7 @@ impl DefaultExecuter {
                 merge_strategy,
                 line: _,
             } => {
-                let content = std::fs::read_to_string(file_path).map_err(|e| AamlError::IoError {
+                let content = std::fs::read_to_string(file_path.as_ref()).map_err(|e| AamlError::IoError {
                     details: e.to_string(),
                     diagnostics: Some(crate::error::ErrorDiagnostics::new(
                         "I/O operation failed",
@@ -248,14 +248,14 @@ impl DefaultExecuter {
                 ..
             } => {
                 // Reference resolution: copy target value to source (or resolve interpolation)
-                if let Some(target_value) = output_map.get(target_key.as_str()) {
+                if let Some(target_value) = output_map.get(target_key.as_ref()) {
                     output_map.insert(
-                        source_key.clone().into_boxed_str(),
+                        source_key.clone().into_owned().into_boxed_str(),
                         target_value.clone(),
                     );
                 } else {
                     return Err(AamlError::NotFound {
-                        key: target_key.clone(),
+                        key: target_key.to_string(),
                         context: format!(
                             "Reference target '{}' not found when resolving '{}'",
                             target_key, source_key

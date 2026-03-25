@@ -18,24 +18,24 @@ type Hasher = std::collections::hash_map::RandomState;
 /// ExecutionDescriptor aggregates all necessary information for the Executer to
 /// materialize the configuration without requiring the legacy AAML struct.
 #[derive(Debug, Clone)]
-pub struct ExecutionDescriptor {
+pub struct ExecutionDescriptor<'a> {
     /// Original line numbers from source, indexed by AST node
     pub line_numbers: Vec<usize>,
 
     /// Execution context containing parsed configuration data
-    pub context: ExecutionContext,
+    pub context: ExecutionContext<'a>,
 
     /// Original parsed AST nodes for reference and diagnostics
-    pub parsed_outputs: Vec<AstNode>,
+    pub parsed_outputs: Vec<AstNode<'a>>,
 
     /// Lazy tasks for the parsing phase
-    pub parse_tasks: Vec<ParseTask>,
+    pub parse_tasks: Vec<ParseTask<'a>>,
 
     /// Lazy tasks for the validation phase
-    pub validation_tasks: Vec<ValidationTask>,
+    pub validation_tasks: Vec<ValidationTask<'a>>,
 
     /// Lazy tasks for the execution phase
-    pub execution_tasks: Vec<ExecutionTask>,
+    pub execution_tasks: Vec<ExecutionTask<'a>>,
 
     /// Execution statistics
     pub stats: ExecutionStats,
@@ -46,43 +46,43 @@ pub struct ExecutionDescriptor {
 /// This struct holds the accumulated state that would normally be scattered
 /// across the AAML struct and various registries.
 #[derive(Debug, Clone)]
-pub struct ExecutionContext {
+pub struct ExecutionContext<'a> {
     /// Source file path or identifier (for error reporting)
-    pub source: String,
+    pub source: std::borrow::Cow<'a, str>,
 
     /// Key-value map accumulated during parsing
     pub map: HashMap<Box<str>, Box<str>, Hasher>,
 
     /// Schema definitions accumulated from @schema directives
-    pub schemas: HashMap<String, SchemaInfo>,
+    pub schemas: HashMap<std::borrow::Cow<'a, str>, SchemaInfo<'a>>,
 
     /// Type definitions accumulated from @type directives
-    pub types: HashMap<String, TypeInfo>,
+    pub types: HashMap<std::borrow::Cow<'a, str>, TypeInfo<'a>>,
 
     /// Registered commands (directives)
-    pub commands: HashMap<String, CommandInfo>,
+    pub commands: HashMap<std::borrow::Cow<'a, str>, CommandInfo<'a>>,
 
     /// Line number map: key → line number where it was defined
     pub key_line_map: HashMap<Box<str>, usize>,
 
     /// Scope tracking for nested configurations
-    pub scope_stack: Vec<String>,
+    pub scope_stack: Vec<std::borrow::Cow<'a, str>>,
 
     /// Circular reference detection set
     pub visited_keys: std::collections::HashSet<Box<str>>,
 
     /// Import cache to prevent re-importing the same file
-    pub imported_files: std::collections::HashSet<String>,
+    pub imported_files: std::collections::HashSet<std::borrow::Cow<'a, str>>,
 }
 
 /// Information about a registered schema.
 #[derive(Debug, Clone)]
-pub struct SchemaInfo {
+pub struct SchemaInfo<'a> {
     /// Schema name
-    pub name: String,
+    pub name: std::borrow::Cow<'a, str>,
 
     /// Field name → (type_name, is_optional)
-    pub fields: HashMap<String, (String, bool)>,
+    pub fields: HashMap<std::borrow::Cow<'a, str>, (std::borrow::Cow<'a, str>, bool)>,
 
     /// Line number where schema was defined
     pub line: usize,
@@ -90,15 +90,15 @@ pub struct SchemaInfo {
 
 /// Information about a registered type.
 #[derive(Debug, Clone)]
-pub struct TypeInfo {
+pub struct TypeInfo<'a> {
     /// Type name
-    pub name: String,
+    pub name: std::borrow::Cow<'a, str>,
 
     /// Type specification (e.g., "i32", "list<string>", "vector2")
-    pub spec: String,
+    pub spec: std::borrow::Cow<'a, str>,
 
     /// Custom validation rules (if any)
-    pub validator: Option<String>,
+    pub validator: Option<std::borrow::Cow<'a, str>>,
 
     /// Line number where type was defined
     pub line: usize,
@@ -106,28 +106,28 @@ pub struct TypeInfo {
 
 /// Information about a registered command (directive).
 #[derive(Debug, Clone)]
-pub struct CommandInfo {
+pub struct CommandInfo<'a> {
     /// Command name
-    pub name: String,
+    pub name: std::borrow::Cow<'a, str>,
 
     /// Expected argument pattern
-    pub arg_pattern: String,
+    pub arg_pattern: std::borrow::Cow<'a, str>,
 
     /// Line number where command was registered
     pub line: usize,
 }
 
-impl ExecutionContext {
+impl<'a> ExecutionContext<'a> {
     /// Creates a new empty execution context.
-    pub fn new(source: String) -> Self {
+    pub fn new(source: impl Into<std::borrow::Cow<'a, str>>) -> Self {
         Self {
-            source,
+            source: source.into(),
             map: HashMap::with_hasher(Hasher::new()),
             schemas: HashMap::new(),
             types: HashMap::new(),
             commands: HashMap::new(),
             key_line_map: HashMap::new(),
-            scope_stack: vec!["root".to_string()],
+            scope_stack: vec!["root".into()],
             visited_keys: std::collections::HashSet::new(),
             imported_files: std::collections::HashSet::new(),
         }
@@ -139,8 +139,8 @@ impl ExecutionContext {
     }
 
     /// Enters a new nested scope.
-    pub fn push_scope(&mut self, scope_name: String) {
-        self.scope_stack.push(scope_name);
+    pub fn push_scope(&mut self, scope_name: impl Into<std::borrow::Cow<'a, str>>) {
+        self.scope_stack.push(scope_name.into());
     }
 
     /// Exits the current scope.
@@ -151,9 +151,10 @@ impl ExecutionContext {
     }
 
     /// Sets a key-value pair in the map with line tracking.
-    pub fn set_value(&mut self, key: String, value: String, line: usize) {
-        let key_box = key.into_boxed_str();
-        self.map.insert(key_box.clone(), value.into_boxed_str());
+    pub fn set_value(&mut self, key: impl Into<std::borrow::Cow<'a, str>>, value: impl Into<std::borrow::Cow<'a, str>>, line: usize) {
+        let key_cow = key.into();
+        let key_box = key_cow.into_owned().into_boxed_str();
+        self.map.insert(key_box.clone(), value.into().into_owned().into_boxed_str());
         self.key_line_map.insert(key_box, line);
     }
 
@@ -163,17 +164,17 @@ impl ExecutionContext {
     }
 
     /// Registers a schema definition.
-    pub fn register_schema(&mut self, schema: SchemaInfo) {
+    pub fn register_schema(&mut self, schema: SchemaInfo<'a>) {
         self.schemas.insert(schema.name.clone(), schema);
     }
 
     /// Registers a type definition.
-    pub fn register_type(&mut self, type_def: TypeInfo) {
+    pub fn register_type(&mut self, type_def: TypeInfo<'a>) {
         self.types.insert(type_def.name.clone(), type_def);
     }
 
     /// Registers a command (directive).
-    pub fn register_command(&mut self, command: CommandInfo) {
+    pub fn register_command(&mut self, command: CommandInfo<'a>) {
         self.commands.insert(command.name.clone(), command);
     }
 
@@ -193,8 +194,8 @@ impl ExecutionContext {
     }
 
     /// Records an imported file.
-    pub fn record_import(&mut self, file_path: String) {
-        self.imported_files.insert(file_path);
+    pub fn record_import(&mut self, file_path: impl Into<std::borrow::Cow<'a, str>>) {
+        self.imported_files.insert(file_path.into());
     }
 
     /// Checks if a file has already been imported.
@@ -208,9 +209,9 @@ impl ExecutionContext {
     }
 }
 
-impl ExecutionDescriptor {
+impl<'a> ExecutionDescriptor<'a> {
     /// Creates a new execution descriptor from parsed AST.
-    pub fn new(parsed_outputs: Vec<AstNode>, source: String) -> Self {
+    pub fn new(parsed_outputs: Vec<AstNode<'a>>, source: impl Into<std::borrow::Cow<'a, str>>) -> Self {
         let mut line_numbers = Vec::new();
         for node in &parsed_outputs {
             line_numbers.push(node.line());
@@ -228,32 +229,32 @@ impl ExecutionDescriptor {
     }
 
     /// Adds a parse task to the manifest.
-    pub fn add_parse_task(&mut self, task: ParseTask) {
+    pub fn add_parse_task(&mut self, task: ParseTask<'a>) {
         self.parse_tasks.push(task);
     }
 
     /// Adds multiple parse tasks.
-    pub fn add_parse_tasks(&mut self, tasks: Vec<ParseTask>) {
+    pub fn add_parse_tasks(&mut self, tasks: Vec<ParseTask<'a>>) {
         self.parse_tasks.extend(tasks);
     }
 
     /// Adds a validation task.
-    pub fn add_validation_task(&mut self, task: ValidationTask) {
+    pub fn add_validation_task(&mut self, task: ValidationTask<'a>) {
         self.validation_tasks.push(task);
     }
 
     /// Adds multiple validation tasks.
-    pub fn add_validation_tasks(&mut self, tasks: Vec<ValidationTask>) {
+    pub fn add_validation_tasks(&mut self, tasks: Vec<ValidationTask<'a>>) {
         self.validation_tasks.extend(tasks);
     }
 
     /// Adds an execution task.
-    pub fn add_execution_task(&mut self, task: ExecutionTask) {
+    pub fn add_execution_task(&mut self, task: ExecutionTask<'a>) {
         self.execution_tasks.push(task);
     }
 
     /// Adds multiple execution tasks.
-    pub fn add_execution_tasks(&mut self, tasks: Vec<ExecutionTask>) {
+    pub fn add_execution_tasks(&mut self, tasks: Vec<ExecutionTask<'a>>) {
         self.execution_tasks.extend(tasks);
     }
 
@@ -283,12 +284,12 @@ impl ExecutionDescriptor {
     }
 
     /// Returns a mutable reference to the execution context.
-    pub fn context_mut(&mut self) -> &mut ExecutionContext {
+    pub fn context_mut(&mut self) -> &mut ExecutionContext<'a> {
         &mut self.context
     }
 
     /// Returns an immutable reference to the execution context.
-    pub fn context(&self) -> &ExecutionContext {
+    pub fn context(&self) -> &ExecutionContext<'a> {
         &self.context
     }
 }
@@ -335,7 +336,7 @@ mod tests {
         let mut desc = ExecutionDescriptor::new(vec![], "test.aam".to_string());
 
         desc.add_validation_task(ValidationTask::VerifySchemaExists {
-            schema_name: "MySchema".to_string(),
+            schema_name: "MySchema".to_string().into(),
             line: 1,
         });
 

@@ -75,13 +75,13 @@ pub trait Parser: Send + Sync {
     ///
     /// # Errors
     /// Returns `AamlError::ParseError` if the token stream is malformed.
-    fn parse<'a>(&self, tokens: Vec<Token<'a>>) -> Result<Vec<AstNode<'a>>, AamlError>;
+    fn parse<'a>(&self, tokens: &[Token<'a>]) -> Result<Vec<AstNode<'a>>, AamlError>;
 
     /// Generates parse tasks from an AST
-    fn generate_parse_tasks(&self, ast: &[AstNode]) -> Vec<ParseTask>;
+    fn generate_parse_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ParseTask<'a>>;
 
     /// Generates execution tasks from an AST
-    fn generate_execution_tasks(&self, ast: &[AstNode]) -> Vec<ExecutionTask>;
+    fn generate_execution_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ExecutionTask<'a>>;
 }
 
 /// Default implementation of the Parser stage.
@@ -93,9 +93,10 @@ impl DefaultParser {
     }
 
     /// Filters out comment and newline tokens
-    fn filter_tokens(tokens: Vec<Token>) -> Vec<Token> {
+    fn filter_tokens<'a, 'b>(tokens: &'b [Token<'a>]) -> Vec<&'b Token<'a>> {
+        use crate::pipeline::lexer::TokenKind;
         tokens
-            .into_iter()
+            .iter()
             .filter(|t| {
                 t.kind != TokenKind::Comment
             })
@@ -103,7 +104,7 @@ impl DefaultParser {
     }
 
     /// Parses assignment tokens: `identifier = value`
-    fn parse_assignment(tokens: &[Token], start: usize) -> Result<(String, ValueNode, usize), AamlError> {
+    fn parse_assignment<'a>(tokens: &[&Token<'a>], start: usize) -> Result<(std::borrow::Cow<'a, str>, ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         if tokens.len() < start + 3 {
@@ -145,7 +146,7 @@ impl DefaultParser {
     }
 
     /// Parses a value (which may be literal, inline object, or inline list)
-    fn parse_value(tokens: &[Token], start: usize) -> Result<(ValueNode, usize), AamlError> {
+    fn parse_value<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         if start >= tokens.len() {
@@ -171,14 +172,14 @@ impl DefaultParser {
             _ => {
                 // Literal value
                 let value = tokens[start].text.clone();
-                Ok((ValueNode::Literal(value.into()), start + 1))
+                Ok((ValueNode::Literal(value), start + 1))
             }
         }
     }
 
     /// Parses an inline object: `{ key = val, key = val, ... }`
     // High Complexity
-    fn parse_inline_object(tokens: &[Token], start: usize) -> Result<(ValueNode, usize), AamlError> {
+    fn parse_inline_object<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         let mut pairs = Vec::new();
@@ -188,7 +189,7 @@ impl DefaultParser {
             match tokens[pos].kind {
                 TokenKind::RightBrace => return Ok((ValueNode::Object(pairs.into()), pos + 1)),
                 TokenKind::Identifier => {
-                    let key: std::sync::Arc<str> = tokens[pos].text.clone().into();
+                    let key: std::borrow::Cow<'a, str> = tokens[pos].text.clone();
                     if pos + 2 < tokens.len() && tokens[pos + 1].kind == TokenKind::Assign {
                         let (value, next_pos) = Self::parse_value(tokens, pos + 2)?;
                         pairs.push((key, value));
@@ -231,7 +232,7 @@ impl DefaultParser {
     }
 
     /// Parses an inline list: `[item, item, ...]`
-    fn parse_inline_list(tokens: &[Token], start: usize) -> Result<(ValueNode, usize), AamlError> {
+    fn parse_inline_list<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         let mut items = Vec::new();
@@ -269,20 +270,20 @@ impl Default for DefaultParser {
 
 impl Parser for DefaultParser {
     // VERY HIGH COMPLEXITY
-    fn parse<'a>(&self, tokens: Vec<Token<'a>>) -> Result<Vec<AstNode<'a>>, AamlError> {
+    fn parse<'a>(&self, tokens: &[Token<'a>]) -> Result<Vec<AstNode<'a>>, AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
-        let mut ast = Vec::new();
-        let tokens = Self::filter_tokens(tokens);
+        let mut ast: Vec<AstNode<'a>> = Vec::new();
+        let tokens_filtered = Self::filter_tokens(tokens);
         let mut pos = 0;
 
-        while pos < tokens.len() {
-            let token = &tokens[pos];
+        while pos < tokens_filtered.len() {
+            let token = tokens_filtered[pos];
 
             match &token.kind {
                 TokenKind::At => {
                     // Directive: @name args...
-                    if pos + 1 >= tokens.len() {
+                    if pos + 1 >= tokens_filtered.len() {
                         return Err(AamlError::ParseError {
                             line: token.line,
                             content: "@".to_string(),
@@ -295,7 +296,7 @@ impl Parser for DefaultParser {
                         });
                     }
 
-                    let dir_name = tokens[pos + 1].text.clone();
+                    let dir_name: std::borrow::Cow<'a, str> = tokens_filtered[pos + 1].text.clone();
                     let line = token.line;
 
                     // Collect remaining tokens on this line as args
@@ -304,8 +305,8 @@ impl Parser for DefaultParser {
                     let mut brace_count = 0;
                     let mut bracket_count = 0;
 
-                    while arg_pos < tokens.len() {
-                        let tk = &tokens[arg_pos];
+                    while arg_pos < tokens_filtered.len() {
+                        let tk = tokens_filtered[arg_pos];
 
                         if tk.kind == TokenKind::LeftBrace {
                             brace_count += 1;
@@ -334,7 +335,7 @@ impl Parser for DefaultParser {
                     }
 
                     ast.push(AstNode::Directive {
-                        name: dir_name.into(),
+                        name: dir_name,
                         args: args.trim().to_string().into(),
                         body: None,
                         line,
@@ -344,9 +345,9 @@ impl Parser for DefaultParser {
                 }
                 TokenKind::Identifier => {
                     // Assignment: identifier = value
-                    let (key, value, new_pos) = Self::parse_assignment(&tokens, pos)?;
+                    let (key, value, new_pos) = Self::parse_assignment(&tokens_filtered, pos)?;
                     ast.push(AstNode::Assignment {
-                        key: key.into(),
+                        key,
                         value,
                         line: token.line,
                     });
@@ -361,7 +362,7 @@ impl Parser for DefaultParser {
         Ok(ast)
     }
 
-    fn generate_parse_tasks(&self, ast: &[AstNode]) -> Vec<ParseTask> {
+    fn generate_parse_tasks<'a, 'b>(&self, ast: &'b [AstNode<'a>]) -> Vec<ParseTask<'a>> {
         let mut tasks = Vec::new();
         /*
         // A complete implementation would track scope transitions based on braces
@@ -372,14 +373,14 @@ impl Parser for DefaultParser {
         // scope_stack.pop();
         // let current_scope = scope_stack.last().unwrap().clone();
         */
-        let current_scope = "root".to_string();
+        let current_scope = std::borrow::Cow::Borrowed("root");
 
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
                     tasks.push(ParseTask::ProcessVariable {
-                        variable_name: key.to_string(),
-                        value: value.to_string(),
+                        variable_name: key.clone(),
+                        value: value.to_string().into(),
                         scope: current_scope.clone(),
                         line: *line,
                     });
@@ -388,8 +389,8 @@ impl Parser for DefaultParser {
                     if &**name == "type" {
                         // Assuming args contains the full type definition
                         tasks.push(ParseTask::RegisterType {
-                            type_name: args.split_whitespace().next().unwrap_or("").to_string(),
-                            type_spec: args.to_string(),
+                            type_name: args.split_whitespace().next().unwrap_or("").to_string().into(),
+                            type_spec: args.clone(),
                             line: *line,
                         });
                     } else if &**name == "schema" {
@@ -403,19 +404,19 @@ impl Parser for DefaultParser {
                             .join(",");
 
                         tasks.push(ParseTask::RegisterSchema {
-                            schema_name: name_part,
-                            fields: parsed_fields,
+                            schema_name: name_part.into(),
+                            fields: parsed_fields.into(),
                             line: *line,
                         });
                     } else if &**name == "derive" {
                         tasks.push(ParseTask::ResolveDeriveImport {
-                            derive_path: args.to_string(),
+                            derive_path: args.clone(),
                             line: *line,
                         });
                     } else {
                         tasks.push(ParseTask::ExecuteDirective {
-                            directive_name: name.to_string(),
-                            arguments: args.to_string(),
+                            directive_name: name.clone(),
+                            arguments: args.clone(),
                             line: *line,
                         });
                     }
@@ -425,15 +426,15 @@ impl Parser for DefaultParser {
         tasks
     }
 
-    fn generate_execution_tasks(&self, ast: &[AstNode]) -> Vec<ExecutionTask> {
+    fn generate_execution_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ExecutionTask<'a>> {
         let mut tasks = Vec::new();
 
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
                     tasks.push(ExecutionTask::SetValue {
-                        key: key.to_string(),
-                        value: value.to_string(),
+                        key: key.clone(),
+                        value: value.to_string().into(),
                         line: *line,
                     });
                 }
@@ -441,16 +442,16 @@ impl Parser for DefaultParser {
                 AstNode::Directive { name, args, line, .. } => {
                     if &**name == "import" {
                         tasks.push(ExecutionTask::ImportFile {
-                            file_path: args.to_string(),
-                            merge_strategy: "merge".to_string(),
+                            file_path: args.clone(),
+                            merge_strategy: std::borrow::Cow::Borrowed("merge"),
                             line: *line,
                         });
                     } else if &**name == "derive" {
                         // Assuming current_key is tracked or can be determined (using scope string temporarily for simple configs)
                         // This would need a more sophisticated tracking to know the "current key" exactly if nested
                         tasks.push(ExecutionTask::ExecuteInheritance {
-                            derive_path: args.to_string(),
-                            child_key: "".to_string(), // In a robust parser we track standard object parent scope
+                            derive_path: args.clone(),
+                            child_key: std::borrow::Cow::Borrowed(""), // In a robust parser we track standard object parent scope
                             line: *line,
                         });
                     }
