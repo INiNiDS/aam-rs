@@ -127,7 +127,11 @@ impl DefaultExecuter {
                             schema: schema_name.to_string(),
                             field: field.to_string(),
                             type_name: type_name.to_string(),
-                            details: format!("Type mismatch for field '{}': {}", field, err_msg),
+                            details: format!(
+                                "Type mismatch for field '{}': {}",
+                                field,
+                                err_msg.short_message()
+                            ),
                             diagnostics: None,
                         });
                     }

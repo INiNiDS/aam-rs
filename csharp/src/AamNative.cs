@@ -36,6 +36,9 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_merge", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern int aam_merge(AamHandle* handle, byte* content);
 
+        [DllImport(__DllName, EntryPoint = "aam_recover_simple", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int aam_recover_simple(AamHandle* handle, byte* content);
+
         [DllImport(__DllName, EntryPoint = "aam_format", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_format(AamHandle* handle, byte* content);
 

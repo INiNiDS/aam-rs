@@ -7,8 +7,18 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use crate::aaml::AAML as AAM;
+use crate::aam::AAM;
+use crate::error::AamlError;
 use crate::pipeline::formatter::FormattingOptions as FormatterRules;
+
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty parse error list".to_string(),
+        diagnostics: None,
+    })
+}
 
 // ── Opaque handle ────────────────────────────────────────────────────────────
 
@@ -79,7 +89,7 @@ pub unsafe extern "C" fn aam_parse(handle: *mut AamHandle, content: *const c_cha
             0
         }
         Err(e) => {
-            handle.set_error(e);
+            handle.set_error(first_error(e));
             -1
         }
     }
@@ -107,7 +117,7 @@ pub unsafe extern "C" fn aam_load(handle: *mut AamHandle, path: *const c_char) -
             0
         }
         Err(e) => {
-            handle.set_error(e);
+            handle.set_error(first_error(e));
             -1
         }
     }
@@ -138,6 +148,30 @@ pub unsafe extern "C" fn aam_merge(handle: *mut AamHandle, content: *const c_cha
             -1
         }
     }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_recover_simple(
+    handle: *mut AamHandle,
+    content: *const c_char,
+) -> i32 {
+    if handle.is_null() || content.is_null() {
+        return -1;
+    }
+    let handle = unsafe { &mut *handle };
+
+    let content = match unsafe { CStr::from_ptr(content) }.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            handle.set_error(e);
+            return -1;
+        }
+    };
+
+    let report = AAM::recover_simple(content);
+    handle.inner = report.recovered;
+    handle.clear_error();
+    0
 }
 
 #[unsafe(no_mangle)]

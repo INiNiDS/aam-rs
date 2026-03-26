@@ -1,8 +1,8 @@
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
 use aam_rs::builder::{AAMBuilder, SchemaField};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== AAML Custom Types Example ===\n");
+    println!("=== AAM Custom Types Example ===\n");
 
     // --- 1. Builtin primitive types ---
     println!("--- 1. Built-in primitive types ---");
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     b.add_line("active", "true");
     b.add_line("tint", "#ff6600");
 
-    match AAML::parse(&b.build()) {
+    match AAM::parse(&b.build()) {
         Ok(cfg) => {
             cfg.validate_schemas_completeness()?;
             println!("name   = {}", cfg.find_obj("name").unwrap().as_str());
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     b.add_line("ip", "192.168.1.1");
     b.add_line("port", "8080");
 
-    match AAML::parse(&b.build()) {
+    match AAM::parse(&b.build()) {
         Ok(cfg) => {
             cfg.validate_schemas_completeness()?;
             println!("ip   = {}", cfg.find_obj("ip").unwrap().as_str());
@@ -67,25 +67,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut b = AAMBuilder::new();
     b.schema("S", [SchemaField::required("val", "i32")]);
     b.add_line("val", "not_a_number");
-    match AAML::parse(&b.build()) {
+    match AAM::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad i32 accepted"),
-        Err(e) => println!("Correctly rejected bad i32: {}", e),
+        Err(e) => println!("Correctly rejected bad i32: {:?}", e),
     }
 
     let mut b = AAMBuilder::new();
     b.schema("S", [SchemaField::required("flag", "bool")]);
     b.add_line("flag", "yes_please");
-    match AAML::parse(&b.build()) {
+    match AAM::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad bool accepted"),
-        Err(e) => println!("Correctly rejected bad bool: {}", e),
+        Err(e) => println!("Correctly rejected bad bool: {:?}", e),
     }
 
     let mut b = AAMBuilder::new();
     b.schema("S", [SchemaField::required("c", "color")]);
     b.add_line("c", "notacolor");
-    match AAML::parse(&b.build()) {
+    match AAM::parse(&b.build()) {
         Ok(_) => println!("(unexpected) bad color accepted"),
-        Err(e) => println!("Correctly rejected bad color: {}", e),
+        Err(e) => println!("Correctly rejected bad color: {:?}", e),
     }
 
     // --- 4. apply_schema ---
@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SchemaField::required("score", "i32"),
         ],
     );
-    let cfg = AAML::parse(&b.build())?;
+    let cfg = AAM::parse(&b.build()).map_err(|errs| errs.into_iter().next().unwrap())?;
 
     let mut data = std::collections::HashMap::new();
     data.insert("name".into(), "Bob".into());

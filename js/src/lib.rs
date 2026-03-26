@@ -1,12 +1,43 @@
+    let report = AAM::recover_simple(&content);
+    let mut aam = AAM::new();
+    let rules = FormatterRules::default();
+    aam.format(&content, &rules).map_err(to_napi_error)
+        .map(|inner| JsAam { inner: Some(inner) })
+        .map(|inner| JsAam { inner: Some(inner) })
+        self.inner_ref()?.validate_value(&type_name, &value).map_err(to_napi_error)
+            inner.find_obj(&key).and_then(|v| v.as_object().map(|m| m.into_iter().collect()))
+        self.inner_ref().ok().and_then(|inner| inner.find_obj(&key).and_then(|v| v.as_list()))
+        self.inner_ref().ok().and_then(|inner| inner.find_deep(&key).map(|v| v.as_str().to_string()))
+            .and_then(|inner| inner.find_key(&value).map(|k| k.as_str().to_string()))
+            .and_then(|inner| inner.find_obj(&key).map(|v| v.as_str().to_string()))
+        let rules = FormatterRules::default();
+        self.inner_ref()?
+            .format(&content, &rules)
+            .map_err(to_napi_error)
+        self.inner_mut()?.merge_file(path).map_err(to_napi_error)
+        self.inner_mut()?
+            .merge_content(&content)
+            .map_err(to_napi_error)
+            inner: Some(AAM::new()),
+use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
 use aam_rs::aam::AAM;
-use aam_rs::error::AamError;
-use aam_rs::pipeline::formatter::FormatterRules;
+use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
 use napi::{Error, Result, Status};
 use napi_derive::napi;
 use std::collections::BTreeMap;
 
 fn to_napi_error(err: AamError) -> Error {
     Error::new(Status::GenericFailure, err.to_string())
+}
+
+fn first_napi_error(errors: Vec<AamError>) -> Error {
+    let err = errors.into_iter().next().unwrap_or(AamError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty parse error list".to_string(),
+        diagnostics: None,
+    });
+    to_napi_error(err)
 }
 
 fn closed_error() -> Error {
@@ -64,12 +95,16 @@ impl JsAam {
 
     #[napi(js_name = "findObj")]
     pub fn find_obj(&self, key: String) -> Option<String> {
-        self.inner_ref().ok().and_then(|inner| inner.find_obj(&key).map(|v| v.as_str().to_string()))
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_obj(&key).map(|v| v.as_str().to_string()))
     }
 
     #[napi(js_name = "findKey")]
     pub fn find_key(&self, value: String) -> Option<String> {
-        self.inner_ref().ok().and_then(|inner| inner.find_key(&value).map(|k| k.as_str().to_string()))
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.find_key(&value).map(|k| k.as_str().to_string()))
     }
 
     #[napi(js_name = "findDeep")]
@@ -125,14 +160,14 @@ impl JsAam {
 pub fn parse(content: String) -> Result<JsAam> {
     AAM::parse(&content)
         .map(|inner| JsAam { inner: Some(inner) })
-        .map_err(to_napi_error)
+        .map_err(first_napi_error)
 }
 
 #[napi]
 pub fn load(path: String) -> Result<JsAam> {
     AAM::load(path)
         .map(|inner| JsAam { inner: Some(inner) })
-        .map_err(to_napi_error)
+        .map_err(first_napi_error)
 }
 
 #[napi]
@@ -142,24 +177,14 @@ pub fn format(content: String) -> Result<String> {
     aam.format(&content, &rules).map_err(to_napi_error)
 }
 
-// Deprecated AAML aliases
-#[napi(js_name = "AAML")]
-pub struct JsAaml {
-    inner: JsAam,
+#[napi(js_name = "recoverSimple")]
+pub fn recover_simple(content: String) -> Result<JsAam> {
+    let report = AAM::recover_simple(&content);
+    Ok(JsAam {
+        inner: Some(report.recovered),
+    })
 }
 
-#[napi]
-impl JsAaml {
-    #[napi(constructor)]
-    pub fn new() -> Self {
-        Self { inner: JsAam::new() }
-    }
-    
-    #[napi(js_name = "findObj")]
-    pub fn find_obj(&self, key: String) -> Option<String> {
-        self.inner.find_obj(key)
-    }
-}
 
 #[napi]
 pub fn version() -> String {

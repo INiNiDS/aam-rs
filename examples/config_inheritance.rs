@@ -13,7 +13,7 @@
 //! cargo run --example config_inheritance
 //! ```
 
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
 use aam_rs::error::AamlError;
 use std::collections::HashMap;
 use std::path::Path;
@@ -22,7 +22,7 @@ fn main() {
     let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
     std::env::set_current_dir(&examples_dir).expect("Cannot change dir to examples/");
 
-    header("AAML — Config Inheritance with @derive");
+    header("AAM — Config Inheritance with @derive");
 
     section_1_base();
     section_2_child();
@@ -38,7 +38,7 @@ fn main() {
 fn section_1_base() {
     section("1. Load config_base.aam — production base (all schemas)");
 
-    match AAML::load("config_base.aam") {
+    match AAM::load("config_base.aam").map_err(first_error) {
         Ok(cfg) => {
             println!("   ✔ Loaded config_base.aam\n");
             for name in &["Address", "Database", "Server"] {
@@ -66,7 +66,7 @@ fn section_2_child() {
     section("2. Load config_child.aam — @derive config_base.aam::Server::Database");
     println!("   Expected: Server ✔, Database ✔, Address ✗ (not imported)\n");
 
-    match AAML::load("config_child.aam") {
+    match AAM::load("config_child.aam").map_err(first_error) {
         Ok(cfg) => {
             println!("   ✔ Loaded config_child.aam\n");
             println!("   Schema presence:");
@@ -98,7 +98,7 @@ fn section_3_selective_two_schemas() {
         "app_env  = test\n",
     );
 
-    match AAML::parse(content) {
+    match AAM::parse(content).map_err(first_error) {
         Ok(cfg) => {
             println!("   ✔ Parsed successfully\n");
             println!("   Schemas present after selective derive:");
@@ -119,11 +119,12 @@ fn section_3_selective_two_schemas() {
 fn section_4_apply_schema_runtime() {
     section("4. apply_schema — validate arbitrary map at runtime");
 
-    let cfg = AAML::parse(concat!(
+    let cfg = AAM::parse(concat!(
         "@schema Server { name: string, version: string, address: Address, ",
         "allowed_ips: list<string>, debug*: bool }\n",
         "@schema Address { host: string, port: i32, tls*: bool }\n",
     ))
+    .map_err(first_error)
     .expect("Schema parse failed");
 
     // 4a. Valid complete map
@@ -186,7 +187,7 @@ fn section_5_error_cases() {
 
     // 5a. Derive non-existent schema
     println!("   5a. @derive config_base.aam::PhantomSchema → DirectiveError");
-    match AAML::parse("@derive config_base.aam::PhantomSchema\n") {
+    match AAM::parse("@derive config_base.aam::PhantomSchema\n").map_err(first_error) {
         Err(AamlError::DirectiveError {
             directive: cmd,
             message: msg,
@@ -198,7 +199,7 @@ fn section_5_error_cases() {
     // 5b. Schema field type mismatch at parse time
     println!("\n   5b. build_id = not-a-number  in @schema with i32 → SchemaValidationError");
     let src = "@schema Build { build_id: i32, env: string }\nbuild_id = not-a-number\nenv = prod\n";
-    match AAML::parse(src) {
+    match AAM::parse(src).map_err(first_error) {
         Err(AamlError::SchemaValidationError {
             schema,
             field,
@@ -214,7 +215,7 @@ fn section_5_error_cases() {
         "\n   5c. Required field 'env' absent → SchemaValidationError (via completeness check)"
     );
     let src2 = "@schema Build { build_id: i32, env: string }\nbuild_id = 7\n";
-    match AAML::parse(src2).and_then(|cfg| {
+    match AAM::parse(src2).map_err(first_error).and_then(|cfg| {
         cfg.validate_schemas_completeness()?;
         Ok(cfg)
     }) {
@@ -230,7 +231,7 @@ fn section_5_error_cases() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn validate_map(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) {
+fn validate_map(cfg: &AAM, schema: &str, data: &HashMap<String, String>, label: &str) {
     match cfg.apply_schema(schema, data) {
         Ok(()) => println!("   ✔ {label}"),
         Err(AamlError::SchemaValidationError {
@@ -243,21 +244,21 @@ fn validate_map(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label:
     }
 }
 
-fn print_key(cfg: &AAML, key: &str) {
+fn print_key(cfg: &AAM, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {key:>15} = {v}"),
         None => println!("   {key:>15} = <not found>"),
     }
 }
 
-fn print_schema_compact(cfg: &AAML, name: &str) {
+fn print_schema_compact(cfg: &AAM, name: &str) {
     match cfg.get_schema(name) {
         Some(s) => {
             let mut fields: Vec<_> = s.fields.iter().collect();
             fields.sort_by_key(|(k, _)| k.as_str());
             println!("   Schema '{name}':");
-            for (field, ty) in &fields {
-                let opt = if s.is_optional(field) { "*" } else { " " };
+            for (field, (ty, optional)) in &fields {
+                let opt = if *optional { "*" } else { " " };
                 println!("     {opt} {field:<20} : {ty}");
             }
             println!();
@@ -266,7 +267,7 @@ fn print_schema_compact(cfg: &AAML, name: &str) {
     }
 }
 
-fn schema_marker(cfg: &AAML, name: &str, expect_present: bool) -> &'static str {
+fn schema_marker(cfg: &AAM, name: &str, expect_present: bool) -> &'static str {
     match (cfg.get_schema(name).is_some(), expect_present) {
         (true, true) => "present  ✔",
         (false, false) => "absent   ✔",
@@ -277,6 +278,15 @@ fn schema_marker(cfg: &AAML, name: &str, expect_present: bool) -> &'static str {
 
 fn divider() {
     println!("   {}", "─".repeat(52));
+}
+
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty error list".to_string(),
+        diagnostics: None,
+    })
 }
 
 fn header(title: &str) {

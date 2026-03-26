@@ -170,7 +170,7 @@ impl DefaultValidateExecutor {
         value: &str,
         type_name: &str,
         context: &ExecutionContext,
-    ) -> Result<(), String> {
+    ) -> Result<(), AamlError> {
         crate::pipeline::utils::validate_type_value(value, type_name, context)
     }
 
@@ -201,7 +201,7 @@ impl DefaultValidateExecutor {
                 provided: value.to_string(),
                 diagnostics: Some(ErrorDiagnostics::new(
                     "Type validation failed",
-                    e,
+                        e.to_string(),
                     format!("Ensure '{}' conforms to type '{}'", value, type_name),
                 )),
             });
@@ -274,6 +274,72 @@ impl DefaultValidateExecutor {
 
         Ok(true)
     }
+
+    #[inline]
+    fn derive_schema_names(derive_path: &str) -> impl Iterator<Item=&str> {
+        derive_path.split("::").skip(1)
+    }
+
+    #[inline]
+    fn derived_required_key(current_key: &str, field: &str) -> String {
+        if current_key.is_empty() {
+            field.to_string()
+        } else {
+            format!("{}.{}", current_key, field)
+        }
+    }
+
+    fn ensure_derived_schema_complete(
+        &self,
+        schema_name: &str,
+        current_key: &str,
+        context: &ExecutionContext,
+    ) -> Result<(), AamlError> {
+        let schema = context
+            .schemas
+            .get(schema_name)
+            .ok_or_else(|| AamlError::NotFound {
+                key: schema_name.to_string(),
+                context: "schema derivation".to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Schema not defined",
+                    format!(
+                        "Schema '{}' referenced in derive chain but not defined",
+                        schema_name
+                    ),
+                    "Ensure the file being derived from defines this schema",
+                )),
+            })?;
+
+        for (field, (type_name, is_optional)) in &schema.fields {
+            if *is_optional {
+                continue;
+            }
+
+            let full_key = Self::derived_required_key(current_key, field);
+            if context.map.contains_key(full_key.as_str()) {
+                continue;
+            }
+
+            return Err(AamlError::SchemaValidationError {
+                schema: schema_name.to_string(),
+                field: field.to_string(),
+                type_name: type_name.to_string(),
+                details: format!(
+                    "Missing required field '{}' from derived schema '{}'",
+                    field, schema_name
+                ),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Incomplete derivation",
+                    format!("Derived object missing required field: {}", field),
+                    "Add the field to satisfy the derived schema",
+                )),
+            });
+        }
+
+        Ok(())
+    }
+
     // HIGH COMPLEXITY
     fn check_derive_completeness(
         &self,
@@ -281,56 +347,12 @@ impl DefaultValidateExecutor {
         current_key: &std::borrow::Cow<'_, str>,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
-        let parts: Vec<&str> = derive_path.split("::").collect();
-        if parts.len() < 2 {
+        if !derive_path.contains("::") {
             return Ok(true);
         }
 
-        for schema_name in &parts[1..] {
-            let schema = context
-                .schemas
-                .get(*schema_name)
-                .ok_or_else(|| AamlError::NotFound {
-                    key: schema_name.to_string(),
-                    context: "schema derivation".to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
-                        "Schema not defined",
-                        format!(
-                            "Schema '{}' referenced in derive chain but not defined",
-                            schema_name
-                        ),
-                        "Ensure the file being derived from defines this schema",
-                    )),
-                })?;
-
-            for (field, (type_name, is_optional)) in &schema.fields {
-                if *is_optional {
-                    continue;
-                }
-
-                let full_key = if current_key.is_empty() {
-                    field.to_string()
-                } else {
-                    format!("{}.{}", current_key, field)
-                };
-
-                if !context.map.contains_key(full_key.as_str()) {
-                    return Err(AamlError::SchemaValidationError {
-                        schema: schema_name.to_string(),
-                        field: field.to_string(),
-                        type_name: type_name.to_string(),
-                        details: format!(
-                            "Missing required field '{}' from derived schema '{}'",
-                            field, schema_name
-                        ),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Incomplete derivation",
-                            format!("Derived object missing required field: {}", field),
-                            "Add the field to satisfy the derived schema",
-                        )),
-                    });
-                }
-            }
+        for schema_name in Self::derive_schema_names(derive_path) {
+            self.ensure_derived_schema_complete(schema_name, current_key, context)?;
         }
 
         Ok(true)
@@ -362,7 +384,7 @@ impl DefaultValidateExecutor {
                 schema: schema_name.to_string(),
                 field: key.to_string(),
                 type_name: "schema".to_string(),
-                details: e,
+                details: e.to_string(),
                 diagnostics: None,
             });
         }
@@ -418,7 +440,7 @@ impl DefaultValidateExecutor {
                     provided: item.to_string(),
                     diagnostics: Some(ErrorDiagnostics::new(
                         "List element validation failed",
-                        e,
+                        e.to_string(),
                         format!("All elements in list must be of type '{}'", element_type),
                     )),
                 });
@@ -610,6 +632,33 @@ impl DefaultParserExecutor {
         schema_fields
     }
 
+    fn auto_register_list_types<'a>(
+        &self,
+        schema_fields: &PipelineHashMap<SmolStr, (SmolStr, bool)>,
+        line: usize,
+        context: &mut ExecutionContext<'a>,
+    ) {
+        let field_type_names: Vec<SmolStr> = schema_fields
+            .values()
+            .map(|(type_name, _)| type_name.clone())
+            .collect();
+
+        for type_name in field_type_names {
+            if !type_name.starts_with("list<") || context.types.contains_key(type_name.as_str()) {
+                continue;
+            }
+
+            context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
+                name: type_name.clone(),
+                spec: type_name,
+                validator: None,
+                default_value: Some("[]".into()),
+                metadata: new_pipeline_hash_map(),
+                line,
+            });
+        }
+    }
+
     // HIGH COMPLEXITY
     fn register_schema<'a>(
         &self,
@@ -619,24 +668,7 @@ impl DefaultParserExecutor {
         context: &mut ExecutionContext<'a>,
     ) {
         let schema_fields = self.parse_schema_fields(fields);
-
-        let field_type_names: Vec<SmolStr> = schema_fields
-            .values()
-            .map(|(type_name, _)| type_name.clone())
-            .collect();
-
-        for type_name in field_type_names {
-            if type_name.starts_with("list<") && !context.types.contains_key(type_name.as_str()) {
-                context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
-                    name: type_name.clone(),
-                    spec: type_name,
-                    validator: None,
-                    default_value: Some("[]".into()),
-                    metadata: new_pipeline_hash_map(),
-                    line,
-                });
-            }
-        }
+        self.auto_register_list_types(&schema_fields, line, context);
 
         context.register_schema(crate::pipeline::execution_descriptor::SchemaInfo {
             name: schema_name.as_ref().into(),

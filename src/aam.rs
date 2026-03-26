@@ -1,8 +1,12 @@
 use crate::error::AamlError;
+use crate::found_value::FoundValue;
 use crate::pipeline::{
-    Pipeline, PipelineHashMap, PipelineOutput, SchemaInfo, TypeInfo, new_pipeline_hash_map,
+    new_pipeline_hash_map, DefaultFormatter, DefaultLexer, DefaultParser, ExecutionContext,
+    Formatter, FormattingOptions, Lexer, Parser, Pipeline, PipelineBuildHasher, PipelineHashMap,
+    PipelineOutput, SchemaInfo, TypeInfo,
 };
 use smol_str::SmolStr;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 #[cfg(feature = "aot")]
@@ -77,7 +81,11 @@ impl AAM {
 
     #[cfg(feature = "aot")]
     fn pipeline_output_from_mapped(mapped: &MappedAam) -> PipelineOutput {
-        let mut map = new_pipeline_hash_map();
+        let pair_count = mapped.archived().nodes.len().saturating_sub(1);
+        let mut map = PipelineHashMap::with_capacity_and_hasher(
+            pair_count,
+            PipelineBuildHasher::default(),
+        );
         for (k, v) in mapped.iter_pairs() {
             map.insert(SmolStr::new(k), SmolStr::new(v));
         }
@@ -141,16 +149,34 @@ impl AAM {
     // ── Key-Value Data Accessors ─────────────────────────────────────────────
 
     /// Retrieves a string value by its key.
+    #[inline]
     pub fn get(&self, key: &str) -> Option<&str> {
         self.pipeline_output.map.get(key).map(|v| v.as_ref())
     }
 
+    /// Returns direct access to the internal key-value map without allocations.
+    pub fn map(&self) -> &PipelineHashMap<SmolStr, SmolStr> {
+        &self.pipeline_output.map
+    }
+
+    /// Iterates over all key-value pairs without allocating.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.pipeline_output
+            .map
+            .iter()
+            .map(|(k, v)| (k.as_ref(), v.as_ref()))
+    }
+
     /// Returns all keys currently stored in the map.
+    /// Prefer [`AAM::iter`] for zero-allocation iteration.
+    #[inline]
     pub fn keys(&self) -> Vec<&str> {
         self.pipeline_output.map.keys().map(|k| &**k).collect()
     }
 
     /// Returns all key-value pairs as a standard `FxHashMap<String, String>`.
+    /// Prefer [`AAM::iter`] for zero-allocation iteration.
+    #[inline]
     pub fn to_map(&self) -> PipelineHashMap<String, String> {
         self.pipeline_output
             .map
@@ -162,6 +188,8 @@ impl AAM {
     // ── Schema & Type Accessors ──────────────────────────────────────────────
 
     /// Returns a reference to all registered schemas.
+    /// Prefer [`AAM::iter`] for zero-allocation iteration.
+    #[inline]
     pub fn schemas(&self) -> &PipelineHashMap<SmolStr, SchemaInfo> {
         &self.pipeline_output.schemas
     }
@@ -172,6 +200,8 @@ impl AAM {
     }
 
     /// Returns a reference to all registered types.
+    /// Prefer [`AAM::iter`] for zero-allocation iteration.
+    #[inline]
     pub fn types(&self) -> &PipelineHashMap<SmolStr, TypeInfo> {
         &self.pipeline_output.types
     }

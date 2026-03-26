@@ -22,6 +22,7 @@ rustc-hash = { version = "2.1.1" }
 smol_str = "0.3.6"
 bumpalo = { version = "3.20.2" }
 tinyvec = { version = "1.11.0", features = ["alloc"] }
+rayon = { version = "1", optional = true }
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 pyo3 = { version = "0.28", features = ["extension-module", "abi3-py38"], optional = true }
 jni = { version = "0.22.3", optional = true }
@@ -48,6 +49,7 @@ python = ["pyo3"]
 jni = ["dep:jni"]
 csharp = ["dep:csbindgen", "ffi"]
 legacy = []
+parallel = ["dep:rayon"]
 64bit = ["rkyv/pointer_width_64"]
 
 [[example]]

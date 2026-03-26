@@ -35,6 +35,7 @@
 //! assert!(content.contains("host = localhost"));
 //! ```
 
+use std::fmt::Write;
 use std::fmt::Display;
 use std::io;
 use std::ops::Deref;
@@ -83,13 +84,17 @@ impl SchemaField {
         }
     }
 
+
+
+    pub fn to_aaml_writer(&self, mut w: impl Write) -> std::fmt::Result {
+        write!(w, "{}{}: {}", self.name, if self.optional { "*" } else { "" }, self.type_name)
+    }
+
     /// Renders the field as an AAML field declaration string.
     pub fn to_aaml(&self) -> String {
-        if self.optional {
-            format!("{}*: {}", self.name, self.type_name)
-        } else {
-            format!("{}: {}", self.name, self.type_name)
-        }
+        let mut s = String::new();
+        self.to_aaml_writer(&mut s).unwrap();
+        s
     }
 }
 
@@ -183,12 +188,21 @@ impl AAMBuilder {
         name: &str,
         fields: impl IntoIterator<Item = SchemaField>,
     ) -> &mut Self {
-        let fields_str: Vec<String> = fields.into_iter().map(|f| f.to_aaml()).collect();
         self.push_sep();
         self.buffer.push_str("@schema ");
         self.buffer.push_str(name);
         self.buffer.push_str(" { ");
-        self.buffer.push_str(&fields_str.join(", "));
+
+        let mut first = true;
+        for field in fields {
+            if !first {
+                self.buffer.push_str(", ");
+            }
+            // Пишем напрямую в буфер, без создания временной String
+            field.to_aaml_writer(&mut self.buffer).unwrap();
+            first = false;
+        }
+
         self.buffer.push_str(" }");
         self
     }
@@ -216,16 +230,12 @@ impl AAMBuilder {
         fields: impl IntoIterator<Item = SchemaField>,
     ) -> &mut Self {
         self.push_sep();
-        self.buffer.push_str("@schema ");
-        self.buffer.push_str(name);
-        self.buffer.push_str(" {");
+        write!(&mut self.buffer, "@schema {} {{", name).unwrap();
         for field in fields {
-            self.buffer.push('\n');
-            self.buffer.push_str("    ");
-            self.buffer.push_str(&field.to_aaml());
+            write!(&mut self.buffer, "\n    ").unwrap();
+            field.to_aaml_writer(&mut self.buffer).unwrap();
         }
-        self.buffer.push('\n');
-        self.buffer.push('}');
+        self.buffer.push_str("\n}");
         self
     }
 

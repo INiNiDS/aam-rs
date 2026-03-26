@@ -1,12 +1,12 @@
 #![allow(improper_ctypes_definitions)]
-#[allow(non_snake_case)]
+#![allow(non_snake_case)]
 use jni::Env;
 use jni::objects::{JClass, JString, JValue};
 use jni::strings::JNIString;
 use jni::sys::{jlong, jobject, jobjectArray, jstring};
 
-// Use the newly renamed AAM core parser struct, and deprecated AAML alias.
-use crate::aaml::AAML as AAM;
+use crate::aam::AAM;
+use crate::error::AamlError;
 use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 
 fn throw_java_exception(env: &mut Env<'_>, class: &str, msg: impl ToString) {
@@ -15,6 +15,15 @@ fn throw_java_exception(env: &mut Env<'_>, class: &str, msg: impl ToString) {
 
 fn java_string_to_rust(env: &mut Env<'_>, value: &JString<'_>) -> Result<String, String> {
     value.try_to_string(env).map_err(|e| e.to_string())
+}
+
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty parse error list".to_string(),
+        diagnostics: None,
+    })
 }
 
 unsafe fn get_aam<'a>(ptr: jlong) -> Option<&'a AAM> {
@@ -60,7 +69,7 @@ pub extern "system" fn Java_com_rustgames_aam_AAM_parse<'local>(
     match AAM::parse(&content) {
         Ok(aam) => Box::into_raw(Box::new(aam)) as jlong,
         Err(e) => {
-            throw_java_exception(&mut env, "java/lang/IllegalStateException", e);
+            throw_java_exception(&mut env, "java/lang/IllegalStateException", first_error(e));
             0
         }
     }
@@ -83,10 +92,28 @@ pub extern "system" fn Java_com_rustgames_aam_AAM_load<'local>(
     match AAM::load(&path) {
         Ok(aam) => Box::into_raw(Box::new(aam)) as jlong,
         Err(e) => {
-            throw_java_exception(&mut env, "java/lang/IllegalStateException", e);
+            throw_java_exception(&mut env, "java/lang/IllegalStateException", first_error(e));
             0
         }
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_rustgames_aam_AAM_recoverSimple<'local>(
+    mut env: Env<'local>,
+    _class: JClass<'local>,
+    content: JString<'local>,
+) -> jlong {
+    let content = match java_string_to_rust(&mut env, &content) {
+        Ok(v) => v,
+        Err(e) => {
+            throw_java_exception(&mut env, "java/lang/IllegalArgumentException", e);
+            return 0;
+        }
+    };
+
+    let report = AAM::recover_simple(&content);
+    Box::into_raw(Box::new(report.recovered)) as jlong
 }
 
 #[unsafe(no_mangle)]

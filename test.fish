@@ -1,10 +1,8 @@
 #!/usr/bin/fish
 
-# Убираем предупреждения, чтобы не засорять вывод
 set -x RUSTFLAGS "-A warnings"
 
-# Список фич для проверки (убедитесь, что они есть в Cargo.toml)
-set standalone_features 64bit hash-fx hash-ahash hash-ripemd perf-hash hash-rapidhash hash-std
+set standalone_features 64bit hash-fx hash-ahash hash-ripemd perf-hash hash-rapidhash hash-std parallel
 
 set aot_modes dev release unsafe_fast_path
 
@@ -15,7 +13,6 @@ for feat in $standalone_features
     echo -n "Testing feature [$feat]... "
     set -l extra_flags ""
 
-    # Меняем маску на *hash*, чтобы захватить и perf-hash
     if string match -q "*hash*" $feat
         set extra_flags "--no-default-features"
     end
@@ -29,7 +26,7 @@ end
 
 for mode in $aot_modes
     echo -n "Testing AOT mode [$mode]... "
-    # Добавляем --no-default-features и явно указываем hash-std, чтобы release не лез без спроса
+
     if cargo test --quiet --no-default-features --features "aot,$mode,hash-std" > /dev/null 2>&1
         echo (set_color green)"OK"(set_color normal)
     else
@@ -48,7 +45,7 @@ for hash in $hash_strategies
     rm -f generated_stress_test.aam.bin 2>/dev/null
 
     # Запуск примера. Добавлен --no-default-features для чистоты эксперимента
-    if cargo run --quiet --example standard_stress --release --no-default-features --features aot,release,64bit,$hash
+    if cargo run --quiet --example standard_stress --release --no-default-features --features aot,unsafe_fast_path,64bit,$hash,parallel
         echo (set_color green)"Success: $hash"(set_color normal)
     else
         echo (set_color red)"Ошибка при выполнении $hash"(set_color normal)

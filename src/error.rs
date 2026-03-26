@@ -172,6 +172,9 @@ pub enum AamlError {
     },
 }
 
+/// Backward-compatible alias used by some bindings.
+pub type AamError = AamlError;
+
 impl AamlError {
     /// Get the primary error message (short form).
     pub fn short_message(&self) -> String {

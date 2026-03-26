@@ -20,6 +20,7 @@ compile_error!("Select only one AOT mode feature: dev, release, or unsafe_fast_p
 compile_error!("One AOT mode feature must be enabled: dev, release, or unsafe_fast_path.");
 
 const INVALID_INDEX: u32 = u32::MAX;
+const CURRENT_AOT_VERSION: u32 = 1;
 type FrontendErrors = TinyVec<[Option<AamlError>; 4]>;
 
 #[inline]
@@ -83,7 +84,7 @@ pub struct CookedAotBlob {
 impl CookedAotBlob {
     fn empty() -> Self {
         Self {
-            version: 1,
+            version: CURRENT_AOT_VERSION,
             string_blob: Vec::new(),
             nodes: vec![FlatNode {
                 kind: NodeKind::Root as u32,
@@ -112,17 +113,29 @@ struct SoaBuilder {
 }
 
 impl SoaBuilder {
-    fn new() -> Self {
+    fn with_capacity(n: usize) -> Self {
         let base = CookedAotBlob::empty();
         Self {
-            string_blob: base.string_blob,
-            nodes: base.nodes,
-            key_spans: base.key_spans,
-            value_spans: base.value_spans,
-            symbols: base.hash_table,
+            string_blob: Vec::with_capacity(n.saturating_mul(32)),
+            nodes: {
+                let mut v = base.nodes;
+                v.reserve(n);
+                v
+            },
+            key_spans: {
+                let mut v = base.key_spans;
+                v.reserve(n);
+                v
+            },
+            value_spans: {
+                let mut v = base.value_spans;
+                v.reserve(n);
+                v
+            },
+            symbols: Vec::with_capacity(n),
             last_root_child: None,
             #[cfg(feature = "release")]
-            queue_type_checks: Vec::new(),
+            queue_type_checks: Vec::with_capacity(n),
             #[cfg(feature = "release")]
             queue_ref_resolve: Vec::new(),
         }
@@ -266,7 +279,7 @@ impl SoaBuilder {
     }
 
     fn finish(self) -> CookedAotBlob {
-        let capacity = (self.symbols.len() * 3 / 2).next_power_of_two();
+        let capacity = (self.symbols.len() * 2).next_power_of_two();
         let capacity = std::cmp::max(capacity, 16);
 
         let mut hash_table = vec![
@@ -291,7 +304,7 @@ impl SoaBuilder {
         }
 
         CookedAotBlob {
-            version: 1,
+            version: CURRENT_AOT_VERSION,
             string_blob: self.string_blob,
             nodes: self.nodes,
             key_spans: self.key_spans,
@@ -332,7 +345,8 @@ fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
         return compile_via_pipeline(text);
     }
 
-    let mut builder = SoaBuilder::new();
+    let estimated = text.lines().count();
+    let mut builder = SoaBuilder::with_capacity(estimated);
     let mut errors: FrontendErrors = TinyVec::new();
 
     #[cfg(feature = "dev")]
@@ -409,7 +423,8 @@ fn compile_via_pipeline(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
     let pipeline = Pipeline::new();
     let output = pipeline.process(text)?;
 
-    let mut builder = SoaBuilder::new();
+    let estimated = output.map.len();
+    let mut builder = SoaBuilder::with_capacity(estimated);
     let mut errors: FrontendErrors = TinyVec::new();
 
     for (key, value) in output.map {
@@ -682,6 +697,18 @@ impl AamLoader {
                 diagnostics: None,
             }]
         })?;
+
+        let archived_version = {
+            // Safe minimal check: read only the archived version field.
+            let blob = unsafe { rkyv::access_unchecked::<rkyv::Archived<CookedAotBlob>>(&mmap) };
+            blob.version.to_native()
+        };
+
+        if archived_version != CURRENT_AOT_VERSION {
+            let _ = fs::remove_file(&cache);
+            AamCompiler::cook(source_path)?;
+            return Self::load_fast(source_path);
+        }
 
         Ok(MappedAam { mmap })
     }

@@ -23,6 +23,7 @@ void aam_free(AamlHandle *handle);
 int aam_parse(AamlHandle *handle, const char *content);
 int aam_load(AamlHandle *handle, const char *path);
 int aam_merge(AamlHandle *handle, const char *content);
+int aam_recover_simple(AamlHandle *handle, const char *content);
 
 char *aam_find_obj(const AamlHandle *handle, const char *key);
 char *aam_find_key(const AamlHandle *handle, const char *value);

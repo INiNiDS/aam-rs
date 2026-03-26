@@ -93,6 +93,16 @@ public sealed unsafe class AamDocument : IDisposable
     }
 
     /// <summary>
+    /// Performs best-effort recovery for simple malformed input.
+    /// </summary>
+    /// <param name="content">AAM text to recover.</param>
+    /// <exception cref="AamException">Thrown when native recovery fails.</exception>
+    public void RecoverSimple(string content)
+    {
+        CheckResult(AamNative.aam_recover_simple(Handle, content));
+    }
+
+    /// <summary>
     /// Finds a value by key.
     /// </summary>
     /// <param name="key">Key to search for.</param>

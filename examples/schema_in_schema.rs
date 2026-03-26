@@ -2,7 +2,7 @@
 //!
 //! Demonstrates every nested-schema feature in a single, self-contained run:
 //!
-//! 1. **Inline definition** — schemas declared directly in Rust source via `AAML::parse`.
+//! 1. **Inline definition** — schemas declared directly in Rust source via `AAM::parse`.
 //! 2. **Nested schema field** — `Address` used as a type inside `Server`.
 //! 3. **Optional field** (`*`) — `debug*: bool` in `Server` may be omitted.
 //! 4. **list\<string\>** — `allowed_ips` is a list of string values.
@@ -15,7 +15,7 @@
 //! cargo run --example schema_in_schema
 //! ```
 
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
 use aam_rs::error::AamlError;
 use std::collections::HashMap;
 use std::path::Path;
@@ -24,7 +24,7 @@ fn main() {
     let examples_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
     std::env::set_current_dir(&examples_dir).expect("Cannot change dir to examples/");
 
-    header("AAML — Nested Schemas, Optional Fields & Lists");
+    header("AAM — Nested Schemas, Optional Fields & Lists");
 
     section_1_inline_nested();
     section_2_optional_fields();
@@ -51,7 +51,7 @@ fn section_1_inline_nested() {
             address: Address
             debug*: bool
         }";
-    let cfg = AAML::parse(src).expect("Schema parse failed");
+    let cfg = AAM::parse(src).map_err(first_error).expect("Schema parse failed");
 
     print_schema(&cfg, "Address");
     print_schema(&cfg, "Server");
@@ -86,7 +86,7 @@ fn section_2_optional_fields() {
             debug*: bool
             timeout*: f64
         }";
-    let cfg = AAML::parse(src).expect("Parse failed");
+    let cfg = AAM::parse(src).map_err(first_error).expect("Parse failed");
     print_schema(&cfg, "Config");
 
     // All required fields present, all optional absent
@@ -129,7 +129,7 @@ fn section_3_list_of_primitives() {
             scores: list<i32>
             nicknames*: list<string>
         }";
-    let cfg = AAML::parse(src).expect("Parse failed");
+    let cfg = AAM::parse(src).map_err(first_error).expect("Parse failed");
     print_schema(&cfg, "Profile");
 
     let ok: HashMap<String, String> = [
@@ -178,7 +178,7 @@ fn section_4_list_of_schemas() {
     let src = "
         @schema Item { item_name: string, item_weight: f64, item_rare*: bool }
         @schema Chest { chest_name: string, gold: i32, loot: list<Item>, owner*: string }";
-    let cfg = AAML::parse(src).expect("Parse failed");
+    let cfg = AAM::parse(src).map_err(first_error).expect("Parse failed");
     print_schema(&cfg, "Item");
     print_schema(&cfg, "Chest");
 
@@ -236,7 +236,7 @@ fn section_4_list_of_schemas() {
 fn section_5_file_based() {
     section("5. Load config_base.aam — file with nested schemas & lists");
 
-    match AAML::load("config_base.aam") {
+    match AAM::load("config_base.aam").map_err(first_error) {
         Ok(cfg) => {
             println!("   ✔ Loaded config_base.aam\n");
             println!("   Schemas in file:");
@@ -271,7 +271,7 @@ fn section_5_file_based() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn check(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) {
+fn check(cfg: &AAM, schema: &str, data: &HashMap<String, String>, label: &str) {
     match cfg.apply_schema(schema, data) {
         Ok(()) => println!("   ✔ {label}"),
         Err(AamlError::SchemaValidationError {
@@ -284,27 +284,36 @@ fn check(cfg: &AAML, schema: &str, data: &HashMap<String, String>, label: &str) 
     }
 }
 
-fn print_key(cfg: &AAML, key: &str) {
+fn print_key(cfg: &AAM, key: &str) {
     match cfg.find_obj(key) {
         Some(v) => println!("   {key:>15} = {v}"),
         None => println!("   {key:>15} = <not found>"),
     }
 }
 
-fn print_schema(cfg: &AAML, name: &str) {
+fn print_schema(cfg: &AAM, name: &str) {
     match cfg.get_schema(name) {
         Some(s) => {
             let mut fields: Vec<_> = s.fields.iter().collect();
             fields.sort_by_key(|(k, _)| k.as_str());
             println!("   Schema '{name}':");
-            for (field, ty) in &fields {
-                let opt = if s.is_optional(field) { "*" } else { " " };
+            for (field, (ty, optional)) in &fields {
+                let opt = if *optional { "*" } else { " " };
                 println!("     {opt} {field:<20} : {ty}");
             }
             println!();
         }
         None => println!("   Schema '{name}' not found\n"),
     }
+}
+
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty error list".to_string(),
+        diagnostics: None,
+    })
 }
 
 fn header(title: &str) {

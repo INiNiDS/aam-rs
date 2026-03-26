@@ -243,6 +243,9 @@ impl Pipeline {
         self.process_with_arena(content, &arena)
     }
 
+    /// Creates a pipeline instance.
+    ///
+    /// Enable the `parallel` feature to run stateless parse-task pre-validation in parallel.
     pub fn new() -> Self {
         Self {
             lexer: Box::new(DefaultLexer::new()),
@@ -253,6 +256,16 @@ impl Pipeline {
             executer: Box::new(DefaultExecuter::new()),
             formatter: Box::new(DefaultFormatter::new()),
         }
+    }
+
+    #[cfg(feature = "parallel")]
+    fn execute_parse_tasks_parallel(tasks: &[ParseTask<'_>]) -> Vec<TaskError> {
+        use rayon::prelude::*;
+
+        tasks
+            .par_iter()
+            .filter_map(|task| task.validate_stateless().err())
+            .collect()
     }
 
     fn collect_parse_errors(all_errors: &mut ErrorAccumulator, errors: Vec<TaskError>) {
@@ -298,9 +311,30 @@ impl Pipeline {
         let parse_tasks = self.parser.generate_parse_tasks(ast);
         descriptor.add_parse_tasks(parse_tasks.clone());
 
-        let parse_result =
-            self.parser_executor
-                .execute_batch(&parse_tasks, arena, descriptor.context_mut());
+        #[cfg(feature = "parallel")]
+        let stateless_errors = Self::execute_parse_tasks_parallel(&parse_tasks);
+
+        #[cfg(feature = "parallel")]
+        {
+            if !stateless_errors.is_empty() {
+                Self::collect_parse_errors(all_errors, stateless_errors);
+            }
+        }
+
+        #[cfg(feature = "parallel")]
+        let sequential_tasks: Vec<ParseTask<'a>> = parse_tasks
+            .into_iter()
+            .filter(|task| task.validate_stateless().is_ok())
+            .collect();
+
+        #[cfg(not(feature = "parallel"))]
+        let sequential_tasks = parse_tasks;
+
+        let parse_result = self.parser_executor.execute_batch(
+            &sequential_tasks,
+            arena,
+            descriptor.context_mut(),
+        );
         if !parse_result.success {
             Self::collect_parse_errors(all_errors, parse_result.errors);
         }

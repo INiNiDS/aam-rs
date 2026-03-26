@@ -1,7 +1,26 @@
+        self.inner_ref()?
+            .find_obj(key)
+            .map(|i| i.find_obj(key).is_some())
+        self.inner_ref()?
+            .validate_value(type_name, value)
+            .map_err(to_py)
+            .and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
+            .and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
+            .and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
+            .and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
+            .and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
+        self.inner_mut()?.merge_file(path).map_err(to_py)
+        self.inner_mut()?.merge_content(content).map_err(to_py)
+        let rules = FormatterRules::default();
+        self.inner_ref()?.format(content, &rules).map_err(to_py)
+        let report = AAM::recover_simple(content);
+            .map(|inner| PyAam { inner: Some(inner) })
+            .map(|inner| PyAam { inner: Some(inner) })
+            inner: Some(AAM::new()),
+use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 //! PyO3 bindings — exposes `AAM` to Python as `aam_py.AAM`.
 
-use crate::aaml::AAML as AAM;
-use crate::error::AamlError as AamError;
+use crate::aam::AAM;
 use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -11,6 +30,15 @@ use std::collections::HashMap;
 
 fn to_py(err: AamError) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
+}
+
+fn first_error(errors: Vec<AamError>) -> AamError {
+    errors.into_iter().next().unwrap_or(AamError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty parse error list".to_string(),
+        diagnostics: None,
+    })
 }
 
 // ── PyAAM class ──────────────────────────────────────────────────────────────
@@ -46,6 +74,7 @@ impl PyAam {
     #[staticmethod]
     fn parse(content: &str) -> PyResult<Self> {
         AAM::parse(content)
+            .map_err(first_error)
             .map(|inner| PyAam { inner: Some(inner) })
             .map_err(to_py)
     }
@@ -53,8 +82,20 @@ impl PyAam {
     #[staticmethod]
     fn load(path: &str) -> PyResult<Self> {
         AAM::load(path)
+            .map_err(first_error)
             .map(|inner| PyAam { inner: Some(inner) })
             .map_err(to_py)
+    }
+
+    #[staticmethod]
+    fn recover_simple(content: &str) -> (Self, usize) {
+        let report = AAM::recover_simple(content);
+        (
+            PyAam {
+                inner: Some(report.recovered),
+            },
+            report.dropped_lines.len(),
+        )
     }
 
     fn format(&self, content: &str) -> PyResult<String> {

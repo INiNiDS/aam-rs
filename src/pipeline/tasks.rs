@@ -305,6 +305,27 @@ impl<'a> ParseTask<'a> {
             }
         }
     }
+
+    /// Performs checks that do not require mutable execution context.
+    pub fn validate_stateless(&self) -> Result<(), TaskError> {
+        if let ParseTask::ExecuteDirective {
+            directive_name,
+            line,
+            ..
+        } = self
+        {
+            if !matches!(directive_name.as_ref(), "import" | "derive") {
+                return Err(TaskError {
+                    line: *line,
+                    message: format!("Unknown directive: @{}", directive_name),
+                    task_description: self.description(),
+                    aaml_error: None,
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// A declarative execution task for the final execution phase.

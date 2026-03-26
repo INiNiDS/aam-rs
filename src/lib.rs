@@ -25,6 +25,7 @@ pub mod commands;
 pub mod error;
 pub mod found_value;
 pub mod pipeline;
+pub(crate) mod binding_compat;
 mod types;
 mod types_aam;
 

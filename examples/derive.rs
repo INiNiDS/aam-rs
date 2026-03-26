@@ -11,7 +11,7 @@
 //! cargo run --example derive
 //! ```
 
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
 use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ fn main() {
 
     // ── 1. Successful load ────────────────────────────────────────────────────
     println!("▶ 1. Loading derive_child.aam (all required fields present)");
-    match AAML::load("derive_child.aam") {
+    match AAM::load("derive_child.aam").map_err(first_error) {
         Ok(config) => {
             println!("   ✔ Loaded successfully\n");
 
@@ -82,10 +82,10 @@ fn main() {
         b.to_file(base_path).unwrap();
 
         let content = format!("@derive {base_path}\n");
-        let result = AAML::parse(&content);
+        let result = AAM::parse(&content).map_err(first_error);
         let _ = std::fs::remove_file(base_path);
 
-        match_result::<AAML, AamlError>(result)
+        match_result::<AAM>(result)
     }
 
     // ── 3. Wrong type for a field → SchemaValidationError ────────────────────
@@ -109,16 +109,17 @@ fn main() {
         b.to_file(base_path).unwrap();
 
         let content = format!("@derive {base_path}\n");
-        let result = AAML::parse(&content);
+        let result = AAM::parse(&content).map_err(first_error);
         let _ = std::fs::remove_file(base_path);
 
-        match_result::<AAML, AamlError>(result)
+        match_result::<AAM>(result)
     }
 
     // ── 4. apply_schema — validate an arbitrary data map ─────────────────────
     println!("\n▶ 4. apply_schema — explicit data-map validation");
     {
-        let config = AAML::parse("@schema Player { name: string, score: i32, health: f64 }")
+        let config = AAM::parse("@schema Player { name: string, score: i32, health: f64 }")
+            .map_err(first_error)
             .expect("Schema parse must succeed");
 
         // 4a. Valid data
@@ -169,7 +170,7 @@ fn main() {
 }
 
 /// Prints a single key-value pair from the config, or `<not found>` if absent.
-fn print_key(config: &AAML, key: &str) {
+fn print_key(config: &AAM, key: &str) {
     let value = config
         .find_obj(key)
         .map(|v| v.to_string())
@@ -178,20 +179,21 @@ fn print_key(config: &AAML, key: &str) {
 }
 
 /// Prints the fields of a named schema, or a message if the schema is absent.
-fn print_schema(config: &AAML, schema_name: &str) {
+fn print_schema(config: &AAM, schema_name: &str) {
     match config.get_schema(schema_name) {
         Some(schema) => {
             let mut fields: Vec<_> = schema.fields.iter().collect();
             fields.sort_by_key(|(k, _)| k.as_str());
-            for (field, ty) in fields {
-                println!("   {field:>15} : {ty}");
+            for (field, (ty, optional)) in fields {
+                let opt = if *optional { "*" } else { " " };
+                println!("   {field:>15}{opt}: {ty}");
             }
         }
         None => println!("   Schema '{schema_name}' not found"),
     }
 }
 
-fn match_result<T, E: std::fmt::Debug + std::fmt::Display>(result: Result<T, AamlError>) {
+fn match_result<T>(result: Result<T, AamlError>) {
     match result {
         Err(AamlError::SchemaValidationError {
             schema,
@@ -209,3 +211,13 @@ fn match_result<T, E: std::fmt::Debug + std::fmt::Display>(result: Result<T, Aam
         Ok(_) => eprintln!("   ✘ Expected an error but parsing succeeded"),
     }
 }
+
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
+        line: 1,
+        content: String::new(),
+        details: "unexpected empty error list".to_string(),
+        diagnostics: None,
+    })
+}
+
