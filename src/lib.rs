@@ -19,21 +19,17 @@
 //! println!("{}", cfg.find_obj("host").unwrap());
 //! ```
 
-#[cfg(feature = "legacy")]
-#[allow(deprecated)]
 pub mod aaml;
-
 pub mod builder;
 pub mod commands;
 pub mod error;
-#[cfg(feature = "legacy")]
 pub mod found_value;
 pub mod pipeline;
-#[cfg(feature = "legacy")]
-#[allow(deprecated)]
 mod types;
-
 mod types_aam;
+
+#[cfg(feature = "aot")]
+pub mod aot;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
@@ -41,9 +37,10 @@ pub mod ffi;
 #[cfg(feature = "python")]
 pub mod python;
 
+pub mod aam;
+pub mod aam_value;
 #[cfg(feature = "jni")]
 pub mod jni;
-pub mod aam_value;
 
 /// Python extension-module entry point, compiled only with `--features python`.
 ///

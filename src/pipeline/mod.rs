@@ -1,59 +1,206 @@
 //! The new five-stage architecture pipeline for AAML parsing.
 //!
 //! Pipeline stages:
-//! 1. **Lexer** — tokenizes raw text into `Token` stream
-//! 2. **Parser** — builds AST from tokens, manages scope
-//! 3. **Validator** — applies schema and type checks to AST
-//! 4. **Executer** — executes directives and populates final map
-//! 5. **Output** — final key-value map, schemas, types
-//!
-//! Each stage is independent and can be tested in isolation.
+//! 1. **Lexer** - tokenizes raw text into `Token` stream
+//! 2. **Parser** - builds AST from tokens, manages scope
+//! 3. **Validator** - applies schema and type checks to AST
+//! 4. **Executer** - executes directives and populates final map
+//! 5. **Output** - final key-value map, schemas, types
 
-pub mod utils;
+pub mod execution_descriptor;
+pub mod formatter;
 pub mod lexer;
 pub mod parser;
 pub mod scope_manager;
-pub mod validator;
-pub mod executer;
-pub mod tasks;
-pub mod execution_descriptor;
-pub mod executor_traits;
-pub mod formatter;
+pub mod utils;
 
-pub use lexer::{Lexer, Token, DefaultLexer};
-pub use parser::{Parser, AstNode, DefaultParser};
+pub mod executer;
+pub mod executor_traits;
+pub mod tasks;
+pub mod validator;
+
+pub use executer::{DefaultExecuter, Executer};
+pub use execution_descriptor::{
+    CommandInfo, ExecutionContext, ExecutionDescriptor, SchemaInfo, TypeInfo,
+};
+pub use executor_traits::{
+    DefaultParserExecutor, DefaultValidateExecutor, ParserExecutor, ValidateExecutor,
+};
+pub use formatter::{DefaultFormatter, FormatRange, Formatter, FormattingOptions};
+pub use lexer::{DefaultLexer, Lexer, Token};
+pub use parser::{AstNode, DefaultParser, Parser};
 pub use scope_manager::ScopeManager;
-pub use validator::{Validator, DefaultValidator};
-pub use executer::{Executer, DefaultExecuter};
-pub use tasks::{ValidationTask, ParseTask, ExecutionTask, TaskExecutionResult, TaskError};
-pub use execution_descriptor::{ExecutionDescriptor, ExecutionContext, SchemaInfo, TypeInfo, CommandInfo};
-pub use executor_traits::{ValidateExecutor, ParserExecutor, DefaultValidateExecutor, DefaultParserExecutor};
-pub use formatter::{Formatter, DefaultFormatter, FormattingOptions, FormatRange};
+pub use tasks::{ExecutionTask, ParseTask, TaskError, TaskExecutionResult, ValidationTask};
+pub use validator::{DefaultValidator, Validator};
 
 use crate::error::AamlError;
-use crate::commands::schema::SchemaDef;
-use crate::types::Type;
-use std::collections::HashMap;
+use bumpalo::Bump;
+use smol_str::SmolStr;
+use tinyvec::TinyVec;
 
-#[cfg(feature = "perf-hash")]
-type Hasher = ahash::RandomState;
+#[cfg(all(feature = "hash-std", feature = "hash-fx"))]
+compile_error!("Features 'hash-std' and 'hash-fx' are mutually exclusive for pipeline hashing.");
 
-#[cfg(not(feature = "perf-hash"))]
-type Hasher = std::collections::hash_map::RandomState;
+#[cfg(all(feature = "hash-std", feature = "hash-ahash"))]
+compile_error!("Features 'hash-std' and 'hash-ahash' are mutually exclusive for pipeline hashing.");
 
-type AamlString = Box<str>;
+#[cfg(all(feature = "hash-fx", feature = "hash-ahash"))]
+compile_error!("Features 'hash-fx' and 'hash-ahash' are mutually exclusive for pipeline hashing.");
 
-/// Output produced by the full pipeline after all stages complete successfully.
-pub struct PipelineOutput<'a> {
-    /// Final key-value map with all directives executed
-    pub map: HashMap<AamlString, AamlString, Hasher>,
-    /// Registered schema definitions
-    pub schemas: HashMap<std::borrow::Cow<'a, str>, SchemaInfo<'a>, Hasher>,
-    /// Registered custom types
-    pub types: HashMap<std::borrow::Cow<'a, str>, TypeInfo<'a>, Hasher>,
+#[cfg(all(feature = "hash-std", feature = "hash-rapidhash"))]
+compile_error!(
+    "Features 'hash-std' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-std", feature = "hash-ritehash"))]
+compile_error!(
+    "Features 'hash-std' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-std", feature = "hash-ripemd"))]
+compile_error!(
+    "Features 'hash-std' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-fx", feature = "hash-rapidhash"))]
+compile_error!(
+    "Features 'hash-fx' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-fx", feature = "hash-ritehash"))]
+compile_error!(
+    "Features 'hash-fx' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-fx", feature = "hash-ripemd"))]
+compile_error!("Features 'hash-fx' and 'hash-ripemd' are mutually exclusive for pipeline hashing.");
+
+#[cfg(all(feature = "hash-ahash", feature = "hash-rapidhash"))]
+compile_error!(
+    "Features 'hash-ahash' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-ahash", feature = "hash-ritehash"))]
+compile_error!(
+    "Features 'hash-ahash' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-ahash", feature = "hash-ripemd"))]
+compile_error!(
+    "Features 'hash-ahash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-rapidhash", feature = "hash-ritehash"))]
+compile_error!(
+    "Features 'hash-rapidhash' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-rapidhash", feature = "hash-ripemd"))]
+compile_error!(
+    "Features 'hash-rapidhash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(all(feature = "hash-ritehash", feature = "hash-ripemd"))]
+compile_error!(
+    "Features 'hash-ritehash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
+);
+
+#[cfg(feature = "hash-ripemd")]
+#[derive(Default, Clone)]
+pub struct RipemdBuildHasher;
+
+#[cfg(feature = "hash-ripemd")]
+#[derive(Default, Clone)]
+pub struct RipemdHasher {
+    bytes: Vec<u8>,
 }
 
-impl<'a> std::fmt::Debug for PipelineOutput<'a> {
+#[cfg(feature = "hash-ripemd")]
+impl std::hash::BuildHasher for RipemdBuildHasher {
+    type Hasher = RipemdHasher;
+
+    fn build_hasher(&self) -> Self::Hasher {
+        RipemdHasher::default()
+    }
+}
+
+#[cfg(feature = "hash-ripemd")]
+impl std::hash::Hasher for RipemdHasher {
+    fn finish(&self) -> u64 {
+        use ripemd::Digest;
+        let mut hasher = ripemd::Ripemd160::new();
+        hasher.update(&self.bytes);
+        let digest = hasher.finalize();
+
+        let mut out = [0_u8; 8];
+        out.copy_from_slice(&digest[..8]);
+        u64::from_le_bytes(out)
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.bytes.extend_from_slice(bytes);
+    }
+}
+
+#[cfg(feature = "hash-std")]
+pub type PipelineBuildHasher = std::collections::hash_map::RandomState;
+
+#[cfg(all(not(feature = "hash-std"), feature = "hash-fx"))]
+pub type PipelineBuildHasher = rustc_hash::FxBuildHasher;
+
+#[cfg(all(
+    not(feature = "hash-std"),
+    not(feature = "hash-fx"),
+    feature = "hash-ahash"
+))]
+pub type PipelineBuildHasher = ahash::RandomState;
+
+#[cfg(all(
+    not(feature = "hash-std"),
+    not(feature = "hash-fx"),
+    not(feature = "hash-ahash"),
+    feature = "hash-rapidhash"
+))]
+pub type PipelineBuildHasher = rapidhash::fast::RandomState;
+
+#[cfg(all(
+    not(feature = "hash-std"),
+    not(feature = "hash-fx"),
+    not(feature = "hash-ahash"),
+    not(feature = "hash-rapidhash"),
+    not(feature = "hash-ritehash"),
+    feature = "hash-ripemd"
+))]
+pub type PipelineBuildHasher = RipemdBuildHasher;
+
+#[cfg(not(any(
+    feature = "hash-std",
+    feature = "hash-fx",
+    feature = "hash-ahash",
+    feature = "hash-rapidhash",
+    feature = "hash-ritehash",
+    feature = "hash-ripemd"
+)))]
+pub type PipelineBuildHasher = std::collections::hash_map::RandomState;
+
+pub type PipelineHashMap<K, V> = std::collections::HashMap<K, V, PipelineBuildHasher>;
+
+#[inline]
+pub(crate) fn new_pipeline_hash_map<K, V>() -> PipelineHashMap<K, V> {
+    PipelineHashMap::with_hasher(PipelineBuildHasher::default())
+}
+
+type AamlString = SmolStr;
+type ErrorAccumulator = TinyVec<[Option<AamlError>; 4]>;
+
+/// Output produced by the full pipeline after all stages complete successfully.
+pub struct PipelineOutput {
+    pub map: PipelineHashMap<AamlString, AamlString>,
+    pub schemas: PipelineHashMap<AamlString, SchemaInfo>,
+    pub types: PipelineHashMap<AamlString, TypeInfo>,
+}
+
+impl std::fmt::Debug for PipelineOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PipelineOutput")
             .field("map", &self.map)
@@ -63,37 +210,22 @@ impl<'a> std::fmt::Debug for PipelineOutput<'a> {
     }
 }
 
-impl<'a> PipelineOutput<'a> {
-    /// Creates a new empty pipeline output
+impl PipelineOutput {
     pub fn new() -> Self {
         Self {
-            map: HashMap::with_hasher(Hasher::new()),
-            schemas: HashMap::new(),
-            types: HashMap::new(),
+            map: new_pipeline_hash_map(),
+            schemas: new_pipeline_hash_map(),
+            types: new_pipeline_hash_map(),
         }
     }
 }
 
-impl<'a> Default for PipelineOutput<'a> {
+impl Default for PipelineOutput {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// The complete pipeline orchestrator that coordinates all five stages with task-based architecture.
-///
-/// This pipeline implements strict Separation of Concerns:
-/// 1. Lexer tokenizes input
-/// 2. Parser builds AST
-/// 3. Validator generates declarative ValidationTasks
-/// 4. ValidateExecutor executes tasks and aggregates errors
-/// 5. ParserExecutor populates ExecutionContext
-/// 6. Executer runs ExecutionTasks to produce final output
-///
-/// The pipeline is LSP-ready with support for:
-/// - Error aggregation (all errors returned, not just first)
-/// - Independent formatting (via Formatter)
-/// - No AAML struct dependency in execution stage
 pub struct Pipeline {
     lexer: Box<dyn Lexer>,
     parser: Box<dyn Parser>,
@@ -105,7 +237,12 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// Creates a new pipeline with default implementations for all stages
+    /// Processes AAML content using the 5-stage arena-based pipeline.
+    pub fn process(&self, content: &str) -> Result<PipelineOutput, Vec<AamlError>> {
+        let arena = Bump::new();
+        self.process_with_arena(content, &arena)
+    }
+
     pub fn new() -> Self {
         Self {
             lexer: Box::new(DefaultLexer::new()),
@@ -118,104 +255,105 @@ impl Pipeline {
         }
     }
 
-    /// Process AAML content through all pipeline stages with task-based architecture.
-    ///
-    /// # Flow
-    /// 1. Lexer: Raw text → Tokens
-    /// 2. Parser: Tokens → AST
-    /// 3. Validator: AST → ValidationTasks (+ syntax check)
-    /// 4. ValidateExecutor: Tasks → Aggregated validation results
-    /// 5. ParserExecutor: Parse tasks → ExecutionContext
-    /// 6. Executer: ExecutionDescriptor → Final FoundValue
-    ///
-    /// # Returns
-    /// - `Ok(PipelineOutput)` on success with final map, schemas, and types
-    /// - `Err(AamlError)` on failure (from any stage)
-    ///
-    /// # Note
-    /// The Executer never instantiates an AAML struct. All execution is
-    /// task-based and stateless beyond the ExecutionDescriptor.
-    pub fn process<'a>(&self, content: &'a str) -> Result<PipelineOutput<'a>, Vec<AamlError>> {
-        let mut all_errors = Vec::new();
+    fn collect_parse_errors(all_errors: &mut ErrorAccumulator, errors: Vec<TaskError>) {
+        for err in errors.into_iter() {
+            all_errors.push(Some(AamlError::ParseError {
+                line: err.line,
+                content: String::new(),
+                details: err.message,
+                diagnostics: None,
+            }));
+        }
+    }
 
-        // Stage 1: Lexer
-        let tokens = match self.lexer.tokenize(content) {
-            Ok(t) => t,
-            Err(e) => {
-                all_errors.push(e);
-                return Err(all_errors); // Lexer failure is fatal as we can't parse
-            }
-        };
+    fn collect_validation_errors(all_errors: &mut ErrorAccumulator, errors: Vec<TaskError>) {
+        for err in errors.into_iter() {
+            all_errors.push(Some(AamlError::DirectiveError {
+                directive: "validation".to_string(),
+                message: err.message,
+                diagnostics: None,
+            }));
+        }
+    }
 
-        // Stage 2: Parser
-        let ast = match self.parser.parse(&tokens) {
-            Ok(a) => a,
-            Err(e) => {
-                all_errors.push(e);
-                // Even if AST fails partially, we might want to continue in a real LSP,
-                // but currently parse returns a single error on failure.
-                // We'll proceed with an empty AST to gather more errors if possible.
-                Vec::new()
-            }
-        };
+    fn parse_ast<'a>(
+        &self,
+        tokens: &[Token<'a>],
+        all_errors: &mut ErrorAccumulator,
+    ) -> Vec<AstNode<'a>> {
+        let parse_output = self.parser.parse_with_recovery(tokens);
+        for err in parse_output.errors {
+            all_errors.push(Some(err));
+        }
+        parse_output.ast
+    }
 
-        // Create ExecutionDescriptor to hold all information
-        let mut descriptor = ExecutionDescriptor::new(ast.clone(), "inline".to_string());
-
-        // Stage 3: Parser to generate ParseTasks
-        let parse_tasks = self.parser.generate_parse_tasks(&ast);
+    fn run_parse_tasks<'a>(
+        &self,
+        ast: &[AstNode<'a>],
+        arena: &'a Bump,
+        descriptor: &mut ExecutionDescriptor<'a>,
+        all_errors: &mut ErrorAccumulator,
+    ) {
+        let parse_tasks = self.parser.generate_parse_tasks(ast);
         descriptor.add_parse_tasks(parse_tasks.clone());
 
-        // Execute ParseTasks to populate descriptor.context
-        let parse_result = self.parser_executor.execute_batch(&parse_tasks, descriptor.context_mut());
+        let parse_result =
+            self.parser_executor
+                .execute_batch(&parse_tasks, arena, descriptor.context_mut());
         if !parse_result.success {
-            for err in parse_result.errors {
-                all_errors.push(AamlError::ParseError {
-                    line: err.line,
-                    content: "".to_string(),
-                    details: err.message,
-                    diagnostics: None,
-                });
-            }
+            Self::collect_parse_errors(all_errors, parse_result.errors);
         }
+    }
 
-        // Stage 4: Validator (generates tasks based on AST)
-        let validation_tasks = match self.validator.validate(&ast) {
-            Ok(t) => t,
-            Err(e) => {
-                all_errors.push(e);
-                Vec::new()
-            }
-        };
+    fn run_validation_tasks<'a>(
+        &self,
+        ast: &[AstNode<'a>],
+        descriptor: &mut ExecutionDescriptor<'a>,
+        all_errors: &mut ErrorAccumulator,
+    ) {
+        let validation_tasks = self.validator.validate(ast).unwrap_or_else(|e| {
+            all_errors.push(Some(e));
+            Vec::new()
+        });
         descriptor.add_validation_tasks(validation_tasks.clone());
 
-        // Stage 5: ValidateExecutor (aggregates errors, reading from context if needed)
-        let validation_result = self.validate_executor.execute_batch(&validation_tasks, descriptor.context());
+        let validation_result = self
+            .validate_executor
+            .execute_batch(&validation_tasks, descriptor.context());
         if !validation_result.success {
-            for err in validation_result.errors {
-                all_errors.push(AamlError::DirectiveError {
-                    directive: "validation".to_string(),
-                    message: err.message,
-                    diagnostics: None,
-                });
-            }
+            Self::collect_validation_errors(all_errors, validation_result.errors);
+        }
+    }
+
+    fn process_with_tasks<'a>(
+        &self,
+        content: &'a str,
+        arena: &'a Bump,
+    ) -> Result<PipelineOutput, Vec<AamlError>> {
+        let mut all_errors: ErrorAccumulator = TinyVec::new();
+
+        let tokens = match self.lexer.tokenize(content) {
+            Ok(t) => t,
+            Err(e) => return Err(vec![e]),
+        };
+
+        let ast = self.parse_ast(&tokens, &mut all_errors);
+        let mut descriptor = ExecutionDescriptor::new(ast.clone(), "inline".to_string());
+
+        self.run_parse_tasks(&ast, arena, &mut descriptor, &mut all_errors);
+        self.run_validation_tasks(&ast, &mut descriptor, &mut all_errors);
+
+        if let Some(errors) = finalize_error_accumulator(all_errors) {
+            return Err(errors);
         }
 
-        if !all_errors.is_empty() {
-            return Err(all_errors);
-        }
+        descriptor.add_execution_tasks(self.parser.generate_execution_tasks(&ast));
 
-        // Stage 6: Generate internal execution tasks from AST
-        let execution_tasks = self.parser.generate_execution_tasks(&ast);
-        descriptor.add_execution_tasks(execution_tasks);
-
-        // Stage 7: Executer (task-based, no AAML struct)
         if let Err(e) = self.executer.execute(&mut descriptor) {
-            all_errors.push(e);
-            return Err(all_errors);
+            return Err(vec![e]);
         }
 
-        // Return final output
         Ok(PipelineOutput {
             map: descriptor.context.map,
             schemas: descriptor.context.schemas,
@@ -223,10 +361,14 @@ impl Pipeline {
         })
     }
 
-    /// Format a document using the Formatter stage (no execution required).
-    ///
-    /// This is useful for LSP "Format Document" commands that don't need
-    /// to execute the full pipeline.
+    pub fn process_with_arena<'a>(
+        &self,
+        content: &'a str,
+        arena: &'a Bump,
+    ) -> Result<PipelineOutput, Vec<AamlError>> {
+        self.process_with_tasks(content, arena)
+    }
+
     pub fn format(
         &self,
         nodes: &[AstNode],
@@ -235,9 +377,6 @@ impl Pipeline {
         self.formatter.format_document(nodes, options)
     }
 
-    /// Format a specific range in a document.
-    ///
-    /// Used for LSP "Format Range" commands.
     pub fn format_range(
         &self,
         nodes: &[AstNode],
@@ -252,4 +391,12 @@ impl Default for Pipeline {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[inline]
+fn finalize_error_accumulator(errors: ErrorAccumulator) -> Option<Vec<AamlError>> {
+    if errors.is_empty() {
+        return None;
+    }
+    Some(errors.into_iter().flatten().collect())
 }

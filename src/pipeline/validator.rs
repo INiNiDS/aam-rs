@@ -44,18 +44,54 @@ impl DefaultValidator {
         Self
     }
 
-    /// Generates validation tasks for an assignment node.
-    fn generate_assignment_tasks<'a>(
-        key: std::borrow::Cow<'a, str>,
+    fn infer_literal_type(value: &str) -> &'static str {
+        if value == "true" || value == "false" {
+            "bool"
+        } else if value.parse::<f64>().is_ok() {
+            "f64"
+        } else {
+            "string"
+        }
+    }
+
+    fn infer_value_type<'a>(value: &ValueNode<'a>) -> std::borrow::Cow<'static, str> {
+        match value {
+            ValueNode::Literal(literal) => Self::infer_literal_type(literal.as_ref()).into(),
+            ValueNode::Object(_) => "object".into(),
+            ValueNode::List(items) => {
+                let inner = Self::infer_list_element_type(items);
+                if inner == "any" {
+                    "list".into()
+                } else {
+                    format!("list<{}>", inner).into()
+                }
+            }
+        }
+    }
+
+    fn infer_list_element_type<'a>(items: &[ValueNode<'a>]) -> std::borrow::Cow<'static, str> {
+        let mut inferred: Option<std::borrow::Cow<'static, str>> = None;
+        for item in items {
+            let current = Self::infer_value_type(item);
+            match &inferred {
+                None => inferred = Some(current),
+                Some(existing) if *existing == current => {}
+                _ => return "any".into(),
+            }
+        }
+
+        inferred.unwrap_or_else(|| "any".into())
+    }
+
+    fn build_value_tasks<'a>(
+        tasks: &mut Vec<ValidationTask<'a>>,
+        key: &std::borrow::Cow<'a, str>,
         value: &ValueNode<'a>,
         line: usize,
-    ) -> Vec<ValidationTask<'a>> {
-        let mut tasks = Vec::new();
-
+    ) {
         match value {
             ValueNode::Literal(_s) => {
-                // Literals might be matched against schemas or generic type validation in execution
-                // We don't know the expected type here, so we defer those tasks
+                // Literal type checks are deferred until execution when schema/type context is available.
             }
             ValueNode::Object(pairs) => {
                 tasks.push(ValidationTask::ValidateObjectStructure {
@@ -65,14 +101,25 @@ impl DefaultValidator {
                 });
             }
             ValueNode::List(items) => {
+                let inferred_type = Self::infer_list_element_type(items);
                 tasks.push(ValidationTask::ValidateListElements {
                     key: key.to_string().into(),
                     items: items.clone(),
-                    element_type: std::borrow::Cow::Borrowed("string"), // Could be determined from context
+                    element_type: inferred_type,
                     line,
                 });
             }
         }
+    }
+
+    /// Generates validation tasks for an assignment node.
+    fn generate_assignment_tasks<'a>(
+        key: std::borrow::Cow<'a, str>,
+        value: &ValueNode<'a>,
+        line: usize,
+    ) -> Vec<ValidationTask<'a>> {
+        let mut tasks = Vec::new();
+        Self::build_value_tasks(&mut tasks, &key, value, line);
 
         // Check for circular references
         tasks.push(ValidationTask::CheckNoCircularReference {
@@ -139,8 +186,14 @@ impl Validator for DefaultValidator {
                     let node_tasks = Self::generate_assignment_tasks(key.clone(), value, *line);
                     tasks.extend(node_tasks);
                 }
-                AstNode::Directive { name, args, line, body: _ } => {
-                    let node_tasks = Self::generate_directive_tasks(name.clone(), args.clone(), *line);
+                AstNode::Directive {
+                    name,
+                    args,
+                    line,
+                    body: _,
+                } => {
+                    let node_tasks =
+                        Self::generate_directive_tasks(name.clone(), args.clone(), *line);
                     tasks.extend(node_tasks);
                 }
             }
@@ -166,7 +219,12 @@ impl Validator for DefaultValidator {
                         });
                     }
                 }
-                AstNode::Directive { name, args: _, line, body: _ } => {
+                AstNode::Directive {
+                    name,
+                    args: _,
+                    line,
+                    body: _,
+                } => {
                     if name.is_empty() {
                         return Err(AamlError::ParseError {
                             line: *line,
@@ -214,19 +272,22 @@ mod tests {
     fn test_generate_tasks_for_list_value() {
         let node = AstNode::Assignment {
             key: "items".to_string().into(),
-            value: ValueNode::List(vec![
-                ValueNode::Literal("a".to_string().into()),
-                ValueNode::Literal("b".to_string().into())
-            ].into()),
+            value: ValueNode::List(
+                vec![
+                    ValueNode::Literal("a".to_string().into()),
+                    ValueNode::Literal("b".to_string().into()),
+                ]
+                .into(),
+            ),
             line: 1,
         };
         let validator = DefaultValidator::new();
         let tasks = validator.validate(&[node]).unwrap();
 
         // Should have generated ValidateListElements task among others
-        let has_list_task = tasks.iter().any(|t| {
-            matches!(t, ValidationTask::ValidateListElements { .. })
-        });
+        let has_list_task = tasks
+            .iter()
+            .any(|t| matches!(t, ValidationTask::ValidateListElements { .. }));
         assert!(has_list_task);
     }
 
@@ -234,21 +295,22 @@ mod tests {
     fn test_generate_tasks_for_object_value() {
         let node = AstNode::Assignment {
             key: "config".to_string().into(),
-            value: ValueNode::Object(vec![
-                ("foo".to_string().into(), ValueNode::Literal("bar".to_string().into()))
-            ].into()),
+            value: ValueNode::Object(
+                vec![(
+                    "foo".to_string().into(),
+                    ValueNode::Literal("bar".to_string().into()),
+                )]
+                .into(),
+            ),
             line: 1,
         };
         let validator = DefaultValidator::new();
         let tasks = validator.validate(&[node]).unwrap();
 
         // Should have generated ValidateObjectStructure task among others
-        let has_object_task = tasks.iter().any(|t| {
-            matches!(t, ValidationTask::ValidateObjectStructure { .. })
-        });
+        let has_object_task = tasks
+            .iter()
+            .any(|t| matches!(t, ValidationTask::ValidateObjectStructure { .. }));
         assert!(has_object_task);
     }
 }
-
-
-

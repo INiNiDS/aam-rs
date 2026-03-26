@@ -18,7 +18,9 @@ pub fn validate_type_value(
 
     // 3. Built-in types
     match crate::types_aam::resolve_builtin(type_name) {
-        Ok(validator) => validator.validate(value, context).map_err(|e| e.to_string()),
+        Ok(validator) => validator
+            .validate(value, context)
+            .map_err(|e| e.to_string()),
         Err(_) => Err(format!("Unknown type '{}'", type_name)),
     }
 }
@@ -43,7 +45,7 @@ pub fn validate_inline_object_against_schema(
     }
 
     for (field, (type_name, is_optional)) in &schema_info.fields {
-        match pair_map.get(field.as_ref()) {
+        match pair_map.get(field.as_str()) {
             None => {
                 if !is_optional {
                     return Err(format!(

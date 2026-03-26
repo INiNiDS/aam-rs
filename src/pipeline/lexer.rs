@@ -17,8 +17,18 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
-    pub fn new(kind: TokenKind, line: usize, column: usize, text: impl Into<std::borrow::Cow<'a, str>>) -> Self {
-        Self { kind, line, column, text: text.into() }
+    pub fn new(
+        kind: TokenKind,
+        line: usize,
+        column: usize,
+        text: impl Into<std::borrow::Cow<'a, str>>,
+    ) -> Self {
+        Self {
+            kind,
+            line,
+            column,
+            text: text.into(),
+        }
     }
 }
 
@@ -122,17 +132,75 @@ impl Lexer for DefaultLexer {
                 '#' => {
                     self.handle_comment(&mut tokens, &mut chars, line, &mut column);
                 }
-                '=' => self.push_single_token(&mut tokens, TokenKind::Assign, line, column, "=", &mut chars, &mut column),
-                '{' => self.push_single_token(&mut tokens, TokenKind::LeftBrace, line, column, "{", &mut chars, &mut column),
-                '}' => self.push_single_token(&mut tokens, TokenKind::RightBrace, line, column, "}", &mut chars, &mut column),
-                '[' => self.push_single_token(&mut tokens, TokenKind::LeftBracket, line, column, "[", &mut chars, &mut column),
-                ']' => self.push_single_token(&mut tokens, TokenKind::RightBracket, line, column, "]", &mut chars, &mut column),
-                ',' => self.push_single_token(&mut tokens, TokenKind::Comma, line, column, ",", &mut chars, &mut column),
-                '@' => self.push_single_token(&mut tokens, TokenKind::At, line, column, "@", &mut chars, &mut column),
+                '=' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::Assign,
+                    line,
+                    column,
+                    "=",
+                    &mut chars,
+                    &mut column,
+                ),
+                '{' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::LeftBrace,
+                    line,
+                    column,
+                    "{",
+                    &mut chars,
+                    &mut column,
+                ),
+                '}' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::RightBrace,
+                    line,
+                    column,
+                    "}",
+                    &mut chars,
+                    &mut column,
+                ),
+                '[' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::LeftBracket,
+                    line,
+                    column,
+                    "[",
+                    &mut chars,
+                    &mut column,
+                ),
+                ']' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::RightBracket,
+                    line,
+                    column,
+                    "]",
+                    &mut chars,
+                    &mut column,
+                ),
+                ',' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::Comma,
+                    line,
+                    column,
+                    ",",
+                    &mut chars,
+                    &mut column,
+                ),
+                '@' => self.push_single_token(
+                    &mut tokens,
+                    TokenKind::At,
+                    line,
+                    column,
+                    "@",
+                    &mut chars,
+                    &mut column,
+                ),
                 '"' | '\'' => {
                     self.handle_string(&mut tokens, &mut chars, ch, line, &mut column, &mut line)?;
                 }
-                _ if Self::is_digit(ch) || (ch == '-' && chars.clone().nth(1).map_or(false, Self::is_digit)) => {
+                _ if Self::is_digit(ch)
+                    || (ch == '-' && chars.clone().nth(1).map_or(false, Self::is_digit)) =>
+                {
                     self.handle_number(&mut tokens, &mut chars, ch, line, &mut column);
                 }
                 _ if Self::is_id_start(ch) => {
@@ -155,7 +223,12 @@ impl Lexer for DefaultLexer {
 
         // Add final newline if not present
         if tokens.is_empty() || tokens.last().map_or(true, |t| t.kind != TokenKind::Newline) {
-            tokens.push(Token::new(TokenKind::Newline, line, column, "\n".to_string()));
+            tokens.push(Token::new(
+                TokenKind::Newline,
+                line,
+                column,
+                "\n".to_string(),
+            ));
         }
 
         Ok(tokens)
@@ -170,7 +243,12 @@ impl DefaultLexer {
         line: &mut usize,
         column: &mut usize,
     ) {
-        tokens.push(Token::new(TokenKind::Newline, *line, *column, "\n".to_string()));
+        tokens.push(Token::new(
+            TokenKind::Newline,
+            *line,
+            *column,
+            "\n".to_string(),
+        ));
         chars.next();
         *line += 1;
         *column = 1;
@@ -210,7 +288,35 @@ impl DefaultLexer {
         chars.next();
         *col_ref += 1;
     }
-    // HIGH COMPLEXITY
+    fn update_string_scan_state(
+        c: char,
+        quote: char,
+        escaped: &mut bool,
+        line: &mut usize,
+        column: &mut usize,
+    ) -> bool {
+        if *escaped {
+            *escaped = false;
+            return false;
+        }
+
+        if c == '\\' {
+            *escaped = true;
+            return false;
+        }
+
+        if c == quote {
+            return true;
+        }
+
+        if c == '\n' {
+            *line += 1;
+            *column = 1;
+        }
+
+        false
+    }
+
     fn handle_string(
         &self,
         tokens: &mut Vec<Token>,
@@ -231,23 +337,8 @@ impl DefaultLexer {
             chars.next();
             *column += 1;
 
-            if escaped {
-                escaped = false;
-                continue;
-            }
-
-            if c == '\\' {
-                escaped = true;
-                continue;
-            }
-
-            if c == quote {
+            if Self::update_string_scan_state(c, quote, &mut escaped, &mut line, column) {
                 break;
-            }
-
-            if c == '\n' {
-                line += 1;
-                *column = 1;
             }
         }
 
@@ -383,9 +474,10 @@ mod tests {
     #[test]
     fn test_comment() {
         let lexer = DefaultLexer::new();
-        let tokens = lexer.tokenize("host = localhost # This is a comment").unwrap();
+        let tokens = lexer
+            .tokenize("host = localhost # This is a comment")
+            .unwrap();
 
         assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment));
     }
 }
-

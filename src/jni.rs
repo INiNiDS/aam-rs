@@ -6,8 +6,8 @@ use jni::strings::JNIString;
 use jni::sys::{jlong, jobject, jobjectArray, jstring};
 
 // Use the newly renamed AAM core parser struct, and deprecated AAML alias.
-use crate::aam::{AAM, AAML};
-use crate::pipeline::formatter::FormatterRules;
+use crate::aaml::AAML as AAM;
+use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 
 fn throw_java_exception(env: &mut Env<'_>, class: &str, msg: impl ToString) {
     let _ = env.throw_new(JNIString::from(class), JNIString::from(msg.to_string()));
@@ -97,7 +97,11 @@ pub extern "system" fn Java_com_rustgames_aam_AAM_format<'local>(
     content: JString<'local>,
 ) -> jstring {
     let Some(aam) = (unsafe { get_aam(ptr) }) else {
-        throw_java_exception(&mut env, "java/lang/IllegalStateException", "AAM Document is closed");
+        throw_java_exception(
+            &mut env,
+            "java/lang/IllegalStateException",
+            "AAM Document is closed",
+        );
         return std::ptr::null_mut();
     };
 
@@ -378,7 +382,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_merge<'local>(
     Java_com_rustgames_aam_AAM_merge(env, class, ptr, content)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_destroy instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_destroy instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_destroy<'local>(
     env: Env<'local>,
@@ -388,7 +395,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_destroy<'local>(
     Java_com_rustgames_aam_AAM_destroy(env, class, ptr)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findObj instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findObj instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_findObj<'local>(
     env: Env<'local>,
@@ -399,7 +409,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_findObj<'local>(
     Java_com_rustgames_aam_AAM_findObj(env, class, ptr, key)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findKey instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findKey instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_findKey<'local>(
     env: Env<'local>,
@@ -410,7 +423,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_findKey<'local>(
     Java_com_rustgames_aam_AAM_findKey(env, class, ptr, value)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findDeep instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findDeep instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_findDeep<'local>(
     env: Env<'local>,
@@ -421,7 +437,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_findDeep<'local>(
     Java_com_rustgames_aam_AAM_findDeep(env, class, ptr, path)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findList instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findList instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_findList<'local>(
     env: Env<'local>,
@@ -432,7 +451,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAML_findList<'local>(
     Java_com_rustgames_aam_AAM_findList(env, class, ptr, key)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findObject instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findObject instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAML_findObject<'local>(
     env: Env<'local>,
@@ -479,7 +501,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_merge<'local>(
     Java_com_rustgames_aam_AAM_merge(env, class, ptr, content)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_destroy instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_destroy instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_destroy<'local>(
     env: Env<'local>,
@@ -489,7 +514,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_destroy<'local>(
     Java_com_rustgames_aam_AAM_destroy(env, class, ptr)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findObj instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findObj instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findObj<'local>(
     env: Env<'local>,
@@ -500,7 +528,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_findObj<'local>(
     Java_com_rustgames_aam_AAM_findObj(env, class, ptr, key)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findKey instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findKey instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findKey<'local>(
     env: Env<'local>,
@@ -511,7 +542,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_findKey<'local>(
     Java_com_rustgames_aam_AAM_findKey(env, class, ptr, value)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findDeep instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findDeep instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findDeep<'local>(
     env: Env<'local>,
@@ -522,7 +556,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_findDeep<'local>(
     Java_com_rustgames_aam_AAM_findDeep(env, class, ptr, path)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findList instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findList instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
     env: Env<'local>,
@@ -533,7 +570,10 @@ pub extern "system" fn Java_com_aamrs_AamNative_findList<'local>(
     Java_com_rustgames_aam_AAM_findList(env, class, ptr, key)
 }
 
-#[deprecated(since = "1.0.0", note = "Use Java_com_rustgames_aam_AAM_findObject instead")]
+#[deprecated(
+    since = "1.0.0",
+    note = "Use Java_com_rustgames_aam_AAM_findObject instead"
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_aamrs_AamNative_findObject<'local>(
     env: Env<'local>,

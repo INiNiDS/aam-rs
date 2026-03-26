@@ -4,11 +4,14 @@
 //! completely decoupled from AAML struct manipulation.
 
 use crate::error::{AamlError, ErrorDiagnostics};
-use crate::pipeline::tasks::{ValidationTask, ParseTask, TaskExecutionResult, TaskError};
+use crate::pipeline::PipelineHashMap;
 use crate::pipeline::execution_descriptor::ExecutionContext;
 use crate::pipeline::lexer::Lexer;
+use crate::pipeline::new_pipeline_hash_map;
 use crate::pipeline::parser::Parser;
-use std::collections::HashMap;
+use crate::pipeline::tasks::{ParseTask, TaskError, TaskExecutionResult, ValidationTask};
+use bumpalo::Bump;
+use smol_str::SmolStr;
 
 /// Trait for executing validation tasks.
 ///
@@ -48,13 +51,10 @@ pub trait ValidateExecutor: Send + Sync {
         context: &ExecutionContext,
     ) -> TaskExecutionResult {
         let mut errors = Vec::new();
-        let mut successful = 0;
 
         for task in tasks {
             match self.execute_validation(task, context) {
-                Ok(true) => {
-                    successful += 1;
-                }
+                Ok(true) => {}
                 Ok(false) => {
                     // Task executed but validation failed
                     errors.push(TaskError {
@@ -99,7 +99,8 @@ pub trait ParserExecutor: Send + Sync {
     /// - `Err(AamlError)` if parsing failed
     fn execute_parse<'a>(
         &self,
-        task: &ParseTask<'a>,
+        task: &ParseTask<'_>,
+        arena: &'a Bump,
         context: &mut ExecutionContext<'a>,
     ) -> Result<(), AamlError>;
 
@@ -113,17 +114,15 @@ pub trait ParserExecutor: Send + Sync {
     /// - `TaskExecutionResult` with aggregated results
     fn execute_batch<'a>(
         &self,
-        tasks: &[ParseTask<'a>],
+        tasks: &[ParseTask<'_>],
+        arena: &'a Bump,
         context: &mut ExecutionContext<'a>,
     ) -> TaskExecutionResult {
         let mut errors = Vec::new();
-        let mut successful = 0;
 
         for task in tasks {
-            match self.execute_parse(task, context) {
-                Ok(()) => {
-                    successful += 1;
-                }
+            match self.execute_parse(task, arena, context) {
+                Ok(()) => {}
                 Err(e) => {
                     errors.push(TaskError {
                         line: task.line(),
@@ -157,31 +156,295 @@ impl DefaultValidateExecutor {
 
     /// Checks if a type exists in the context's type registry.
     fn type_exists(&self, context: &ExecutionContext, type_name: &str) -> bool {
-        context.types.contains_key(type_name)
-            || Self::is_builtin_type(type_name)
+        context.types.contains_key(type_name) || Self::is_builtin_type(type_name)
     }
 
     /// Checks if a built-in type is recognized.
     fn is_builtin_type(type_name: &str) -> bool {
-        matches!(
-            type_name,
-            "string"
-                | "i32"
-                | "f64"
-                | "bool"
-                | "color"
-                | "vector2"
-                | "vector3"
-                | "vector4"
-                | "matrix4x4"
-                | "kilogram"
-                | "datetime"
-        )
+        matches!(type_name, "string" | "i32" | "f64" | "bool" | "color")
     }
 
     /// Validates a value against a type (basic implementation).
-    fn validate_type_value(&self, value: &str, type_name: &str, context: &ExecutionContext) -> Result<(), String> {
+    fn validate_type_value(
+        &self,
+        value: &str,
+        type_name: &str,
+        context: &ExecutionContext,
+    ) -> Result<(), String> {
         crate::pipeline::utils::validate_type_value(value, type_name, context)
+    }
+
+    fn validate_type_match(
+        &self,
+        key: &std::borrow::Cow<'_, str>,
+        value: &std::borrow::Cow<'_, str>,
+        type_name: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        if !self.type_exists(context, type_name) {
+            return Err(AamlError::InvalidType {
+                type_name: type_name.to_string(),
+                details: format!("Type not found in registry for key '{}'", key),
+                provided: value.to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Unknown type",
+                    format!("Type '{}' is not registered", type_name),
+                    "Register the type using @type directive".to_string(),
+                )),
+            });
+        }
+
+        if let Err(e) = self.validate_type_value(value, type_name, context) {
+            return Err(AamlError::InvalidType {
+                type_name: type_name.to_string(),
+                details: format!("Validation failed for key '{}'", key),
+                provided: value.to_string(),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Type validation failed",
+                    e,
+                    format!("Ensure '{}' conforms to type '{}'", value, type_name),
+                )),
+            });
+        }
+
+        Ok(true)
+    }
+
+    fn verify_schema_exists(
+        &self,
+        schema_name: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        if context.schemas.contains_key(schema_name.as_ref()) {
+            return Ok(true);
+        }
+
+        Err(AamlError::NotFound {
+            key: schema_name.to_string(),
+            context: "Schema not found in registry".to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Schema not defined",
+                format!("Schema '{}' referenced but not defined", schema_name),
+                "Define it using @schema directive".to_string(),
+            )),
+        })
+    }
+
+    fn verify_file_exists(&self, path: &std::borrow::Cow<'_, str>) -> Result<bool, AamlError> {
+        if std::path::Path::new(path.as_ref()).exists() {
+            return Ok(true);
+        }
+
+        Err(AamlError::IoError {
+            details: format!("Imported file '{}' not found", path),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "File missing",
+                format!("The file '{}' does not exist.", path),
+                "Check the file path in your import directive.",
+            )),
+        })
+    }
+
+    fn check_no_circular_reference(
+        &self,
+        key: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        let mut current_key: &str = key;
+        let mut visited = std::collections::HashSet::new();
+
+        while let Some(next_val) = context.map.get(current_key) {
+            if !visited.insert(current_key) {
+                return Err(AamlError::CircularDependency {
+                    path: format!("{} -> {}", key, next_val),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "Circular reference detected",
+                        format!("Key '{}' references itself directly or indirectly", key),
+                        "Break the reference loop".to_string(),
+                    )),
+                });
+            }
+
+            if context.map.contains_key(&**next_val) {
+                current_key = next_val;
+            } else {
+                break;
+            }
+        }
+
+        Ok(true)
+    }
+    // HIGH COMPLEXITY
+    fn check_derive_completeness(
+        &self,
+        derive_path: &std::borrow::Cow<'_, str>,
+        current_key: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        let parts: Vec<&str> = derive_path.split("::").collect();
+        if parts.len() < 2 {
+            return Ok(true);
+        }
+
+        for schema_name in &parts[1..] {
+            let schema = context
+                .schemas
+                .get(*schema_name)
+                .ok_or_else(|| AamlError::NotFound {
+                    key: schema_name.to_string(),
+                    context: "schema derivation".to_string(),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "Schema not defined",
+                        format!(
+                            "Schema '{}' referenced in derive chain but not defined",
+                            schema_name
+                        ),
+                        "Ensure the file being derived from defines this schema",
+                    )),
+                })?;
+
+            for (field, (type_name, is_optional)) in &schema.fields {
+                if *is_optional {
+                    continue;
+                }
+
+                let full_key = if current_key.is_empty() {
+                    field.to_string()
+                } else {
+                    format!("{}.{}", current_key, field)
+                };
+
+                if !context.map.contains_key(full_key.as_str()) {
+                    return Err(AamlError::SchemaValidationError {
+                        schema: schema_name.to_string(),
+                        field: field.to_string(),
+                        type_name: type_name.to_string(),
+                        details: format!(
+                            "Missing required field '{}' from derived schema '{}'",
+                            field, schema_name
+                        ),
+                        diagnostics: Some(ErrorDiagnostics::new(
+                            "Incomplete derivation",
+                            format!("Derived object missing required field: {}", field),
+                            "Add the field to satisfy the derived schema",
+                        )),
+                    });
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn validate_against_schema(
+        &self,
+        schema_name: &std::borrow::Cow<'_, str>,
+        key: &std::borrow::Cow<'_, str>,
+        value: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        let schema_info = context.schemas.get(schema_name.as_ref()).ok_or_else(|| {
+            AamlError::SchemaValidationError {
+                schema: schema_name.to_string(),
+                field: key.to_string(),
+                type_name: "schema".to_string(),
+                details: format!("Schema '{}' not found", schema_name),
+                diagnostics: None,
+            }
+        })?;
+
+        if let Err(e) = crate::pipeline::utils::validate_inline_object_against_schema(
+            value,
+            schema_info,
+            context,
+        ) {
+            return Err(AamlError::SchemaValidationError {
+                schema: schema_name.to_string(),
+                field: key.to_string(),
+                type_name: "schema".to_string(),
+                details: e,
+                diagnostics: None,
+            });
+        }
+
+        Ok(true)
+    }
+
+    fn check_schema_completeness(
+        &self,
+        schema_name: &std::borrow::Cow<'_, str>,
+        missing_fields: &[std::borrow::Cow<'_, str>],
+    ) -> Result<bool, AamlError> {
+        if missing_fields.is_empty() {
+            return Ok(true);
+        }
+
+        let missing_str = missing_fields
+            .iter()
+            .map(|s| s.as_ref())
+            .collect::<Vec<_>>()
+            .join(", ");
+        Err(AamlError::SchemaValidationError {
+            schema: schema_name.to_string(),
+            field: missing_str.clone(),
+            type_name: "required".to_string(),
+            details: format!(
+                "Schema incomplete: missing required fields: {}",
+                missing_str
+            ),
+            diagnostics: None,
+        })
+    }
+
+    fn validate_list_elements(
+        &self,
+        key: &std::borrow::Cow<'_, str>,
+        items: &[crate::pipeline::parser::ValueNode<'_>],
+        element_type: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext,
+    ) -> Result<bool, AamlError> {
+        if element_type.as_ref() == "any"
+            || element_type.as_ref() == "list"
+            || element_type.as_ref() == "object"
+        {
+            return Ok(true);
+        }
+
+        for item in items {
+            if let Err(e) = self.validate_type_value(&item.to_string(), element_type, context) {
+                return Err(AamlError::InvalidType {
+                    type_name: element_type.to_string(),
+                    details: format!("List element invalid in '{}'", key),
+                    provided: item.to_string(),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "List element validation failed",
+                        e,
+                        format!("All elements in list must be of type '{}'", element_type),
+                    )),
+                });
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn validate_object_structure(
+        &self,
+        key: &std::borrow::Cow<'_, str>,
+        pairs: &[(
+            std::borrow::Cow<'_, str>,
+            crate::pipeline::parser::ValueNode<'_>,
+        )],
+    ) -> Result<bool, AamlError> {
+        if pairs.is_empty() {
+            return Err(AamlError::InvalidValue {
+                details: format!("Empty object for key '{}'", key),
+                expected: "non-empty object".to_string(),
+                diagnostics: None,
+            });
+        }
+
+        Ok(true)
     }
 }
 
@@ -192,7 +455,6 @@ impl Default for DefaultValidateExecutor {
 }
 
 impl ValidateExecutor for DefaultValidateExecutor {
-    // High Complexity
     fn execute_validation(
         &self,
         task: &ValidationTask,
@@ -203,231 +465,43 @@ impl ValidateExecutor for DefaultValidateExecutor {
                 key,
                 value,
                 type_name,
-                line,
-            } => {
-                if !self.type_exists(context, type_name) {
-                    return Err(AamlError::InvalidType {
-                        type_name: type_name.to_string(),
-                        details: format!("Type not found in registry for key '{}'", key),
-                        provided: value.to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Unknown type",
-                            format!("Type '{}' is not registered", type_name),
-                            "Register the type using @type directive".to_string(),
-                        )),
-                    });
-                }
-
-                if let Err(e) = self.validate_type_value(value, type_name, context) {
-                    return Err(AamlError::InvalidType {
-                        type_name: type_name.to_string(),
-                        details: format!("Validation failed for key '{}'", key),
-                        provided: value.to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Type validation failed",
-                            e,
-                            format!("Ensure '{}' conforms to type '{}'", value, type_name),
-                        )),
-                    });
-                }
-
-                Ok(true)
+                line: _,
+            } => self.validate_type_match(key, value, type_name, context),
+            ValidationTask::VerifySchemaExists {
+                schema_name,
+                line: _,
+            } => self.verify_schema_exists(schema_name, context),
+            ValidationTask::VerifyFileExists { path, line: _ } => self.verify_file_exists(path),
+            ValidationTask::CheckNoCircularReference { key, line: _ } => {
+                self.check_no_circular_reference(key, context)
             }
-
-            ValidationTask::VerifySchemaExists { schema_name, line } => {
-                if context.schemas.contains_key(schema_name) {
-                    Ok(true)
-                } else {
-                    Err(AamlError::NotFound {
-                        key: schema_name.to_string(),
-                        context: "Schema not found in registry".to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Schema not defined",
-                            format!("Schema '{}' referenced but not defined", schema_name),
-                            "Define it using @schema directive".to_string(),
-                        )),
-                    })
-                }
-            }
-
-            ValidationTask::VerifyFileExists { path, line } => {
-                if std::path::Path::new(path.as_ref()).exists() {
-                    Ok(true)
-                } else {
-                    Err(AamlError::IoError {
-                        details: format!("Imported file '{}' not found", path),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "File missing",
-                            format!("The file '{}' does not exist.", path),
-                            "Check the file path in your import directive.",
-                        )),
-                    })
-                }
-            }
-
-            ValidationTask::CheckNoCircularReference { key, line } => {
-                let mut current_key: &str = key;
-                let mut visited = std::collections::HashSet::new();
-                
-                while let Some(next_val) = context.map.get(current_key) {
-                    if !visited.insert(current_key) {
-                        return Err(AamlError::CircularDependency {
-                            path: format!("{} -> {}", key, next_val),
-                            diagnostics: Some(ErrorDiagnostics::new(
-                                "Circular reference detected",
-                                format!("Key '{}' references itself directly or indirectly", key),
-                                "Break the reference loop".to_string()
-                            ))
-                        });
-                    }
-                    if context.map.contains_key(&**next_val) {
-                        current_key = next_val;
-                    } else {
-                        break;
-                    }
-                }
-                
-                Ok(true)
-            }
-
-            ValidationTask::CheckDeriveCompleteness { derive_path, current_key, line: _ } => {
-                let parts: Vec<&str> = derive_path.split("::").collect();
-                if parts.len() < 2 {
-                    return Ok(true); // Nothing to validate if no schemas are specified
-                }
-
-                // Skip the first part (filename)
-                let schema_names = &parts[1..];
-
-                for schema_name in schema_names {
-                    let schema = context.schemas.get(*schema_name).ok_or_else(|| {
-                        AamlError::NotFound {
-                            key: schema_name.to_string(),
-                            context: "schema derivation".to_string(),
-                            diagnostics: Some(ErrorDiagnostics::new(
-                                "Schema not defined",
-                                format!("Schema '{}' referenced in derive chain but not defined", schema_name),
-                                "Ensure the file being derived from defines this schema",
-                            )),
-                        }
-                    })?;
-
-                    for (field, (type_name, is_optional)) in &schema.fields {
-                        if !is_optional {
-                            let full_key = if current_key.is_empty() {
-                                field.to_string()
-                            } else {
-                                format!("{}.{}", current_key, field)
-                            };
-
-                            // Check if the current context has this key defined
-                            // The AST might not have been fully executed into map yet during validation,
-                            // but `context.map` and `context.parsed_outputs` track what we have so far.
-                            // For a robust implementation, `current_key` is typically the scope,
-                            // and we need to check if a value for `full_key` exists.
-                            // Currently `context.map` is populated during parsing (ProcessVariable).
-                            if !context.map.contains_key(full_key.as_str()) {
-                                return Err(AamlError::SchemaValidationError {
-                                    schema: schema_name.to_string(),
-                                    field: field.to_string(),
-                                    type_name: type_name.to_string(),
-                                    details: format!("Missing required field '{}' from derived schema '{}'", field, schema_name),
-                                    diagnostics: Some(ErrorDiagnostics::new(
-                                        "Incomplete derivation",
-                                        format!("Derived object missing required field: {}", field),
-                                        "Add the field to satisfy the derived schema",
-                                    )),
-                                });
-                            }
-                        }
-                    }
-                }
-                Ok(true)
-            }
-
-            ValidationTask::ValidateAgainstSchema { schema_name, key, value, line: _ } => {
-                let schema_info = context.schemas.get(schema_name).ok_or_else(|| {
-                    AamlError::SchemaValidationError {
-                        schema: schema_name.to_string(),
-                        field: key.to_string(),
-                        type_name: "schema".to_string(),
-                        details: format!("Schema '{}' not found", schema_name),
-                        diagnostics: None,
-                    }
-                })?;
-
-                if let Err(e) = crate::pipeline::utils::validate_inline_object_against_schema(value, schema_info, context) {
-                    return Err(AamlError::SchemaValidationError {
-                        schema: schema_name.to_string(),
-                        field: key.to_string(),
-                        type_name: "schema".to_string(),
-                        details: e,
-                        diagnostics: None,
-                    });
-                }
-
-                Ok(true)
-            }
-
+            ValidationTask::CheckDeriveCompleteness {
+                derive_path,
+                current_key,
+                line: _,
+            } => self.check_derive_completeness(derive_path, current_key, context),
+            ValidationTask::ValidateAgainstSchema {
+                schema_name,
+                key,
+                value,
+                line: _,
+            } => self.validate_against_schema(schema_name, key, value, context),
             ValidationTask::CheckSchemaCompleteness {
                 schema_name,
                 missing_fields,
-                line,
-            } => {
-                if missing_fields.is_empty() {
-                    Ok(true)
-                } else {
-                    let missing_str = missing_fields.iter().map(|s| s.as_ref()).collect::<Vec<_>>().join(", ");
-                    Err(AamlError::SchemaValidationError {
-                        schema: schema_name.to_string(),
-                        field: missing_str.clone(),
-                        type_name: "required".to_string(),
-                        details: format!(
-                            "Schema incomplete: missing required fields: {}",
-                            missing_str
-                        ),
-                        diagnostics: None,
-                    })
-                }
-            }
+                line: _,
+            } => self.check_schema_completeness(schema_name, missing_fields),
             ValidationTask::ValidateListElements {
                 key,
                 items,
                 element_type,
-                line,
-            } => {
-                let mut all_valid = true;
-                for item in items.iter() {
-                    if let Err(e) = self.validate_type_value(&item.to_string(), element_type, context) {
-                        all_valid = false;
-                        return Err(AamlError::InvalidType {
-                            type_name: element_type.to_string(),
-                            details: format!("List element invalid in '{}'", key),
-                            provided: item.to_string(),
-                            diagnostics: Some(ErrorDiagnostics::new(
-                                "List element validation failed",
-                                e,
-                                format!(
-                                    "All elements in list must be of type '{}'",
-                                    element_type
-                                ),
-                            )),
-                        });
-                    }
-                }
-                Ok(true)
-            }
-
-            ValidationTask::ValidateObjectStructure { key, pairs, line } => {
-                if pairs.is_empty() {
-                    return Err(AamlError::InvalidValue {
-                        details: format!("Empty object for key '{}'", key),
-                        expected: "non-empty object".to_string(),
-                        diagnostics: None,
-                    });
-                }
-                Ok(true)
-            }
+                line: _,
+            } => self.validate_list_elements(key, items, element_type, context),
+            ValidationTask::ValidateObjectStructure {
+                key,
+                pairs,
+                line: _,
+            } => self.validate_object_structure(key, pairs),
         }
     }
 }
@@ -444,6 +518,215 @@ impl DefaultParserExecutor {
     pub fn new() -> Self {
         Self {}
     }
+
+    fn process_variable<'a>(
+        &self,
+        variable_name: &std::borrow::Cow<'_, str>,
+        value: &std::borrow::Cow<'_, str>,
+        line: usize,
+        context: &mut ExecutionContext<'a>,
+    ) {
+        context.set_value(variable_name.as_ref(), value.as_ref(), line);
+    }
+
+    fn manage_scope<'a>(
+        &self,
+        scope: &std::borrow::Cow<'_, str>,
+        is_entry: bool,
+        context: &mut ExecutionContext<'a>,
+    ) {
+        if is_entry {
+            context.push_scope(scope.as_ref().to_string());
+        } else {
+            context.pop_scope();
+        }
+    }
+
+    fn execute_directive(
+        &self,
+        directive_name: &std::borrow::Cow<'_, str>,
+        arguments: &std::borrow::Cow<'_, str>,
+        line: usize,
+    ) -> Result<(), AamlError> {
+        match directive_name.as_ref() {
+            "import" | "derive" => Ok(()),
+            _ => Err(AamlError::ParseError {
+                line,
+                content: format!("@{} {}", directive_name, arguments),
+                details: format!("Unknown directive: @{}", directive_name),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Unknown directive",
+                    format!("Directive '@{}' is not recognized", directive_name),
+                    "Known directives: @import, @derive, @schema, @type",
+                )),
+            }),
+        }
+    }
+
+    fn register_type<'a>(
+        &self,
+        type_name: &std::borrow::Cow<'_, str>,
+        type_spec: &std::borrow::Cow<'_, str>,
+        line: usize,
+        context: &mut ExecutionContext<'a>,
+    ) {
+        let inferred_default = if type_spec.starts_with("list<") {
+            Some("[]".to_string())
+        } else {
+            None
+        };
+
+        context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
+            name: type_name.as_ref().into(),
+            spec: type_spec.as_ref().into(),
+            validator: None,
+            default_value: inferred_default.map(Into::into),
+            metadata: new_pipeline_hash_map(),
+            line,
+        });
+    }
+
+    fn parse_schema_fields(&self, fields: &str) -> PipelineHashMap<SmolStr, (SmolStr, bool)> {
+        let mut schema_fields = new_pipeline_hash_map();
+
+        for field_def in fields.split(',') {
+            let parts: Vec<&str> = field_def.trim().split(':').collect();
+            if parts.len() != 2 {
+                continue;
+            }
+
+            let field_name = parts[0].trim().to_string();
+            let type_name = parts[1].trim().to_string();
+            let is_optional = field_name.ends_with('*');
+            let clean_name = if is_optional {
+                field_name.trim_end_matches('*').trim().to_string()
+            } else {
+                field_name
+            };
+
+            schema_fields.insert(clean_name.into(), (type_name.into(), is_optional));
+        }
+
+        schema_fields
+    }
+
+    // HIGH COMPLEXITY
+    fn register_schema<'a>(
+        &self,
+        schema_name: &std::borrow::Cow<'_, str>,
+        fields: &str,
+        line: usize,
+        context: &mut ExecutionContext<'a>,
+    ) {
+        let schema_fields = self.parse_schema_fields(fields);
+
+        let field_type_names: Vec<SmolStr> = schema_fields
+            .values()
+            .map(|(type_name, _)| type_name.clone())
+            .collect();
+
+        for type_name in field_type_names {
+            if type_name.starts_with("list<") && !context.types.contains_key(type_name.as_str()) {
+                context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
+                    name: type_name.clone(),
+                    spec: type_name,
+                    validator: None,
+                    default_value: Some("[]".into()),
+                    metadata: new_pipeline_hash_map(),
+                    line,
+                });
+            }
+        }
+
+        context.register_schema(crate::pipeline::execution_descriptor::SchemaInfo {
+            name: schema_name.as_ref().into(),
+            fields: schema_fields,
+            line,
+        });
+
+        context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
+            name: schema_name.as_ref().into(),
+            spec: "schema".into(),
+            validator: None,
+            default_value: Some("{}".into()),
+            metadata: new_pipeline_hash_map(),
+            line,
+        });
+    }
+
+    fn resolve_derive_import<'a>(
+        &self,
+        derive_path: &std::borrow::Cow<'_, str>,
+        arena: &'a Bump,
+        context: &mut ExecutionContext<'a>,
+    ) -> Result<(), AamlError> {
+        let parts: Vec<&str> = derive_path.split("::").collect();
+        if parts.is_empty() {
+            return Err(AamlError::DirectiveError {
+                directive: "derive".to_string(),
+                message: "Empty derive path".to_string(),
+                diagnostics: None,
+            });
+        }
+
+        let file_path = parts[0].to_string();
+        if !context.is_imported(&file_path) {
+            let content_string =
+                std::fs::read_to_string(&file_path).map_err(|e| AamlError::IoError {
+                    details: format!("Failed to read imported file '{}': {}", file_path, e),
+                    diagnostics: Some(ErrorDiagnostics::new(
+                        "Import failed",
+                        format!("Could not read file '{}'", file_path),
+                        "Check if the file exists and is readable",
+                    )),
+                })?;
+
+            let content = arena.alloc_str(&content_string);
+            let lexer = crate::pipeline::lexer::DefaultLexer::new();
+            let parser = crate::pipeline::parser::DefaultParser::new();
+
+            let tokens = lexer.tokenize(content)?;
+            let parse_output = parser.parse_with_recovery(&tokens);
+            if let Some(first_error) = parse_output.errors.into_iter().next() {
+                return Err(first_error);
+            }
+
+            let sub_tasks = parser.generate_parse_tasks(&parse_output.ast);
+            for sub_task in sub_tasks {
+                self.execute_parse(&sub_task, arena, context)?;
+            }
+
+            context.record_import(file_path);
+        }
+
+        Ok(())
+    }
+
+    fn resolve_module_reference<'a>(
+        &self,
+        module_name: &std::borrow::Cow<'_, str>,
+        scope: &std::borrow::Cow<'_, str>,
+        context: &ExecutionContext<'a>,
+    ) -> Result<(), AamlError> {
+        if !context.imported_files.contains(module_name)
+            && !context.schemas.contains_key(module_name.as_ref())
+        {
+            return Err(AamlError::NotFound {
+                key: module_name.to_string(),
+                context: format!("module reference in scope '{}'", scope),
+                diagnostics: Some(ErrorDiagnostics::new(
+                    "Module not found",
+                    format!(
+                        "The module '{}' has not been imported or defined",
+                        module_name
+                    ),
+                    "Check for a missing @import directive",
+                )),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for DefaultParserExecutor {
@@ -453,30 +736,29 @@ impl Default for DefaultParserExecutor {
 }
 
 impl ParserExecutor for DefaultParserExecutor {
-    // High Complexity
     fn execute_parse<'a>(
         &self,
-        task: &ParseTask<'a>,
+        task: &ParseTask<'_>,
+        arena: &'a Bump,
         context: &mut ExecutionContext<'a>,
     ) -> Result<(), AamlError> {
         match task {
             ParseTask::ProcessVariable {
                 variable_name,
                 value,
-                scope,
+                scope: _,
                 line,
             } => {
-                // Record the variable in the current scope
-                context.set_value(variable_name.clone(), value.clone(), *line);
+                self.process_variable(variable_name, value, *line, context);
                 Ok(())
             }
 
-            ParseTask::ManageScope { scope, is_entry, line } => {
-                if *is_entry {
-                    context.push_scope(scope.clone());
-                } else {
-                    context.pop_scope();
-                }
+            ParseTask::ManageScope {
+                scope,
+                is_entry,
+                line: _,
+            } => {
+                self.manage_scope(scope, *is_entry, context);
                 Ok(())
             }
 
@@ -484,36 +766,14 @@ impl ParserExecutor for DefaultParserExecutor {
                 directive_name,
                 arguments,
                 line,
-            } => {
-                match directive_name.as_ref() {
-                    "import" | "derive" => {
-                        // Handled in Execution Phase
-                        Ok(())
-                    },
-                    _ => Err(AamlError::ParseError {
-                        line: *line,
-                        content: format!("@{} {}", directive_name, arguments),
-                        details: format!("Unknown directive: @{}", directive_name),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Unknown directive",
-                            format!("Directive '@{}' is not recognized", directive_name),
-                            "Known directives: @import, @derive, @schema, @type",
-                        )),
-                    }),
-                }
-            }
+            } => self.execute_directive(directive_name, arguments, *line),
 
             ParseTask::RegisterType {
                 type_name,
                 type_spec,
                 line,
             } => {
-                context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
-                    name: type_name.clone(),
-                    spec: type_spec.clone(),
-                    validator: None,
-                    line: *line,
-                });
+                self.register_type(type_name, type_spec, *line, context);
                 Ok(())
             }
 
@@ -522,97 +782,20 @@ impl ParserExecutor for DefaultParserExecutor {
                 fields,
                 line,
             } => {
-                // Parse fields (simplified: "field1:type1,field2:type2")
-                let mut schema_fields = HashMap::new();
-                for field_def in fields.split(',') {
-                    let parts: Vec<&str> = field_def.trim().split(':').collect();
-                    if parts.len() == 2 {
-                        let field_name = parts[0].trim().to_string();
-                        let type_name = parts[1].trim().to_string();
-                        let is_optional = field_name.ends_with('*');
-                        let clean_name = if is_optional {
-                            field_name.trim_end_matches('*').trim().to_string()
-                        } else {
-                            field_name
-                        };
-                        schema_fields.insert(clean_name.into(), (type_name.into(), is_optional));
-                    }
-                }
-
-                context.register_schema(crate::pipeline::execution_descriptor::SchemaInfo {
-                    name: schema_name.clone(),
-                    fields: schema_fields,
-                    line: *line,
-                });
+                self.register_schema(schema_name, fields, *line, context);
                 Ok(())
             }
 
-            ParseTask::ResolveDeriveImport { derive_path, line } => {
-                let parts: Vec<&str> = derive_path.split("::").collect();
-                if parts.is_empty() {
-                    return Err(AamlError::DirectiveError {
-                        directive: "derive".to_string(),
-                        message: "Empty derive path".to_string(),
-                        diagnostics: None,
-                    });
-                }
-                
-                let file_path = parts[0].to_string();
-                if !context.is_imported(&file_path) {
-                    let content_string = std::fs::read_to_string(&file_path).map_err(|e| {
-                        AamlError::IoError {
-                            details: format!("Failed to read imported file '{}': {}", file_path, e),
-                            diagnostics: Some(ErrorDiagnostics::new(
-                                "Import failed",
-                                format!("Could not read file '{}'", file_path),
-                                "Check if the file exists and is readable",
-                            )),
-                        }
-                    })?;
-                    // Leak the imported content so it lives for 'static (and thus 'a)
-                    let content: &'a str = Box::leak(content_string.into_boxed_str());
-
-                    // Run localized parsing on imported content
-                    let lexer = crate::pipeline::lexer::DefaultLexer::new();
-                    let parser = crate::pipeline::parser::DefaultParser::new();
-                    
-                    let tokens = lexer.tokenize(content)?;
-                    let ast = parser.parse(&tokens)?;
-                    let sub_tasks = parser.generate_parse_tasks(&ast);
-                    
-                    // Note: We're executing these tasks in the same context to merge types/schemas.
-                    // Assignments from the imported file are currently ignored as derive only imports types/schemas,
-                    // but we could filter or apply them if needed. For now, we apply them all.
-                    for sub_task in sub_tasks {
-                        self.execute_parse(&sub_task, context)?;
-                    }
-
-                    context.record_import(file_path);
-                }
-                
-                Ok(())
-            }
+            ParseTask::ResolveDeriveImport {
+                derive_path,
+                line: _,
+            } => self.resolve_derive_import(derive_path, arena, context),
 
             ParseTask::ResolveModuleReference {
                 module_name,
                 scope,
-                line,
-            } => {
-                // If it's a known module (cached import), ok, otherwise report not found
-                if !context.imported_files.contains(module_name) && !context.schemas.contains_key(module_name) {
-                    return Err(AamlError::NotFound {
-                        key: module_name.to_string(),
-                        context: format!("module reference in scope '{}'", scope),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Module not found",
-                            format!("The module '{}' has not been imported or defined", module_name),
-                            "Check for a missing @import directive"
-                        )),
-                    });
-                }
-                Ok(())
-            }
+                line: _,
+            } => self.resolve_module_reference(module_name, scope, context),
         }
     }
 }
-

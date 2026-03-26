@@ -46,7 +46,6 @@ type AamlString = Box<str>;
 /// let cfg = AAML::parse("host = localhost\nport = 8080").unwrap();
 /// assert_eq!(cfg.find_obj("host").unwrap().as_str(), "localhost");
 /// ```
-#[deprecated(since = "2.0.0", note = "Use AAM instead")]
 pub struct AAML {
     map: HashMap<AamlString, AamlString, Hasher>,
     commands: HashMap<String, Arc<dyn Command>>,

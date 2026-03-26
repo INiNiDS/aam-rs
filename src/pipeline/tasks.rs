@@ -288,7 +288,9 @@ impl<'a> ParseTask<'a> {
             ParseTask::ProcessVariable { variable_name, .. } => {
                 format!("Process variable '{}'", variable_name)
             }
-            ParseTask::ManageScope { scope, is_entry, .. } => {
+            ParseTask::ManageScope {
+                scope, is_entry, ..
+            } => {
                 let action = if *is_entry { "Enter" } else { "Exit" };
                 format!("{} scope '{}'", action, scope)
             }
@@ -405,13 +407,21 @@ impl<'a> ExecutionTask<'a> {
             ExecutionTask::ApplySchema { schema_name, .. } => {
                 format!("Apply schema '{}'", schema_name)
             }
-            ExecutionTask::ExecuteInheritance { derive_path, child_key, .. } => {
+            ExecutionTask::ExecuteInheritance {
+                derive_path,
+                child_key,
+                ..
+            } => {
                 format!("Execute inheritance: '{}' <- '{}'", child_key, derive_path)
             }
             ExecutionTask::ImportFile { file_path, .. } => {
                 format!("Import file '{}'", file_path)
             }
-            ExecutionTask::ResolveReference { source_key, target_key, .. } => {
+            ExecutionTask::ResolveReference {
+                source_key,
+                target_key,
+                ..
+            } => {
                 format!("Resolve reference: '{}' -> '{}'", source_key, target_key)
             }
         }
@@ -472,13 +482,14 @@ pub struct ExecutionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
 
     #[test]
     fn test_validation_task_line_numbers() {
         let task = ValidationTask::CheckTypeMatch {
-            key: "foo".to_string(),
-            value: "bar".to_string(),
-            type_name: "string".to_string(),
+            key: Cow::from("foo".to_string()),
+            value: Cow::from("bar"),
+            type_name: Cow::from("string".to_string()),
             line: 42,
         };
         assert_eq!(task.line(), 42);
@@ -487,8 +498,8 @@ mod tests {
     #[test]
     fn test_parse_task_description() {
         let task = ParseTask::ExecuteDirective {
-            directive_name: "import".to_string(),
-            arguments: "base.aam".to_string(),
+            directive_name: Cow::from("import"),
+            arguments: Cow::from("base.aam"),
             line: 10,
         };
         assert_eq!(task.description(), "Execute directive '@import'");
@@ -497,8 +508,8 @@ mod tests {
     #[test]
     fn test_execution_task_inheritance() {
         let task = ExecutionTask::ExecuteInheritance {
-            derive_path: "base.aam::Parent".to_string(),
-            child_key: "child".to_string(),
+            derive_path: Cow::from("base.aam::Parent"),
+            child_key: Cow::from("child"),
             line: 5,
         };
         assert_eq!(
@@ -507,5 +518,3 @@ mod tests {
         );
     }
 }
-
-

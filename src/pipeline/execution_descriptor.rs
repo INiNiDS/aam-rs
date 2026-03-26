@@ -4,20 +4,21 @@
 //! It bundles all necessary context, tasks, and metadata for clean execution.
 
 use crate::pipeline::parser::AstNode;
-use crate::pipeline::tasks::{ExecutionTask, ParseTask, ValidationTask, ExecutionStats};
-use std::collections::HashMap;
+use crate::pipeline::tasks::{ExecutionStats, ExecutionTask, ParseTask, ValidationTask};
+use crate::pipeline::{PipelineBuildHasher, PipelineHashMap};
+use smol_str::SmolStr;
+use std::collections::HashSet;
 
-#[cfg(feature = "perf-hash")]
-type Hasher = ahash::RandomState;
-
-#[cfg(not(feature = "perf-hash"))]
-type Hasher = std::collections::hash_map::RandomState;
+#[inline]
+fn new_pipeline_map<K, V>() -> PipelineHashMap<K, V> {
+    PipelineHashMap::with_hasher(PipelineBuildHasher::default())
+}
 
 /// A comprehensive execution manifest that completely replaces AAML struct usage.
 ///
 /// ExecutionDescriptor aggregates all necessary information for the Executer to
 /// materialize the configuration without requiring the legacy AAML struct.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ExecutionDescriptor<'a> {
     /// Original line numbers from source, indexed by AST node
     pub line_numbers: Vec<usize>,
@@ -45,44 +46,44 @@ pub struct ExecutionDescriptor<'a> {
 ///
 /// This struct holds the accumulated state that would normally be scattered
 /// across the AAML struct and various registries.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// Source file path or identifier (for error reporting)
     pub source: std::borrow::Cow<'a, str>,
 
-    /// Key-value map accumulated during parsing
-    pub map: HashMap<Box<str>, Box<str>, Hasher>,
+    /// Key-value map accumulated during parsing (using SmolStr for SSO)
+    pub map: PipelineHashMap<SmolStr, SmolStr>,
 
     /// Schema definitions accumulated from @schema directives
-    pub schemas: HashMap<std::borrow::Cow<'a, str>, SchemaInfo<'a>>,
+    pub schemas: PipelineHashMap<SmolStr, SchemaInfo>,
 
     /// Type definitions accumulated from @type directives
-    pub types: HashMap<std::borrow::Cow<'a, str>, TypeInfo<'a>>,
+    pub types: PipelineHashMap<SmolStr, TypeInfo>,
 
     /// Registered commands (directives)
-    pub commands: HashMap<std::borrow::Cow<'a, str>, CommandInfo<'a>>,
+    pub commands: PipelineHashMap<std::borrow::Cow<'a, str>, CommandInfo<'a>>,
 
     /// Line number map: key → line number where it was defined
-    pub key_line_map: HashMap<Box<str>, usize>,
+    pub key_line_map: PipelineHashMap<SmolStr, usize>,
 
     /// Scope tracking for nested configurations
     pub scope_stack: Vec<std::borrow::Cow<'a, str>>,
 
     /// Circular reference detection set
-    pub visited_keys: std::collections::HashSet<Box<str>>,
+    pub visited_keys: HashSet<SmolStr>,
 
     /// Import cache to prevent re-importing the same file
-    pub imported_files: std::collections::HashSet<std::borrow::Cow<'a, str>>,
+    pub imported_files: HashSet<std::borrow::Cow<'a, str>>,
 }
 
 /// Information about a registered schema.
 #[derive(Debug, Clone)]
-pub struct SchemaInfo<'a> {
+pub struct SchemaInfo {
     /// Schema name
-    pub name: std::borrow::Cow<'a, str>,
+    pub name: SmolStr,
 
     /// Field name → (type_name, is_optional)
-    pub fields: HashMap<std::borrow::Cow<'a, str>, (std::borrow::Cow<'a, str>, bool)>,
+    pub fields: PipelineHashMap<SmolStr, (SmolStr, bool)>,
 
     /// Line number where schema was defined
     pub line: usize,
@@ -90,15 +91,21 @@ pub struct SchemaInfo<'a> {
 
 /// Information about a registered type.
 #[derive(Debug, Clone)]
-pub struct TypeInfo<'a> {
+pub struct TypeInfo {
     /// Type name
-    pub name: std::borrow::Cow<'a, str>,
+    pub name: SmolStr,
 
     /// Type specification (e.g., "i32", "list<string>", "vector2")
-    pub spec: std::borrow::Cow<'a, str>,
+    pub spec: SmolStr,
 
     /// Custom validation rules (if any)
-    pub validator: Option<std::borrow::Cow<'a, str>>,
+    pub validator: Option<SmolStr>,
+
+    /// Default value used by inheritance when a required field is missing.
+    pub default_value: Option<SmolStr>,
+
+    /// Optional metadata bag for pipeline/type adapters.
+    pub metadata: PipelineHashMap<SmolStr, SmolStr>,
 
     /// Line number where type was defined
     pub line: usize,
@@ -120,17 +127,49 @@ pub struct CommandInfo<'a> {
 impl<'a> ExecutionContext<'a> {
     /// Creates a new empty execution context.
     pub fn new(source: impl Into<std::borrow::Cow<'a, str>>) -> Self {
-        Self {
+        let mut context = Self {
             source: source.into(),
-            map: HashMap::with_hasher(Hasher::new()),
-            schemas: HashMap::new(),
-            types: HashMap::new(),
-            commands: HashMap::new(),
-            key_line_map: HashMap::new(),
+            map: new_pipeline_map(),
+            schemas: new_pipeline_map(),
+            types: new_pipeline_map(),
+            commands: new_pipeline_map(),
+            key_line_map: new_pipeline_map(),
             scope_stack: vec!["root".into()],
-            visited_keys: std::collections::HashSet::new(),
-            imported_files: std::collections::HashSet::new(),
+            visited_keys: HashSet::default(),
+            imported_files: HashSet::default(),
+        };
+
+        context.register_builtin_type_defaults();
+        context
+    }
+
+    fn register_builtin_type_defaults(&mut self) {
+        for (name, default_value) in [
+            ("i32", "0"),
+            ("f64", "0"),
+            ("bool", "false"),
+            ("string", "\"\""),
+            ("color", "#000000"),
+        ] {
+            self.types.insert(
+                name.into(),
+                TypeInfo {
+                    name: name.into(),
+                    spec: name.into(),
+                    validator: None,
+                    default_value: Some(default_value.into()),
+                    metadata: new_pipeline_map(),
+                    line: 0,
+                },
+            );
         }
+    }
+
+    /// Returns the registered inheritance default for a given type.
+    pub fn default_value_for_type(&self, type_name: &str) -> Option<&str> {
+        self.types
+            .get(type_name)
+            .and_then(|info| info.default_value.as_deref())
     }
 
     /// Returns the current scope as a string path.
@@ -151,11 +190,11 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Sets a key-value pair in the map with line tracking.
-    pub fn set_value(&mut self, key: impl Into<std::borrow::Cow<'a, str>>, value: impl Into<std::borrow::Cow<'a, str>>, line: usize) {
-        let key_cow = key.into();
-        let key_box = key_cow.into_owned().into_boxed_str();
-        self.map.insert(key_box.clone(), value.into().into_owned().into_boxed_str());
-        self.key_line_map.insert(key_box, line);
+    pub fn set_value(&mut self, key: impl AsRef<str>, value: impl AsRef<str>, line: usize) {
+        let key_str = key.as_ref();
+        let key_smol: SmolStr = key_str.into();
+        self.map.insert(key_smol.clone(), value.as_ref().into());
+        self.key_line_map.insert(key_smol, line);
     }
 
     /// Gets a value from the map.
@@ -164,12 +203,12 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Registers a schema definition.
-    pub fn register_schema(&mut self, schema: SchemaInfo<'a>) {
+    pub fn register_schema(&mut self, schema: SchemaInfo) {
         self.schemas.insert(schema.name.clone(), schema);
     }
 
     /// Registers a type definition.
-    pub fn register_type(&mut self, type_def: TypeInfo<'a>) {
+    pub fn register_type(&mut self, type_def: TypeInfo) {
         self.types.insert(type_def.name.clone(), type_def);
     }
 
@@ -211,11 +250,11 @@ impl<'a> ExecutionContext<'a> {
 
 impl<'a> ExecutionDescriptor<'a> {
     /// Creates a new execution descriptor from parsed AST.
-    pub fn new(parsed_outputs: Vec<AstNode<'a>>, source: impl Into<std::borrow::Cow<'a, str>>) -> Self {
-        let mut line_numbers = Vec::new();
-        for node in &parsed_outputs {
-            line_numbers.push(node.line());
-        }
+    pub fn new(
+        parsed_outputs: Vec<AstNode<'a>>,
+        source: impl Into<std::borrow::Cow<'a, str>>,
+    ) -> Self {
+        let line_numbers = parsed_outputs.iter().map(AstNode::line).collect();
 
         Self {
             line_numbers,
@@ -332,6 +371,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "lsp")]
     fn test_execution_descriptor_task_management() {
         let mut desc = ExecutionDescriptor::new(vec![], "test.aam".to_string());
 
@@ -344,5 +384,3 @@ mod tests {
         assert_eq!(desc.task_count(), 1);
     }
 }
-
-

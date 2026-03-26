@@ -1,8 +1,8 @@
 //! PyO3 bindings — exposes `AAM` to Python as `aam_py.AAM`.
 
-use crate::aam::AAM;
-use crate::error::AamError;
-use crate::pipeline::formatter::FormatterRules;
+use crate::aaml::AAML as AAM;
+use crate::error::AamlError as AamError;
+use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -59,9 +59,7 @@ impl PyAam {
 
     fn format(&self, content: &str) -> PyResult<String> {
         let rules = FormatterRules::default();
-        self.inner_ref()?
-            .format(content, &rules)
-            .map_err(to_py)
+        self.inner_ref()?.format(content, &rules).map_err(to_py)
     }
 
     fn merge(&mut self, content: &str) -> PyResult<()> {
@@ -77,23 +75,33 @@ impl PyAam {
     }
 
     fn find_obj(&self, key: &str) -> Option<String> {
-        self.inner_ref().ok().and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
+        self.inner_ref()
+            .ok()
+            .and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
     }
 
     fn find_key(&self, value: &str) -> Option<String> {
-        self.inner_ref().ok().and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
+        self.inner_ref()
+            .ok()
+            .and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
     }
 
     fn find_deep(&self, key: &str) -> Option<String> {
-        self.inner_ref().ok().and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
+        self.inner_ref()
+            .ok()
+            .and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
     }
 
     fn find_list(&self, key: &str) -> Option<Vec<String>> {
-        self.inner_ref().ok().and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
+        self.inner_ref()
+            .ok()
+            .and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
     }
 
     fn find_object(&self, key: &str) -> Option<HashMap<String, String>> {
-        self.inner_ref().ok().and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
+        self.inner_ref()
+            .ok()
+            .and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
     }
 
     fn keys(&self) -> Vec<String> {
@@ -104,11 +112,14 @@ impl PyAam {
     }
 
     fn to_dict(&self) -> HashMap<String, String> {
-        self.inner_ref().map_or_else(|_| HashMap::new(), |i| i.to_map())
+        self.inner_ref()
+            .map_or_else(|_| HashMap::new(), |i| i.to_map())
     }
 
     fn validate_value(&self, type_name: &str, value: &str) -> PyResult<()> {
-        self.inner_ref()?.validate_value(type_name, value).map_err(to_py)
+        self.inner_ref()?
+            .validate_value(type_name, value)
+            .map_err(to_py)
     }
 
     fn close(&mut self) {
@@ -131,7 +142,9 @@ impl PyAam {
     }
 
     fn __contains__(&self, key: &str) -> bool {
-        self.inner_ref().map(|i| i.find_obj(key).is_some()).unwrap_or(false)
+        self.inner_ref()
+            .map(|i| i.find_obj(key).is_some())
+            .unwrap_or(false)
     }
 
     fn __getitem__(&self, key: &str) -> PyResult<String> {
@@ -154,7 +167,9 @@ impl PyAaml {
     #[new]
     #[pyo3(signature = ())]
     fn new() -> Self {
-        PyAaml { inner: PyAam::new() }
+        PyAaml {
+            inner: PyAam::new(),
+        }
     }
 
     #[staticmethod]
@@ -170,9 +185,11 @@ impl PyAaml {
     fn find_obj(&self, key: &str) -> Option<String> {
         self.inner.find_obj(key)
     }
-    
+
     // Pass-through other commonly used methods...
-    fn merge(&mut self, content: &str) -> PyResult<()> { self.inner.merge(content) }
+    fn merge(&mut self, content: &str) -> PyResult<()> {
+        self.inner.merge(content)
+    }
 }
 
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {

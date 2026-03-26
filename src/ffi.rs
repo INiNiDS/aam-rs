@@ -7,8 +7,8 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use crate::aam::{AAM, AAML};
-use crate::pipeline::formatter::FormatterRules;
+use crate::aaml::AAML as AAM;
+use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 
 // ── Opaque handle ────────────────────────────────────────────────────────────
 
@@ -146,7 +146,7 @@ pub unsafe extern "C" fn aam_format(handle: *mut AamHandle, content: *const c_ch
         return std::ptr::null_mut();
     }
     let handle_ref = unsafe { &mut *handle };
-    
+
     let content_str = match unsafe { CStr::from_ptr(content) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -186,7 +186,10 @@ pub unsafe extern "C" fn aam_find_obj(handle: *const AamHandle, key: *const c_ch
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn aam_find_key(handle: *const AamHandle, value: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn aam_find_key(
+    handle: *const AamHandle,
+    value: *const c_char,
+) -> *mut c_char {
     if handle.is_null() || value.is_null() {
         return std::ptr::null_mut();
     }
@@ -204,7 +207,10 @@ pub unsafe extern "C" fn aam_find_key(handle: *const AamHandle, value: *const c_
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn aam_find_deep(handle: *const AamHandle, key: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn aam_find_deep(
+    handle: *const AamHandle,
+    key: *const c_char,
+) -> *mut c_char {
     if handle.is_null() || key.is_null() {
         return std::ptr::null_mut();
     }

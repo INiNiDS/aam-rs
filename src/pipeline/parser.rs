@@ -4,14 +4,11 @@
 //! preserving line number information for error diagnostics.
 
 use crate::error::{AamlError, ErrorDiagnostics};
-use crate::pipeline::lexer::Token;
-use crate::pipeline::tasks::{ParseTask, ExecutionTask};
-use crate::pipeline::lexer::TokenKind;
-use std::sync::Arc;
+use crate::pipeline::lexer::{Token, TokenKind};
+use crate::pipeline::tasks::{ExecutionTask, ParseTask};
 
 /// Represents a value in the AST, supporting nested structures.
-#[derive(Debug, Clone)]
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueNode<'a> {
     Literal(std::borrow::Cow<'a, str>),
     Object(std::sync::Arc<[(std::borrow::Cow<'a, str>, ValueNode<'a>)]>),
@@ -31,10 +28,7 @@ impl<'a> ValueNode<'a> {
                 format!("{{ {} }}", formatted_pairs.join(", "))
             }
             ValueNode::List(items) => {
-                let formatted_items: Vec<String> = items
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect();
+                let formatted_items: Vec<String> = items.iter().map(|v| v.to_string()).collect();
                 format!("[{}]", formatted_items.join(", "))
             }
         }
@@ -77,11 +71,20 @@ pub trait Parser: Send + Sync {
     /// Returns `AamlError::ParseError` if the token stream is malformed.
     fn parse<'a>(&self, tokens: &[Token<'a>]) -> Result<Vec<AstNode<'a>>, AamlError>;
 
+    /// Parses with recovery and returns both partial AST and all parse errors.
+    fn parse_with_recovery<'a>(&self, tokens: &[Token<'a>]) -> ParseOutput<'a>;
+
     /// Generates parse tasks from an AST
     fn generate_parse_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ParseTask<'a>>;
 
     /// Generates execution tasks from an AST
     fn generate_execution_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ExecutionTask<'a>>;
+}
+
+/// Parser output for LSP use-cases where partial AST plus diagnostics are required.
+pub struct ParseOutput<'a> {
+    pub ast: Vec<AstNode<'a>>,
+    pub errors: Vec<AamlError>,
 }
 
 /// Default implementation of the Parser stage.
@@ -97,14 +100,15 @@ impl DefaultParser {
         use crate::pipeline::lexer::TokenKind;
         tokens
             .iter()
-            .filter(|t| {
-                t.kind != TokenKind::Comment
-            })
+            .filter(|t| t.kind != TokenKind::Comment)
             .collect()
     }
 
     /// Parses assignment tokens: `identifier = value`
-    fn parse_assignment<'a>(tokens: &[&Token<'a>], start: usize) -> Result<(std::borrow::Cow<'a, str>, ValueNode<'a>, usize), AamlError> {
+    fn parse_assignment<'a>(
+        tokens: &[&Token<'a>],
+        start: usize,
+    ) -> Result<(std::borrow::Cow<'a, str>, ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         if tokens.len() < start + 3 {
@@ -146,7 +150,10 @@ impl DefaultParser {
     }
 
     /// Parses a value (which may be literal, inline object, or inline list)
-    fn parse_value<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
+    fn parse_value<'a, 'b>(
+        tokens: &'b [&'b Token<'a>],
+        start: usize,
+    ) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         if start >= tokens.len() {
@@ -178,39 +185,53 @@ impl DefaultParser {
     }
 
     /// Parses an inline object: `{ key = val, key = val, ... }`
-    // High Complexity
-    fn parse_inline_object<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
+    fn parse_inline_object<'a, 'b>(
+        tokens: &'b [&'b Token<'a>],
+        start: usize,
+    ) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         let mut pairs = Vec::new();
         let mut pos = start + 1;
+        let mut expect_field = true;
+        let mut has_any_field = false;
 
         while pos < tokens.len() {
             match tokens[pos].kind {
+                TokenKind::RightBrace if expect_field && has_any_field => {
+                    return Err(AamlError::ParseError {
+                        line: tokens[pos].line,
+                        content: "trailing comma in inline object".to_string(),
+                        details: "Expected another field after ',' or remove trailing comma"
+                            .to_string(),
+                        diagnostics: None,
+                    });
+                }
                 TokenKind::RightBrace => return Ok((ValueNode::Object(pairs.into()), pos + 1)),
+                TokenKind::Identifier if expect_field => {
+                    pos = Self::parse_inline_object_pair(tokens, pos, &mut pairs)?;
+                    expect_field = false;
+                    has_any_field = true;
+                }
                 TokenKind::Identifier => {
-                    let key: std::borrow::Cow<'a, str> = tokens[pos].text.clone();
-                    if pos + 2 < tokens.len() && tokens[pos + 1].kind == TokenKind::Assign {
-                        let (value, next_pos) = Self::parse_value(tokens, pos + 2)?;
-                        pairs.push((key, value));
-                        pos = next_pos;
-
-                        // Optional comma separation
-                        if pos < tokens.len() && tokens[pos].kind == TokenKind::Comma {
-                            pos += 1;
-                        }
-                    } else {
-                        // Syntax error, didn't find =
-                        return Err(AamlError::ParseError {
-                            line: tokens[pos].line,
-                            content: "invalid inline object format".to_string(),
-                            details: "Expected '=' after key".to_string(),
-                            diagnostics: None,
-                        });
-                    }
+                    return Err(AamlError::ParseError {
+                        line: tokens[pos].line,
+                        content: "missing comma in inline object".to_string(),
+                        details: "Expected ',' between object fields".to_string(),
+                        diagnostics: None,
+                    });
+                }
+                TokenKind::Comma if expect_field => {
+                    return Err(AamlError::ParseError {
+                        line: tokens[pos].line,
+                        content: "unexpected comma in inline object".to_string(),
+                        details: "Expected an object field before ','".to_string(),
+                        diagnostics: None,
+                    });
                 }
                 TokenKind::Comma => {
-                    pos += 1; // skip stray commas
+                    expect_field = true;
+                    pos += 1;
                 }
                 _ => {
                     return Err(AamlError::ParseError {
@@ -231,8 +252,32 @@ impl DefaultParser {
         })
     }
 
+    fn parse_inline_object_pair<'a, 'b>(
+        tokens: &'b [&'b Token<'a>],
+        pos: usize,
+        pairs: &mut Vec<(std::borrow::Cow<'a, str>, ValueNode<'a>)>,
+    ) -> Result<usize, AamlError> {
+        use crate::pipeline::lexer::TokenKind;
+        let key: std::borrow::Cow<'a, str> = tokens[pos].text.clone();
+        if pos + 2 < tokens.len() && tokens[pos + 1].kind == TokenKind::Assign {
+            let (value, next_pos) = Self::parse_value(tokens, pos + 2)?;
+            pairs.push((key, value));
+            Ok(next_pos)
+        } else {
+            Err(AamlError::ParseError {
+                line: tokens[pos].line,
+                content: "invalid inline object format".to_string(),
+                details: "Expected '=' after key".to_string(),
+                diagnostics: None,
+            })
+        }
+    }
+
     /// Parses an inline list: `[item, item, ...]`
-    fn parse_inline_list<'a, 'b>(tokens: &'b [&'b Token<'a>], start: usize) -> Result<(ValueNode<'a>, usize), AamlError> {
+    fn parse_inline_list<'a, 'b>(
+        tokens: &'b [&'b Token<'a>],
+        start: usize,
+    ) -> Result<(ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
         let mut items = Vec::new();
@@ -260,6 +305,119 @@ impl DefaultParser {
             diagnostics: None,
         })
     }
+
+    fn missing_directive_name_error(line: usize) -> AamlError {
+        AamlError::ParseError {
+            line,
+            content: "@".to_string(),
+            details: "Directive name expected after '@'".to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "Missing directive name",
+                "Directive requires a name after '@'".to_string(),
+                "Use format: @directive_name arguments".to_string(),
+            )),
+        }
+    }
+
+    fn should_stop_directive_args(kind: &TokenKind, brace_count: i32, bracket_count: i32) -> bool {
+        brace_count == 0
+            && bracket_count == 0
+            && (*kind == TokenKind::At || *kind == TokenKind::Newline)
+    }
+
+    fn collect_directive_args<'a>(
+        tokens_filtered: &[&Token<'a>],
+        start_pos: usize,
+    ) -> (String, usize) {
+        let mut args = String::new();
+        let mut arg_pos = start_pos;
+        let mut brace_count = 0;
+        let mut bracket_count = 0;
+
+        while arg_pos < tokens_filtered.len() {
+            let tk = tokens_filtered[arg_pos];
+            match tk.kind {
+                TokenKind::LeftBrace => brace_count += 1,
+                TokenKind::RightBrace => brace_count -= 1,
+                TokenKind::LeftBracket => bracket_count += 1,
+                TokenKind::RightBracket => bracket_count -= 1,
+                _ => {}
+            }
+
+            if Self::should_stop_directive_args(&tk.kind, brace_count, bracket_count) {
+                break;
+            }
+
+            if !args.is_empty() {
+                args.push(' ');
+            }
+            args.push_str(&tk.text);
+            arg_pos += 1;
+        }
+
+        (args, arg_pos)
+    }
+
+    fn parse_directive<'a>(
+        tokens_filtered: &[&Token<'a>],
+        pos: &mut usize,
+        line: usize,
+    ) -> Result<AstNode<'a>, AamlError> {
+        if *pos + 1 >= tokens_filtered.len() {
+            return Err(Self::missing_directive_name_error(line));
+        }
+
+        let dir_name: std::borrow::Cow<'a, str> = tokens_filtered[*pos + 1].text.clone();
+        let (args, arg_pos) = Self::collect_directive_args(tokens_filtered, *pos + 2);
+
+        *pos = arg_pos;
+
+        Ok(AstNode::Directive {
+            name: dir_name,
+            args: args.trim().to_string().into(),
+            body: None,
+            line,
+        })
+    }
+
+    fn synchronize(tokens_filtered: &[&Token<'_>], mut pos: usize) -> usize {
+        while pos < tokens_filtered.len() {
+            let kind = &tokens_filtered[pos].kind;
+            if *kind == TokenKind::Newline || *kind == TokenKind::RightBrace {
+                return pos + 1;
+            }
+            pos += 1;
+        }
+        pos
+    }
+
+    fn scope_from_key(key: &str) -> std::borrow::Cow<'static, str> {
+        if let Some((prefix, _)) = key.rsplit_once('.') {
+            return format!("root::{}", prefix.replace('.', "::")).into();
+        }
+        std::borrow::Cow::Borrowed("root")
+    }
+
+    fn emit_assignment_parse_tasks<'a>(
+        tasks: &mut Vec<ParseTask<'a>>,
+        key: std::borrow::Cow<'a, str>,
+        value: &ValueNode<'a>,
+        line: usize,
+    ) {
+        tasks.push(ParseTask::ProcessVariable {
+            variable_name: key.clone(),
+            value: value.to_string().into(),
+            scope: Self::scope_from_key(&key).into_owned().into(),
+            line,
+        });
+
+        if let ValueNode::Object(pairs) = value {
+            for (field, child_value) in pairs.iter() {
+                let child_key = format!("{}.{}", key, field);
+                Self::emit_assignment_parse_tasks(tasks, child_key.into(), child_value, line);
+            }
+        }
+    }
 }
 
 impl Default for DefaultParser {
@@ -269,11 +427,29 @@ impl Default for DefaultParser {
 }
 
 impl Parser for DefaultParser {
-    // VERY HIGH COMPLEXITY
     fn parse<'a>(&self, tokens: &[Token<'a>]) -> Result<Vec<AstNode<'a>>, AamlError> {
+        let result = self.parse_with_recovery(tokens);
+        if result.errors.is_empty() {
+            Ok(result.ast)
+        } else {
+            Err(result
+                .errors
+                .into_iter()
+                .next()
+                .unwrap_or(AamlError::ParseError {
+                    line: 1,
+                    content: "parse failed".to_string(),
+                    details: "Unknown parser failure".to_string(),
+                    diagnostics: None,
+                }))
+        }
+    }
+
+    fn parse_with_recovery<'a>(&self, tokens: &[Token<'a>]) -> ParseOutput<'a> {
         use crate::pipeline::lexer::TokenKind;
 
         let mut ast: Vec<AstNode<'a>> = Vec::new();
+        let mut errors = Vec::new();
         let tokens_filtered = Self::filter_tokens(tokens);
         let mut pos = 0;
 
@@ -282,121 +458,67 @@ impl Parser for DefaultParser {
 
             match &token.kind {
                 TokenKind::At => {
-                    // Directive: @name args...
-                    if pos + 1 >= tokens_filtered.len() {
-                        return Err(AamlError::ParseError {
+                    match Self::parse_directive(&tokens_filtered, &mut pos, token.line) {
+                        Ok(dir_node) => ast.push(dir_node),
+                        Err(err) => {
+                            errors.push(err);
+                            pos = Self::synchronize(&tokens_filtered, pos + 1);
+                        }
+                    }
+                }
+                TokenKind::Identifier => match Self::parse_assignment(&tokens_filtered, pos) {
+                    Ok((key, value, new_pos)) => {
+                        ast.push(AstNode::Assignment {
+                            key,
+                            value,
                             line: token.line,
-                            content: "@".to_string(),
-                            details: "Directive name expected after '@'".to_string(),
-                            diagnostics: Some(ErrorDiagnostics::new(
-                                "Missing directive name",
-                                "Directive requires a name after '@'".to_string(),
-                                "Use format: @directive_name arguments".to_string(),
-                            )),
                         });
+                        pos = new_pos;
                     }
-
-                    let dir_name: std::borrow::Cow<'a, str> = tokens_filtered[pos + 1].text.clone();
-                    let line = token.line;
-
-                    // Collect remaining tokens on this line as args
-                    let mut args = String::new();
-                    let mut arg_pos = pos + 2;
-                    let mut brace_count = 0;
-                    let mut bracket_count = 0;
-
-                    while arg_pos < tokens_filtered.len() {
-                        let tk = tokens_filtered[arg_pos];
-
-                        if tk.kind == TokenKind::LeftBrace {
-                            brace_count += 1;
-                        } else if tk.kind == TokenKind::RightBrace {
-                            brace_count -= 1;
-                        } else if tk.kind == TokenKind::LeftBracket {
-                            bracket_count += 1;
-                        } else if tk.kind == TokenKind::RightBracket {
-                            bracket_count -= 1;
-                        }
-
-                        // Stop condition: token is At or Newline, AND we are not inside braces/brackets
-                        if brace_count == 0 && bracket_count == 0 {
-                            if tk.kind == TokenKind::At || tk.kind == TokenKind::Newline {
-                                // Important: We should break but if it's newline, we don't include it.
-                                // The At token will be processed next iteration.
-                                break;
-                            }
-                        }
-
-                        if !args.is_empty() {
-                            args.push_str(" ");
-                        }
-                        args.push_str(&tk.text);
-                        arg_pos += 1;
+                    Err(err) => {
+                        errors.push(err);
+                        pos = Self::synchronize(&tokens_filtered, pos + 1);
                     }
-
-                    ast.push(AstNode::Directive {
-                        name: dir_name,
-                        args: args.trim().to_string().into(),
-                        body: None,
-                        line,
-                    });
-
-                    pos = arg_pos;
-                }
-                TokenKind::Identifier => {
-                    // Assignment: identifier = value
-                    let (key, value, new_pos) = Self::parse_assignment(&tokens_filtered, pos)?;
-                    ast.push(AstNode::Assignment {
-                        key,
-                        value,
-                        line: token.line,
-                    });
-                    pos = new_pos;
-                }
-                _ => {
-                    pos += 1;
-                }
+                },
+                _ => pos += 1,
             }
         }
 
-        Ok(ast)
+        ParseOutput { ast, errors }
     }
 
     fn generate_parse_tasks<'a, 'b>(&self, ast: &'b [AstNode<'a>]) -> Vec<ParseTask<'a>> {
         let mut tasks = Vec::new();
-        /*
-        // A complete implementation would track scope transitions based on braces
-        // let mut scope_stack = vec!["root".to_string()];
-        // When encountering an opening brace `{` in assignment:
-        // scope_stack.push(new_scope_name);
-        // When encountering `}`:
-        // scope_stack.pop();
-        // let current_scope = scope_stack.last().unwrap().clone();
-        */
-        let current_scope = std::borrow::Cow::Borrowed("root");
 
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
-                    tasks.push(ParseTask::ProcessVariable {
-                        variable_name: key.clone(),
-                        value: value.to_string().into(),
-                        scope: current_scope.clone(),
-                        line: *line,
-                    });
+                    Self::emit_assignment_parse_tasks(&mut tasks, key.clone(), value, *line);
                 }
-                AstNode::Directive { name, args, line, .. } => {
+                AstNode::Directive {
+                    name, args, line, ..
+                } => {
                     if &**name == "type" {
                         // Assuming args contains the full type definition
                         tasks.push(ParseTask::RegisterType {
-                            type_name: args.split_whitespace().next().unwrap_or("").to_string().into(),
+                            type_name: args
+                                .split_whitespace()
+                                .next()
+                                .unwrap_or("")
+                                .to_string()
+                                .into(),
                             type_spec: args.clone(),
                             line: *line,
                         });
                     } else if &**name == "schema" {
                         let name_part = args.split_whitespace().next().unwrap_or("").to_string();
-                        let body = args.split_once('{').and_then(|(_, b)| b.rsplit_once('}')).map(|(b, _)| b).unwrap_or("");
-                        let parsed_fields = body.replace(',', " ")
+                        let body = args
+                            .split_once('{')
+                            .and_then(|(_, b)| b.rsplit_once('}'))
+                            .map(|(b, _)| b)
+                            .unwrap_or("");
+                        let parsed_fields = body
+                            .replace(',', " ")
                             .split_whitespace()
                             .filter_map(|t| t.split_once(':'))
                             .map(|(k, v)| format!("{}:{}", k, v))
@@ -439,7 +561,9 @@ impl Parser for DefaultParser {
                     });
                 }
                 // Directives translated to execution tasks...
-                AstNode::Directive { name, args, line, .. } => {
+                AstNode::Directive {
+                    name, args, line, ..
+                } => {
                     if &**name == "import" {
                         tasks.push(ExecutionTask::ImportFile {
                             file_path: args.clone(),
@@ -472,7 +596,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("key = value").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(tokens).unwrap();
+        let ast = parser.parse(&*tokens).unwrap();
 
         assert_eq!(ast.len(), 1);
         match &ast[0] {
@@ -493,7 +617,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("@import base.aam").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(tokens).unwrap();
+        let ast = parser.parse(&*tokens).unwrap();
 
         assert_eq!(ast.len(), 1);
         match &ast[0] {
@@ -509,7 +633,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("a = b\nc = d").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(tokens).unwrap();
+        let ast = parser.parse(&*tokens).unwrap();
 
         assert_eq!(ast.len(), 2);
     }
