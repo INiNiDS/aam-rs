@@ -46,6 +46,7 @@ type AamlString = Box<str>;
 /// let cfg = AAML::parse("host = localhost\nport = 8080").unwrap();
 /// assert_eq!(cfg.find_obj("host").unwrap().as_str(), "localhost");
 /// ```
+#[deprecated(since = "2.0.0", note = "please use AAM and Pipeline instead")]
 pub struct AAML {
     map: HashMap<AamlString, AamlString, Hasher>,
     commands: HashMap<String, Arc<dyn Command>>,
@@ -103,6 +104,20 @@ impl AAML {
 
     pub(crate) fn get_map_mut(&mut self) -> &mut HashMap<AamlString, AamlString, Hasher> {
         &mut self.map
+    }
+
+    // ── Accessors for pipeline/executer ──────────────────────────────────
+
+    /// Returns a reference to the command map (for internal pipeline use)
+    #[allow(dead_code)]
+    pub(crate) fn get_commands(&self) -> &HashMap<String, Arc<dyn Command>> {
+        &self.commands
+    }
+
+    /// Returns a copy of the current map (for pipeline output)
+    #[allow(dead_code)]
+    pub(crate) fn get_map_copy(&self) -> HashMap<AamlString, AamlString, Hasher> {
+        self.map.clone()
     }
 
     // ── Type registry ────────────────────────────────────────────────────────
@@ -361,23 +376,23 @@ impl AAML {
                 Ok(())
             }
             Err(mut err) => {
-                if let AamlError::MalformedLiteral { diagnostics, .. } = &mut err {
-                    if diagnostics.is_none() {
-                        *diagnostics = Some(ErrorDiagnostics::new(
-                            "Failed to parse assignment",
-                            format!("Line {}: '{}'", line_num, line),
-                            "Check the format: key = value",
-                        ));
-                    }
+                if let AamlError::MalformedLiteral { diagnostics, .. } = &mut err
+                    && diagnostics.is_none()
+                {
+                    *diagnostics = Some(ErrorDiagnostics::new(
+                        "Failed to parse assignment",
+                        format!("Line {}: '{}'", line_num, line),
+                        "Check the format: key = value",
+                    ));
                 }
-                if let AamlError::InvalidValue { diagnostics, .. } = &mut err {
-                    if diagnostics.is_none() {
-                        *diagnostics = Some(ErrorDiagnostics::new(
-                            "Invalid assignment value",
-                            format!("Line {}: '{}'", line_num, line),
-                            "Ensure key and value are properly formatted",
-                        ));
-                    }
+                if let AamlError::InvalidValue { diagnostics, .. } = &mut err
+                    && diagnostics.is_none()
+                {
+                    *diagnostics = Some(ErrorDiagnostics::new(
+                        "Invalid assignment value",
+                        format!("Line {}: '{}'", line_num, line),
+                        "Ensure key and value are properly formatted",
+                    ));
                 }
                 Err(err)
             }

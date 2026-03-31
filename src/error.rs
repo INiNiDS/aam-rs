@@ -158,7 +158,22 @@ pub enum AamlError {
         value: String,
         diagnostics: Option<ErrorDiagnostics>,
     },
+
+    /// Lexical analysis error (invalid character or token).
+    LexError {
+        /// Line number where the error occurred
+        line: usize,
+        /// Column number where the error occurred
+        column: usize,
+        /// The invalid character
+        character: String,
+        /// Diagnostic guidance
+        diagnostics: Option<ErrorDiagnostics>,
+    },
 }
+
+/// Backward-compatible alias used by some bindings.
+pub type AamError = AamlError;
 
 impl AamlError {
     /// Get the primary error message (short form).
@@ -266,6 +281,17 @@ impl AamlError {
                     value, from_type, to_type
                 )
             }
+            AamlError::LexError {
+                line,
+                column,
+                character,
+                ..
+            } => {
+                format!(
+                    "Lexical error at {}:{}: invalid character '{}'",
+                    line, column, character
+                )
+            }
         }
     }
 
@@ -286,6 +312,7 @@ impl AamlError {
             AamlError::MalformedLiteral { diagnostics, .. } => diagnostics.as_ref(),
             AamlError::DirectiveSyntaxError { diagnostics, .. } => diagnostics.as_ref(),
             AamlError::TypeConversionError { diagnostics, .. } => diagnostics.as_ref(),
+            AamlError::LexError { diagnostics, .. } => diagnostics.as_ref(),
         }
     }
 }

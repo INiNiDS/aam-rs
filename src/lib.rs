@@ -19,12 +19,20 @@
 //! println!("{}", cfg.find_obj("host").unwrap());
 //! ```
 
+#[allow(deprecated)]
 pub mod aaml;
 pub mod builder;
+#[allow(deprecated)]
 pub mod commands;
 pub mod error;
 pub mod found_value;
+pub mod pipeline;
+#[allow(deprecated)]
 mod types;
+mod types_aam;
+
+#[cfg(feature = "aot")]
+pub mod aot;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
@@ -32,6 +40,8 @@ pub mod ffi;
 #[cfg(feature = "python")]
 pub mod python;
 
+pub mod aam;
+pub mod aam_value;
 #[cfg(feature = "jni")]
 pub mod jni;
 

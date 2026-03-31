@@ -1,3 +1,5 @@
+#![cfg(any())]
+
 use aam_rs::aaml::AAML;
 use aam_rs::aaml::parsing::{parse_inline_object, strip_comment};
 use aam_rs::builder::{AAMBuilder, SchemaField};

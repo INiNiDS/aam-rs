@@ -113,3 +113,10 @@ buildNumber.properties
 ### Kotlin ###
 *.kotlin_module
 .kotlin/
+
+generated_stress_test.aam
+generated_stress_test.aam.bin
+
+test.fish
+backup_*.zip
+full_project_code.txt

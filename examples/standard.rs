@@ -1,26 +1,21 @@
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
 
 fn main() {
-    let parser = match AAML::parse(include_str!("standard.aam")) {
+    let parser = match AAM::parse(include_str!("standard.aam")) {
         Ok(aaml) => aaml,
         Err(e) => {
-            eprint!("{}", e);
+            eprint!("{:?}", e);
             return;
         }
     };
 
-    if let Some(a) = parser.find_obj("a") {
-        println!("{}", a);
-    } else {
-        println!("a not found");
-    }
+    let a_hits = parser.find("a");
+    println!("{:?}", a_hits);
 
-    if let Some(d) = parser.find_obj("c") {
-        println!("{}", d);
-        if let Some(e) = parser.find_obj(&*d) {
-            println!("{}", e);
-        }
-    } else {
-        println!("a not found");
+    let c_hits = parser.find("c");
+    println!("{:?}", c_hits);
+
+    if let Some((_, deep_ref)) = c_hits.first() {
+        println!("{:?}", parser.find(deep_ref));
     }
 }

@@ -52,6 +52,15 @@ internal static unsafe partial class AamNative
         }
     }
 
+    internal static int aam_recover_simple(SafeAamHandle handle, string content)
+    {
+        var utf8 = ToNullTerminatedUtf8(content);
+        fixed (byte* ptr = utf8)
+        {
+            return aam_recover_simple((AamlHandle*)handle.DangerousGetHandle(), ptr);
+        }
+    }
+
     internal static byte* aam_find_obj(SafeAamHandle handle, string key)
     {
         var utf8 = ToNullTerminatedUtf8(key);

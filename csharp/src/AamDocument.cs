@@ -3,14 +3,14 @@ using System;
 namespace AamCsharp;
 
 /// <summary>
-/// Represents an AAML document and provides operations for parsing, loading, querying, and merging data.
+/// Represents an AAM document and provides operations for parsing, loading, querying, formatting and merging data.
 /// </summary>
 public sealed unsafe class AamDocument : IDisposable
 {
     private SafeAamHandle? _handle;
 
     /// <summary>
-    /// Initializes a new empty AAML document handle.
+    /// Initializes a new empty AAM document handle.
     /// </summary>
     public AamDocument()
     {
@@ -18,9 +18,9 @@ public sealed unsafe class AamDocument : IDisposable
     }
 
     /// <summary>
-    /// Parses AAML content from a string and returns a new document instance.
+    /// Parses AAM content from a string and returns a new document instance.
     /// </summary>
-    /// <param name="content">AAML text to parse.</param>
+    /// <param name="content">AAM text to parse.</param>
     /// <returns>A new <see cref="AamDocument"/> instance containing parsed data.</returns>
     /// <exception cref="AamException">Thrown when native parsing fails.</exception>
     public static AamDocument Parse(string content)
@@ -39,9 +39,9 @@ public sealed unsafe class AamDocument : IDisposable
     }
 
     /// <summary>
-    /// Loads an AAML file from disk and returns a new document instance.
+    /// Loads an AAM file from disk and returns a new document instance.
     /// </summary>
-    /// <param name="path">Path to the AAML file.</param>
+    /// <param name="path">Path to the AAM file.</param>
     /// <returns>A new <see cref="AamDocument"/> instance containing loaded data.</returns>
     /// <exception cref="AamException">Thrown when native loading fails.</exception>
     public static AamDocument Load(string path)
@@ -65,13 +65,41 @@ public sealed unsafe class AamDocument : IDisposable
     public bool IsClosed => _handle is null || _handle.IsClosed || _handle.IsInvalid;
 
     /// <summary>
-    /// Merges AAML content into the current document.
+    /// Formats an AAM string using standardized rules.
     /// </summary>
-    /// <param name="content">AAML text to merge.</param>
+    /// <param name="content">AAM text to format.</param>
+    /// <returns>Formatted AAM string.</returns>
+    /// <exception cref="AamException">Thrown when native formatting fails.</exception>
+    public string Format(string content)
+    {
+        var ptr = AamNative.aam_format(Handle, content);
+        if (ptr == null)
+        {
+            var errPtr = AamNative.aam_last_error(Handle);
+            var message = AamNative.BorrowUtf8String(errPtr) ?? "Native formatting failed";
+            throw new AamException(message);
+        }
+        return AamNative.TakeOwnedUtf8String(ptr)!;
+    }
+
+    /// <summary>
+    /// Merges AAM content into the current document.
+    /// </summary>
+    /// <param name="content">AAM text to merge.</param>
     /// <exception cref="AamException">Thrown when native merge fails.</exception>
     public void Merge(string content)
     {
         CheckResult(AamNative.aam_merge(Handle, content));
+    }
+
+    /// <summary>
+    /// Performs best-effort recovery for simple malformed input.
+    /// </summary>
+    /// <param name="content">AAM text to recover.</param>
+    /// <exception cref="AamException">Thrown when native recovery fails.</exception>
+    public void RecoverSimple(string content)
+    {
+        CheckResult(AamNative.aam_recover_simple(Handle, content));
     }
 
     /// <summary>
@@ -139,5 +167,3 @@ public sealed unsafe class AamDocument : IDisposable
         throw new AamException(message);
     }
 }
-
-

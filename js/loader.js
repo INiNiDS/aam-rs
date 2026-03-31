@@ -14,7 +14,6 @@ function isMusl() {
     return true
 }
 
-// High complexity
 function resolveTarget() {
     const {platform, arch} = process
 
@@ -24,16 +23,15 @@ function resolveTarget() {
             : ['linux-x64-gnu', 'aam-nodejs-linux-x64-gnu']
     }
 
-    if (platform === 'darwin' && arch === 'x64') {
-        return ['darwin-x64', 'aam-nodejs-darwin-x64']
+    const table = {
+        'darwin:x64': ['darwin-x64', 'aam-nodejs-darwin-x64'],
+        'darwin:arm64': ['darwin-arm64', 'aam-nodejs-darwin-arm64'],
+        'win32:x64': ['win32-x64-msvc', 'aam-nodejs-win32-x64-msvc'],
     }
 
-    if (platform === 'darwin' && arch === 'arm64') {
-        return ['darwin-arm64', 'aam-nodejs-darwin-arm64']
-    }
-
-    if (platform === 'win32' && arch === 'x64') {
-        return ['win32-x64-msvc', 'aam-nodejs-win32-x64-msvc']
+    const target = table[`${platform}:${arch}`]
+    if (target) {
+        return target
     }
 
     throw new Error(`Unsupported platform for aam-nodejs: ${platform} ${arch}`)
