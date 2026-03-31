@@ -179,4 +179,3 @@ mod tests {
         assert!(!scope.block_is_complete());
     }
 }
-

@@ -505,7 +505,11 @@ mod tests {
         let tokens = lexer.tokenize("tint = #ff6600").unwrap();
 
         assert!(!tokens.iter().any(|t| t.kind == TokenKind::Comment));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "#ff6600"));
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TokenKind::Identifier && t.text == "#ff6600")
+        );
     }
 
     #[test]
@@ -514,7 +518,15 @@ mod tests {
         let content = "@schema S { items: list<string> }\nurl = https://localhost/test";
         let tokens = lexer.tokenize(content).unwrap();
 
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "list<string>"));
-        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "https://localhost/test"));
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TokenKind::Identifier && t.text == "list<string>")
+        );
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TokenKind::Identifier && t.text == "https://localhost/test")
+        );
     }
 }

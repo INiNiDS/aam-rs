@@ -1,7 +1,7 @@
 use crate::error::{AamlError, ErrorDiagnostics};
+use crate::pipeline::ExecutionContext;
 use crate::types_aam::TypeAAM;
 use std::fmt;
-use crate::pipeline::ExecutionContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

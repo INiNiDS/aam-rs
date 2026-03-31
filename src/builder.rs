@@ -35,8 +35,8 @@
 //! assert!(content.contains("host = localhost"));
 //! ```
 
-use std::fmt::Write;
 use std::fmt::Display;
+use std::fmt::Write;
 use std::io;
 use std::ops::Deref;
 use std::path::Path;
@@ -84,10 +84,14 @@ impl SchemaField {
         }
     }
 
-
-
     pub fn to_aaml_writer(&self, mut w: impl Write) -> std::fmt::Result {
-        write!(w, "{}{}: {}", self.name, if self.optional { "*" } else { "" }, self.type_name)
+        write!(
+            w,
+            "{}{}: {}",
+            self.name,
+            if self.optional { "*" } else { "" },
+            self.type_name
+        )
     }
 
     /// Renders the field as an AAML field declaration string.

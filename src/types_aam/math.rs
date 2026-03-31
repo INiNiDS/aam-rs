@@ -1,7 +1,7 @@
 use crate::error::{AamlError, ErrorDiagnostics};
 use crate::pipeline::ExecutionContext;
-use crate::types_aam::primitive_type::PrimitiveType;
 use crate::types_aam::TypeAAM;
+use crate::types_aam::primitive_type::PrimitiveType;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MathTypes {
