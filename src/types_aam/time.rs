@@ -49,7 +49,7 @@ fn validate_numeric(value: &str, label: &str) -> Result<(), AamlError> {
             details: format!("'{}' is not a valid number", value),
             expected: "floating-point number".to_string(),
             diagnostics: Some(ErrorDiagnostics::new(
-                &format!("Invalid {}", label),
+                format!("Invalid {}", label),
                 format!("Value '{}' cannot be parsed as a number", value),
                 "Use numeric notation: 10.5, 3, -2.5, etc.",
             )),

@@ -88,12 +88,26 @@ impl DefaultLexer {
 
     /// Checks if a character can start an identifier
     fn is_id_start(c: char) -> bool {
-        c.is_alphabetic() || c == '_' || c == '@'
+        c.is_alphabetic() || c == '_' || c == '@' || c == '#'
     }
 
     /// Checks if a character can continue an identifier
     fn is_id_cont(c: char) -> bool {
-        c.is_alphanumeric() || c == '_' || c == ':' || c == '.' || c == '*'
+        c.is_alphanumeric()
+            || c == '_'
+            || c == ':'
+            || c == '.'
+            || c == '*'
+            || c == '#'
+            || c == '-'
+            || c == '/'
+            || c == '<'
+            || c == '>'
+    }
+
+    // Keep legacy quirk: `#` starts a comment only when followed by whitespace.
+    fn is_comment_start(chars: &std::iter::Peekable<std::str::Chars>) -> bool {
+        chars.clone().nth(1).is_some_and(char::is_whitespace)
     }
 
     /// Checks if a character is a digit
@@ -130,7 +144,11 @@ impl Lexer for DefaultLexer {
                     column += 1;
                 }
                 '#' => {
-                    self.handle_comment(&mut tokens, &mut chars, line, &mut column);
+                    if Self::is_comment_start(&chars) {
+                        self.handle_comment(&mut tokens, &mut chars, line, &mut column);
+                    } else {
+                        self.handle_identifier(&mut tokens, &mut chars, line, &mut column);
+                    }
                 }
                 '=' => self.push_single_token(
                     &mut tokens,
@@ -199,7 +217,7 @@ impl Lexer for DefaultLexer {
                     self.handle_string(&mut tokens, &mut chars, ch, line, &mut column, &mut line)?;
                 }
                 _ if Self::is_digit(ch)
-                    || (ch == '-' && chars.clone().nth(1).map_or(false, Self::is_digit)) =>
+                    || (ch == '-' && chars.clone().nth(1).is_some_and(Self::is_digit)) =>
                 {
                     self.handle_number(&mut tokens, &mut chars, ch, line, &mut column);
                 }
@@ -222,7 +240,7 @@ impl Lexer for DefaultLexer {
         }
 
         // Add final newline if not present
-        if tokens.is_empty() || tokens.last().map_or(true, |t| t.kind != TokenKind::Newline) {
+        if tokens.is_empty() || tokens.last().is_none_or(|t| t.kind != TokenKind::Newline) {
             tokens.push(Token::new(
                 TokenKind::Newline,
                 line,
@@ -479,5 +497,24 @@ mod tests {
             .unwrap();
 
         assert!(tokens.iter().any(|t| t.kind == TokenKind::Comment));
+    }
+
+    #[test]
+    fn test_hex_color_is_not_comment() {
+        let lexer = DefaultLexer::new();
+        let tokens = lexer.tokenize("tint = #ff6600").unwrap();
+
+        assert!(!tokens.iter().any(|t| t.kind == TokenKind::Comment));
+        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "#ff6600"));
+    }
+
+    #[test]
+    fn test_schema_generics_and_url_tokenize() {
+        let lexer = DefaultLexer::new();
+        let content = "@schema S { items: list<string> }\nurl = https://localhost/test";
+        let tokens = lexer.tokenize(content).unwrap();
+
+        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "list<string>"));
+        assert!(tokens.iter().any(|t| t.kind == TokenKind::Identifier && t.text == "https://localhost/test"));
     }
 }

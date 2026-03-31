@@ -21,9 +21,6 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern AamHandle* aam_new();
 
-        [DllImport(__DllName, EntryPoint = "aaml_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern AamHandle* aaml_new();
-
         [DllImport(__DllName, EntryPoint = "aam_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern void aam_free(AamHandle* handle);
 
@@ -33,23 +30,26 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_load", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern int aam_load(AamHandle* handle, byte* path);
 
-        [DllImport(__DllName, EntryPoint = "aam_merge", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern int aam_merge(AamHandle* handle, byte* content);
-
-        [DllImport(__DllName, EntryPoint = "aam_recover_simple", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern int aam_recover_simple(AamHandle* handle, byte* content);
-
         [DllImport(__DllName, EntryPoint = "aam_format", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_format(AamHandle* handle, byte* content);
 
-        [DllImport(__DllName, EntryPoint = "aam_find_obj", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern byte* aam_find_obj(AamHandle* handle, byte* key);
+        [DllImport(__DllName, EntryPoint = "aam_get", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_get(AamHandle* handle, byte* key);
 
-        [DllImport(__DllName, EntryPoint = "aam_find_key", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern byte* aam_find_key(AamHandle* handle, byte* value);
+        [DllImport(__DllName, EntryPoint = "aam_find", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_find(AamHandle* handle, byte* query);
 
-        [DllImport(__DllName, EntryPoint = "aam_find_deep", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern byte* aam_find_deep(AamHandle* handle, byte* key);
+        [DllImport(__DllName, EntryPoint = "aam_deep_search", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_deep_search(AamHandle* handle, byte* pattern);
+
+        [DllImport(__DllName, EntryPoint = "aam_reverse_search", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_reverse_search(AamHandle* handle, byte* value);
+
+        [DllImport(__DllName, EntryPoint = "aam_schema_names", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_schema_names(AamHandle* handle);
+
+        [DllImport(__DllName, EntryPoint = "aam_type_names", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_type_names(AamHandle* handle);
 
         [DllImport(__DllName, EntryPoint = "aam_string_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern void aam_string_free(byte* s);
@@ -60,9 +60,6 @@ namespace AamCsharp
 
     }
 
-    /// <summary>
-    ///  Opaque handle to an AAM parser instance.
-    /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal unsafe partial struct AamHandle
     {

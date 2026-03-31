@@ -313,15 +313,14 @@ impl<'a> ParseTask<'a> {
             line,
             ..
         } = self
+            && !matches!(directive_name.as_ref(), "import" | "derive")
         {
-            if !matches!(directive_name.as_ref(), "import" | "derive") {
-                return Err(TaskError {
-                    line: *line,
-                    message: format!("Unknown directive: @{}", directive_name),
-                    task_description: self.description(),
-                    aaml_error: None,
-                });
-            }
+            return Err(TaskError {
+                line: *line,
+                message: format!("Unknown directive: @{}", directive_name),
+                task_description: self.description(),
+                aaml_error: None,
+            });
         }
 
         Ok(())

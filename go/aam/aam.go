@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"unsafe"
 )
 
@@ -22,9 +23,6 @@ import (
 type AAM struct {
 	ptr *C.AamHandle
 }
-
-// Deprecated: Use AAM instead.
-type AAML = AAM
 
 func newAAM(ptr *C.AamHandle) *AAM {
 	a := &AAM{ptr: ptr}
@@ -80,38 +78,26 @@ func (a *AAM) Format(content string) (string, error) {
 	}
 	cContent := C.CString(content)
 	defer C.free(unsafe.Pointer(cContent))
-	
+
 	result := C.aam_format(a.ptr, cContent)
 	if result == nil {
 		return "", fmt.Errorf("aam: format: %s", a.LastError())
 	}
-	
+
 	val := C.GoString(result)
 	C.aam_string_free(result)
 	return val, nil
 }
 
-// Merge parses additional AAM content and merges it into the current instance.
-func (a *AAM) Merge(content string) error {
-	if a.ptr == nil {
-		return errors.New("aam: operation on closed handle")
-	}
-	cContent := C.CString(content)
-	defer C.free(unsafe.Pointer(cContent))
-	if rc := C.aam_merge(a.ptr, cContent); rc != 0 {
-		return fmt.Errorf("aam: merge: %s", a.LastError())
-	}
-	return nil
-}
-
-// FindObj looks up key in the AAM map.
-func (a *AAM) FindObj(key string) (string, bool) {
+// Get retrieves a string value by its key.
+func (a *AAM) Get(key string) (string, bool) {
 	if a.ptr == nil {
 		return "", false
 	}
 	cKey := C.CString(key)
 	defer C.free(unsafe.Pointer(cKey))
-	result := C.aam_find_obj(a.ptr, cKey)
+
+	result := C.aam_get(a.ptr, cKey)
 	if result == nil {
 		return "", false
 	}
@@ -120,39 +106,53 @@ func (a *AAM) FindObj(key string) (string, bool) {
 	return val, true
 }
 
-// FindKey performs a reverse lookup.
-func (a *AAM) FindKey(value string) (string, bool) {
+
+// ReverseSearch finds all keys that match the specified target value.
+func (a *AAM) ReverseSearch(value string) []string {
 	if a.ptr == nil {
-		return "", false
+		return nil
 	}
 	cValue := C.CString(value)
 	defer C.free(unsafe.Pointer(cValue))
-	result := C.aam_find_key(a.ptr, cValue)
-	if result == nil {
-		return "", false
-	}
-	key := C.GoString(result)
-	C.aam_string_free(result)
-	return key, true
+	return parseCList(C.aam_reverse_search(a.ptr, cValue))
 }
 
-// FindDeep follows a chain of key → value → key lookups until a terminal.
-func (a *AAM) FindDeep(key string) (string, bool) {
+// DeepSearch finds all key-value pairs where the key contains the specified pattern.
+func (a *AAM) DeepSearch(pattern string) map[string]string {
 	if a.ptr == nil {
-		return "", false
+		return nil
 	}
-	cKey := C.CString(key)
-	defer C.free(unsafe.Pointer(cKey))
-	result := C.aam_find_deep(a.ptr, cKey)
-	if result == nil {
-		return "", false
-	}
-	val := C.GoString(result)
-	C.aam_string_free(result)
-	return val, true
+	cPattern := C.CString(pattern)
+	defer C.free(unsafe.Pointer(cPattern))
+	return parseCMap(C.aam_deep_search(a.ptr, cPattern))
 }
 
-// LastError returns the last error message stored.
+// Find is a smart lookup: tries key exact match (O(1)), then searches values (O(N)).
+func (a *AAM) Find(query string) map[string]string {
+	if a.ptr == nil {
+		return nil
+	}
+	cQuery := C.CString(query)
+	defer C.free(unsafe.Pointer(cQuery))
+	return parseCMap(C.aam_find(a.ptr, cQuery))
+}
+
+// SchemaNames returns all registered schema names.
+func (a *AAM) SchemaNames() []string {
+	if a.ptr == nil {
+		return nil
+	}
+	return parseCList(C.aam_schema_names(a.ptr))
+}
+
+// TypeNames returns all registered custom type names.
+func (a *AAM) TypeNames() []string {
+	if a.ptr == nil {
+		return nil
+	}
+	return parseCList(C.aam_type_names(a.ptr))
+}
+
 func (a *AAM) LastError() string {
 	if a.ptr == nil {
 		return ""
@@ -164,11 +164,45 @@ func (a *AAM) LastError() string {
 	return C.GoString(cErr)
 }
 
-// Close releases the native memory held by this AAM instance.
 func (a *AAM) Close() {
 	if a.ptr != nil {
 		C.aam_free(a.ptr)
 		a.ptr = nil
 		runtime.SetFinalizer(a, nil)
 	}
+}
+
+func parseCList(cStr *C.char) []string {
+	if cStr == nil {
+		return []string{}
+	}
+	goStr := C.GoString(cStr)
+	C.aam_string_free(cStr)
+
+	if goStr == "" {
+		return []string{}
+	}
+	return strings.Split(goStr, ",")
+}
+
+func parseCMap(cStr *C.char) map[string]string {
+	res := make(map[string]string)
+	if cStr == nil {
+		return res
+	}
+	goStr := C.GoString(cStr)
+	C.aam_string_free(cStr)
+
+	if goStr == "" {
+		return res
+	}
+
+	lines := strings.Split(goStr, "\n")
+	for _, line := range lines {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			res[parts[0]] = parts[1]
+		}
+	}
+	return res
 }

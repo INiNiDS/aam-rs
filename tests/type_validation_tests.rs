@@ -1,102 +1,19 @@
-use aam_rs::aaml::AAML;
-use std::collections::HashMap;
-
-mod test_core;
-mod test_derive;
-mod test_imports;
+use aam_rs::aam::AAM;
 
 #[test]
-fn test_builtin_types() {
-    let aaml = AAML::new();
-
-    assert!(aaml.validate_value("i32", "123").is_ok());
-    assert!(aaml.validate_value("i32", "abc").is_err());
-
-    assert!(aaml.validate_value("bool", "true").is_ok());
-    assert!(aaml.validate_value("bool", "yes").is_err());
-
-    assert!(aaml.validate_value("f64", "3.14").is_ok());
+fn parse_accepts_valid_builtin_types() {
+    let content = "@schema Device { id: i32, active: bool, ratio: f64 }\nid = 42\nactive = true\nratio = 3.14";
+    assert!(AAM::parse(content).is_ok());
 }
 
 #[test]
-fn test_schema_field_validation() {
-    let config = r#"
-    @schema Device {
-        id: i32
-        name: string
-    }
-
-    id = 42
-    name = "Sensor A"
-    "#;
-
-    let aaml = AAML::parse(config).expect("Should parse valid config");
-    aaml.validate_schemas_completeness()
-        .expect("Schema should be complete");
+fn parse_rejects_invalid_i32() {
+    let content = "@schema Device { id: i32 }\nid = not_a_number";
+    assert!(AAM::parse(content).is_err());
 }
 
 #[test]
-fn test_schema_validation_failure() {
-    let config = r#"
-    @schema Device {
-        id: i32
-    }
-
-    id = "not_a_number"
-    "#;
-
-    // Parsing should fail or validation should fail depending on when validation happens.
-    // In current implementation, `merge_content` calls `validate_against_schemas` for assignments if schemas exist.
-    // However, schema is defined *before* assignment here, so it should be active.
-
-    let res = AAML::parse(config);
-    assert!(
-        res.is_err(),
-        "Should fail because 'id' is defined as i32 but assigned string"
-    );
-}
-
-#[test]
-fn test_apply_schema_manual() {
-    let mut aaml = AAML::new();
-    // Valid schema definition
-    aaml.merge_content("@schema Point { x: i32, y: i32 }")
-        .unwrap();
-
-    let mut data = HashMap::new();
-    data.insert("x".to_string(), "10".to_string());
-    data.insert("y".to_string(), "20".to_string());
-
-    assert!(aaml.apply_schema("Point", &data).is_ok());
-
-    data.insert("y".to_string(), "invalid".to_string());
-    assert!(aaml.apply_schema("Point", &data).is_err());
-}
-
-#[test]
-fn test_list_builtin_validation() {
-    let aaml = AAML::new();
-
-    assert!(aaml.validate_value("list<i32>", "[1, 2, 3]").is_ok());
-    assert!(
-        aaml.validate_value("list<bool>", "[true, false, true]")
-            .is_ok()
-    );
-    assert!(aaml.validate_value("list<i32>", "[1, nope, 3]").is_err());
-}
-
-#[test]
-fn test_schema_optional_fields_are_allowed_to_be_missing() {
-    let config = r#"
-    @schema Server {
-        host: string
-        port*: i32
-    }
-
-    host = localhost
-    "#;
-
-    let aaml = AAML::parse(config).expect("Should parse when optional field is absent");
-    aaml.validate_schemas_completeness()
-        .expect("Optional field should not be required");
+fn parse_accepts_optional_schema_fields() {
+    let content = "@schema Server { host: string, port*: i32 }\nhost = localhost";
+    assert!(AAM::parse(content).is_ok());
 }

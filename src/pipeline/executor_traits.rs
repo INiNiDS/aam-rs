@@ -201,7 +201,7 @@ impl DefaultValidateExecutor {
                 provided: value.to_string(),
                 diagnostics: Some(ErrorDiagnostics::new(
                     "Type validation failed",
-                        e.to_string(),
+                    e.to_string(),
                     format!("Ensure '{}' conforms to type '{}'", value, type_name),
                 )),
             });
@@ -276,7 +276,7 @@ impl DefaultValidateExecutor {
     }
 
     #[inline]
-    fn derive_schema_names(derive_path: &str) -> impl Iterator<Item=&str> {
+    fn derive_schema_names(derive_path: &str) -> impl Iterator<Item = &str> {
         derive_path.split("::").skip(1)
     }
 
@@ -340,7 +340,6 @@ impl DefaultValidateExecutor {
         Ok(())
     }
 
-    // HIGH COMPLEXITY
     fn check_derive_completeness(
         &self,
         derive_path: &std::borrow::Cow<'_, str>,
@@ -659,7 +658,6 @@ impl DefaultParserExecutor {
         }
     }
 
-    // HIGH COMPLEXITY
     fn register_schema<'a>(
         &self,
         schema_name: &std::borrow::Cow<'_, str>,

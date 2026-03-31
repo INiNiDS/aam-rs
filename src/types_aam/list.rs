@@ -126,7 +126,7 @@ impl TypeAAM for ListType {
             expected: "[item, item, ...] format".to_string(),
             diagnostics: Some(crate::error::ErrorDiagnostics::new(
                 "Malformed list literal",
-                format!("List must be wrapped in square brackets: [item1, item2, ...]"),
+                "List must be wrapped in square brackets: [item1, item2, ...]".to_string(),
                 "Use format: [value1, value2, value3]",
             )),
         })?;
@@ -134,22 +134,24 @@ impl TypeAAM for ListType {
         let inner_validator = crate::types_aam::resolve_builtin(&self.inner_type)?;
 
         for item in &items {
-            inner_validator.validate(item, context).map_err(|e| AamlError::InvalidValue {
-                details: format!("'{}' does not match type '{}'", item, self.inner_type),
-                expected: format!("value of type {}", self.inner_type),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
-                    "Invalid list item",
-                    format!(
-                        "List item '{}' failed type validation: {}",
-                        item,
-                        e.short_message()
-                    ),
-                    format!(
-                        "Ensure all items match the list type: list<{}>",
-                        self.inner_type
-                    ),
-                )),
-            })?;
+            inner_validator
+                .validate(item, context)
+                .map_err(|e| AamlError::InvalidValue {
+                    details: format!("'{}' does not match type '{}'", item, self.inner_type),
+                    expected: format!("value of type {}", self.inner_type),
+                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                        "Invalid list item",
+                        format!(
+                            "List item '{}' failed type validation: {}",
+                            item,
+                            e.short_message()
+                        ),
+                        format!(
+                            "Ensure all items match the list type: list<{}>",
+                            self.inner_type
+                        ),
+                    )),
+                })?;
         }
 
         Ok(())

@@ -9,14 +9,13 @@ fn main() {
         }
     };
 
-    if let vec = parser.find("a") {
-        println!("{:?}", vec);
-    }
+    let a_hits = parser.find("a");
+    println!("{:?}", a_hits);
 
-    if let vec = parser.find("c") {
-        println!("{:?}", vec);
-        if let vec = parser.find(&*d) {
-            println!("{:?}", vec);
-        }
+    let c_hits = parser.find("c");
+    println!("{:?}", c_hits);
+
+    if let Some((_, deep_ref)) = c_hits.first() {
+        println!("{:?}", parser.find(deep_ref));
     }
 }

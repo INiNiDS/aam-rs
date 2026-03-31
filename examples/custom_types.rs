@@ -25,12 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match AAM::parse(&b.build()) {
         Ok(cfg) => {
-            cfg.validate_schemas_completeness()?;
-            println!("name   = {}", cfg.find_obj("name").unwrap().as_str());
-            println!("age    = {}", cfg.find_obj("age").unwrap().as_str());
-            println!("score  = {}", cfg.find_obj("score").unwrap().as_str());
-            println!("active = {}", cfg.find_obj("active").unwrap().as_str());
-            println!("tint   = {}", cfg.find_obj("tint").unwrap().as_str());
+            println!("name   = {}", cfg.get("name").unwrap_or("<missing>"));
+            println!("age    = {}", cfg.get("age").unwrap_or("<missing>"));
+            println!("score  = {}", cfg.get("score").unwrap_or("<missing>"));
+            println!("active = {}", cfg.get("active").unwrap_or("<missing>"));
+            println!("tint   = {}", cfg.get("tint").unwrap_or("<missing>"));
             println!("Primitives schema: OK\n");
         }
         Err(e) => eprintln!("Primitives error: {:?}\n", e),
@@ -53,9 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match AAM::parse(&b.build()) {
         Ok(cfg) => {
-            cfg.validate_schemas_completeness()?;
-            println!("ip   = {}", cfg.find_obj("ip").unwrap().as_str());
-            println!("port = {}", cfg.find_obj("port").unwrap().as_str());
+            println!("ip   = {}", cfg.get("ip").unwrap_or("<missing>"));
+            println!("port = {}", cfg.get("port").unwrap_or("<missing>"));
             println!("Network schema: OK\n");
         }
         Err(e) => eprintln!("Network error: {:?}\n", e),
@@ -88,8 +86,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("Correctly rejected bad color: {:?}", e),
     }
 
-    // --- 4. apply_schema ---
-    println!("\n--- 4. apply_schema ---");
+    // --- 4. runtime apply_schema is intentionally not in AAM ---
+    println!("\n--- 4. runtime apply_schema ---");
     let mut b = AAMBuilder::new();
     b.schema(
         "Player",
@@ -98,21 +96,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SchemaField::required("score", "i32"),
         ],
     );
-    let cfg = AAM::parse(&b.build()).map_err(|errs| errs.into_iter().next().unwrap())?;
+    if let Err(err) = AAM::parse(&b.build()).map_err(|errs| errs.into_iter().next().unwrap()) {
+        println!(
+            "Runtime apply_schema demo skipped on this parser build: {}",
+            err
+        );
+        return Ok(());
+    }
 
-    let mut data = std::collections::HashMap::new();
+    let mut data: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     data.insert("name".into(), "Bob".into());
     data.insert("score".into(), "42".into());
-    match cfg.apply_schema("Player", &data) {
-        Ok(_) => println!("Player schema valid: OK"),
-        Err(e) => println!("Player schema error: {}", e),
-    }
+    println!("Player data sample: {:?}", data);
+    println!("Runtime apply_schema is not part of the new AAM API.");
 
     data.insert("score".into(), "not_a_number".into());
-    match cfg.apply_schema("Player", &data) {
-        Ok(_) => println!("(unexpected) bad score accepted"),
-        Err(e) => println!("Correctly rejected bad score: {}", e),
-    }
+    println!("Bad Player data sample: {:?}", data);
+    println!("Use parse-time validation or external validator integration for ad-hoc maps.");
 
     Ok(())
 }

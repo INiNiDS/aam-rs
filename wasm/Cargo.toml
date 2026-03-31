@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 aam-rs = { path = ".." }
 wasm-bindgen = "0.2.105"
+js-sys = "0.3.82"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.55"

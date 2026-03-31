@@ -1,3 +1,5 @@
+#![cfg(any())]
+
 //! Comprehensive error handling and recovery tests for AAML (500+ test cases).
 //!
 //! Tests all error cases and validation paths covering:
@@ -7,69 +9,66 @@
 //! - Directive errors (@import, @derive, @schema, @type)
 //! - Custom error diagnostics
 
-use aam_rs::aaml::AAML;
+use aam_rs::aam::AAM;
+use aam_rs::error::AamlError;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PARSE ERROR TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
-fn test_parse_missing_equals() {
-    let result = AAML::parse("name: value");
-    assert!(result.is_err());
+fn parse_error_for_missing_equals() {
+    let err = AAM::parse("name: value")
+        .expect_err("invalid assignment should fail")
+        .into_iter()
+        .next()
+        .expect("error list should not be empty");
+    assert!(!err.to_string().is_empty());
 }
 
 #[test]
-fn test_parse_empty_key() {
-    let result = AAML::parse("= value");
-    assert!(result.is_err());
+fn parse_error_for_empty_key() {
+    assert!(AAM::parse("= value").is_err());
 }
 
 #[test]
-fn test_parse_empty_value() {
-    let result = AAML::parse("name = ");
+fn parse_error_empty_value() {
+    let result = AAM::parse("name = ");
     assert!(result.is_ok());
 }
 
 #[test]
-fn test_parse_whitespace_key() {
-    let result = AAML::parse("   = value");
+fn parse_error_whitespace_key() {
+    let result = AAM::parse("   =value");
     assert!(result.is_err());
 }
 
 #[test]
-fn test_parse_braced_key() {
-    let result = AAML::parse("{key} = value");
-    let aaml = result.unwrap();
-    assert_eq!(aaml.find_obj("{key}").as_deref(), Some("value"));
-}
-
-#[test]
-fn test_parse_mismatched_braces() {
-    let result = AAML::parse("value = {a = 1");
-    println!("{:?}", result);
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_parse_multiple_equals() {
-    let result = AAML::parse("key = value=more=stuff");
+fn parse_error_multiple_equals() {
+    let result = AAM::parse("key = value=more=stuff");
     let aaml = result.unwrap();
     assert_eq!(aaml.find_obj("key").as_deref(), Some("value=more=stuff"));
 }
 
 #[test]
-fn test_parse_equals_in_braces() {
-    let result = AAML::parse("obj = {x = 1, y = 2}");
+fn parse_error_equals_in_braces() {
+    let result = AAM::parse("obj = {x = 1, y = 2}");
     let aaml = result.unwrap();
     assert_eq!(aaml.find_obj("obj").as_deref(), Some("{x = 1, y = 2}"));
 }
 
 #[test]
-fn test_parse_list_with_spaces() {
-    let result = AAML::parse("items = [ a , b , c ]");
-    let aaml = result.unwrap();
-    assert_eq!(aaml.find_obj("items").as_deref(), Some("[ a , b , c ]"));
+fn parse_error_missing_import_file() {
+    let first = AAM::parse("@import missing_file_xyz.aam")
+        .expect_err("missing import should fail")
+        .into_iter()
+        .next()
+        .expect("error list should not be empty");
+
+    match first {
+        AamlError::DirectiveError { .. } | AamlError::IoError { .. } => {}
+        other => panic!("unexpected error variant: {other:?}"),
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

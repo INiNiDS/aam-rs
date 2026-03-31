@@ -2,7 +2,10 @@
 
 ## Project overview
 
-`aam-rs` is a Rust library that parses `.aam` (AAML) configuration files: a line-based `key = value` format with directives (`@import`, `@derive`, `@schema`, `@type`), schema-based type validation, bidirectional lookup, and deep reference resolution. The crate now exposes both the legacy `AAML` API and a newer pipeline-backed `AAM` API with optional AOT (`.aam.bin`) loading.
+`aam-rs` is a Rust library that parses `.aam` (AAM) configuration files: a line-based `key = value` format with
+directives (`@import`, `@derive`, `@schema`, `@type`), schema-based type validation, bidirectional lookup, and deep
+reference resolution. The crate now exposes both the legacy `AAML` API and a newer pipeline-backed `AAM` API with
+optional AOT (`.aam.bin`) loading.
 
 ## Architecture
 
@@ -100,4 +103,32 @@ All lookup methods return `Option<FoundValue>`. It implements `Deref<Target = st
 | `tests/test_comprehensive_coverage.rs` | broad behavior coverage across parsing, lookups, directives, builder paths     |
 | `tests/test_massive_coverage.rs`       | high-volume matrix tests for parser/comment/deep-lookup stability              |
 | `tests/type_validation_tests.rs`       | built-in type validators                                                       |
+
+## Public API docs (multi-language)
+
+Keep these files updated when behavior or signatures change:
+
+| Language / Surface | Public API doc path     | Primary source of truth                       |
+|--------------------|-------------------------|-----------------------------------------------|
+| Rust core          | `PUBLIC_API.md`         | `src/lib.rs`, `src/aaml/`, `src/aam.rs`       |
+| C FFI              | `include/PUBLIC_API.md` | `include/aam.h`, `src/ffi.rs`                 |
+| C#                 | `csharp/PUBLIC_API.md`  | `csharp/src/AamDocument.cs`                   |
+| Go                 | `go/PUBLIC_API.md`      | `go/aam/aam.go`                               |
+| Java/Kotlin        | `java/PUBLIC_API.md`    | `java/src/main/kotlin/AamDocument.kt`         |
+| Node.js            | `js/PUBLIC_API.md`      | `js/index.d.ts`                               |
+| PHP                | `php/PUBLIC_API.md`     | `php/src/AamPhp.php`                          |
+| Python             | `python/PUBLIC_API.md`  | `src/python.rs`                               |
+| Ruby               | `ruby/PUBLIC_API.md`    | `ruby/ext/aam_rs/src/lib.rs`                  |
+| WASM               | `wasm/PUBLIC_API.md`    | `wasm/src/lib.rs`                             |
+
+## API-change workflow
+
+When making a change that can affect users:
+
+1. Update implementation in source code.
+2. Update matching `PUBLIC_API.md` file(s).
+3. Run language-specific tests or smoke checks for affected bindings.
+4. If behavior is intentionally changed, add note to `CHANGELOG.md`.
+
+If you are not sure whether a change is public-facing, treat it as public and update docs.
 

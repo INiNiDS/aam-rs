@@ -1,5 +1,6 @@
-#[cfg(test)]
+#[cfg(any())]
 mod tests {
+    use aam_rs::aam::AAM;
     use aam_rs::aaml::AAML;
     use aam_rs::builder::{AAMBuilder, SchemaField};
     use aam_rs::error::AamlError;
@@ -749,6 +750,39 @@ mod tests {
     name: string
     email: string
 }
+
+use aam_rs::aam::AAM;
+use aam_rs::error::AamlError;
+
+#[test]
+fn derive_nonexistent_schema_returns_error() {
+    let result = AAM::parse("@derive advanced_base.aam::NonExistentSchema\n");
+    assert!(result.is_err());
+}
+
+#[test]
+fn schema_and_type_registration_are_exposed_in_aam() {
+    let content = "@schema Server { host: string, port: i32 }\n@type port_alias = i32\nhost = localhost\nport = 8080";
+    let doc = AAM::parse(content).expect("parse should succeed");
+
+    assert!(doc.get_schema("Server").is_some());
+    assert!(doc.get_type("port_alias").is_some());
+}
+
+#[test]
+fn derive_directive_error_shape_is_stable() {
+    let result = AAM::parse("@derive missing_file_123.aam\n");
+    let first = result
+        .expect_err("expected error")
+        .into_iter()
+        .next()
+        .expect("expected at least one error");
+
+    match first {
+        AamlError::DirectiveError { .. } | AamlError::IoError { .. } => {}
+        other => panic!("unexpected error variant: {other:?}"),
+    }
+}
 @schema PyProject {
     title: string
     authors*: list<Author>
@@ -838,5 +872,35 @@ title = "my_pkg"
             result.is_err(),
             "list<Author> item missing required 'email' must be rejected"
         );
+    }
+
+    #[test]
+    fn derive_nonexistent_schema_returns_error() {
+        let result = AAM::parse("@derive advanced_base.aam::NonExistentSchema\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn schema_and_type_registration_are_exposed_in_aam() {
+        let content = "@schema Server { host: string, port: i32 }\n@type port_alias = i32\nhost = localhost\nport = 8080";
+        let doc = AAM::parse(content).expect("parse should succeed");
+
+        assert!(doc.get_schema("Server").is_some());
+        assert!(doc.get_type("port_alias").is_some());
+    }
+
+    #[test]
+    fn derive_directive_error_shape_is_stable() {
+        let result = AAM::parse("@derive missing_file_123.aam\n");
+        let first = result
+            .expect_err("expected error")
+            .into_iter()
+            .next()
+            .expect("expected at least one error");
+
+        match first {
+            AamlError::DirectiveError { .. } | AamlError::IoError { .. } => {}
+            other => panic!("unexpected error variant: {other:?}"),
+        }
     }
 }

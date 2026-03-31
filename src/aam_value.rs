@@ -55,7 +55,7 @@ impl PartialEq<&str> for AamValue {
 
 impl Display for AamValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.as_str().expect("Here must be AamlError"))
+        f.write_str(self.as_str().expect("Here must be AamlError"))
     }
 }
 
@@ -63,6 +63,6 @@ impl Deref for AamValue {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.as_str().expect("Here must be AamlError")
+        self.as_str().expect("Here must be AamlError")
     }
 }

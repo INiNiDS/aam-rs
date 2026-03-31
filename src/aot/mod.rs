@@ -9,15 +9,7 @@ use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use tinyvec::TinyVec;
 
-#[cfg(all(
-    feature = "dev",
-    any(feature = "release", feature = "unsafe_fast_path")
-))]
-compile_error!("Select only one AOT mode feature: dev, release, or unsafe_fast_path.");
-#[cfg(all(feature = "release", feature = "unsafe_fast_path"))]
-compile_error!("Select only one AOT mode feature: dev, release, or unsafe_fast_path.");
-#[cfg(not(any(feature = "dev", feature = "release", feature = "unsafe_fast_path")))]
-compile_error!("One AOT mode feature must be enabled: dev, release, or unsafe_fast_path.");
+// AOT mode-specific code paths are cfg-gated below and can coexist in all-features builds.
 
 const INVALID_INDEX: u32 = u32::MAX;
 const CURRENT_AOT_VERSION: u32 = 1;
@@ -194,9 +186,8 @@ impl SoaBuilder {
 
         Ok(idx)
     }
-    // HIGH COMPLEXITY
     #[cfg(feature = "release")]
-    fn run_release_validation(&self) -> Result<(), AamlError> {
+    fn validate_release_type_checks(&self) -> Result<(), AamlError> {
         for &node_index in &self.queue_type_checks {
             let i = node_index as usize;
             if self.key_spans[i].len == 0 || self.value_spans[i].len == 0 {
@@ -208,6 +199,11 @@ impl SoaBuilder {
             }
         }
 
+        Ok(())
+    }
+
+    #[cfg(feature = "release")]
+    fn validate_release_references(&self) -> Result<(), AamlError> {
         for &node_index in &self.queue_ref_resolve {
             let value = self.span_bytes(self.value_spans[node_index as usize])?;
             if !value.starts_with(b"$") {
@@ -234,6 +230,12 @@ impl SoaBuilder {
     }
 
     #[cfg(feature = "release")]
+    fn run_release_validation(&self) -> Result<(), AamlError> {
+        self.validate_release_type_checks()?;
+        self.validate_release_references()
+    }
+
+    #[cfg(feature = "release")]
     fn span_bytes(&self, span: Span) -> Result<&[u8], AamlError> {
         let start = span.start as usize;
         let end = start + span.len as usize;
@@ -245,10 +247,8 @@ impl SoaBuilder {
                 diagnostics: None,
             })
     }
-    // HIGH COMPLEXITY
     #[cfg(feature = "release")]
-    fn find_symbol(&self, key: &str) -> Option<u32> {
-        let target_hash = hash64(key.as_bytes());
+    fn lower_bound_symbol_hash(&self, target_hash: u64) -> usize {
         let mut left = 0usize;
         let mut right = self.symbols.len();
 
@@ -262,7 +262,13 @@ impl SoaBuilder {
             }
         }
 
-        let mut i = left;
+        left
+    }
+
+    #[cfg(feature = "release")]
+    fn find_symbol(&self, key: &str) -> Option<u32> {
+        let target_hash = hash64(key.as_bytes());
+        let mut i = self.lower_bound_symbol_hash(target_hash);
         while i < self.symbols.len() {
             let entry = self.symbols[i];
             if entry.hash != target_hash {
@@ -318,7 +324,8 @@ impl SoaBuilder {
 fn hash64(bytes: &[u8]) -> u64 {
     let mut hasher = FxHasher::default();
     hasher.write(bytes);
-    hasher.finish()
+    let h = hasher.finish();
+    h ^ h.rotate_right(32)
 }
 
 fn split_assignment(line: &str) -> Option<(&str, &str)> {
@@ -336,12 +343,55 @@ fn split_assignment(line: &str) -> Option<(&str, &str)> {
     };
     Some((key, value))
 }
-// HIGH COMPLEXITY
-fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
-    if text
-        .lines()
+
+fn should_use_pipeline_compile(text: &str) -> bool {
+    text.lines()
         .any(|line| strip_comment(line).trim_start().starts_with('@'))
-    {
+}
+
+fn parse_assignment_line(
+    builder: &mut SoaBuilder,
+    errors: &mut FrontendErrors,
+    line_idx: usize,
+    raw_line: &str,
+    line: &str,
+    #[cfg(feature = "dev")] dev_symbols: &mut rustc_hash::FxHashMap<u64, TinyVec<[u32; 4]>>,
+    #[cfg(feature = "dev")] dev_root_children: &mut tinyvec::ArrayVec<[u32; 16]>,
+) {
+    let Some((key, value)) = split_assignment(line) else {
+        push_frontend_error(
+            errors,
+            AamlError::ParseError {
+                line: line_idx + 1,
+                content: raw_line.to_string(),
+                details: "expected 'key = value' assignment".to_string(),
+                diagnostics: None,
+            },
+        );
+        return;
+    };
+
+    match builder.push_assignment(key, value) {
+        Ok(node_index) => {
+            let hash = hash64(key.as_bytes());
+            #[cfg(feature = "dev")]
+            {
+                dev_symbols.entry(hash).or_default().push(node_index);
+                if dev_root_children.len() < dev_root_children.capacity() {
+                    dev_root_children.push(node_index);
+                }
+            }
+            #[cfg(not(feature = "dev"))]
+            {
+                builder.symbols.push(SymbolEntry { hash, node_index });
+            }
+        }
+        Err(err) => push_frontend_error(errors, err),
+    }
+}
+
+fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
+    if should_use_pipeline_compile(text) {
         return compile_via_pipeline(text);
     }
 
@@ -365,36 +415,17 @@ fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
             continue;
         }
 
-        let Some((key, value)) = split_assignment(line) else {
-            push_frontend_error(
-                &mut errors,
-                AamlError::ParseError {
-                    line: line_idx + 1,
-                    content: raw_line.to_string(),
-                    details: "expected 'key = value' assignment".to_string(),
-                    diagnostics: None,
-                },
-            );
-            continue;
-        };
-
-        match builder.push_assignment(key, value) {
-            Ok(node_index) => {
-                let hash = hash64(key.as_bytes());
-                #[cfg(feature = "dev")]
-                {
-                    dev_symbols.entry(hash).or_default().push(node_index);
-                    if dev_root_children.len() < dev_root_children.capacity() {
-                        dev_root_children.push(node_index);
-                    }
-                }
-                #[cfg(not(feature = "dev"))]
-                {
-                    builder.symbols.push(SymbolEntry { hash, node_index });
-                }
-            }
-            Err(err) => push_frontend_error(&mut errors, err),
-        }
+        parse_assignment_line(
+            &mut builder,
+            &mut errors,
+            line_idx,
+            raw_line,
+            line,
+            #[cfg(feature = "dev")]
+            &mut dev_symbols,
+            #[cfg(feature = "dev")]
+            &mut dev_root_children,
+        );
     }
 
     if let Some(errors) = finalize_frontend_errors(errors) {
@@ -531,6 +562,7 @@ impl AamCompiler {
 }
 
 /// Zero-copy runtime view over a cooked `.aam.bin` cache.
+#[derive(Debug)]
 pub struct MappedAam {
     mmap: Mmap,
 }
@@ -547,6 +579,7 @@ impl MappedAam {
         (start, end)
     }
 
+    #[cfg(feature = "unsafe_fast_path")]
     fn key_equals(&self, node_index: usize, key: &[u8]) -> bool {
         let archived = self.archived();
         let span = &archived.key_spans.as_slice()[node_index];
@@ -556,48 +589,6 @@ impl MappedAam {
             .as_slice()
             .get(start..end)
             .is_some_and(|bytes| bytes == key)
-    }
-
-    fn value_for_node(&self, node_index: usize) -> Option<&str> {
-        let archived = self.archived();
-        let span = &archived.value_spans.as_slice()[node_index];
-        let (start, end) = Self::span_bounds(span);
-        let bytes = archived.string_blob.as_slice().get(start..end)?;
-        std::str::from_utf8(bytes).ok()
-    }
-    // HIGH COMPLEXITY: O(1) Safe Lookup
-    #[cfg(not(feature = "unsafe_fast_path"))]
-    fn find_symbol_index(&self, hash: u64, key: &[u8]) -> Option<usize> {
-        let table = self.archived().hash_table.as_slice();
-        if table.is_empty() {
-            return None;
-        }
-
-        let mask = table.len() - 1;
-        let mut idx = (hash as usize) & mask;
-
-        let mut probes = 0;
-        let max_probes = table.len();
-
-        loop {
-            if probes >= max_probes {
-                return None;
-            }
-
-            let entry = &table[idx];
-            let node_idx = entry.node_index.to_native();
-
-            if node_idx == INVALID_INDEX {
-                return None;
-            }
-
-            if entry.hash.to_native() == hash && self.key_equals(node_idx as usize, key) {
-                return Some(node_idx as usize);
-            }
-
-            idx = (idx + 1) & mask;
-            probes += 1;
-        }
     }
 
     #[cfg(feature = "unsafe_fast_path")]
@@ -627,14 +618,49 @@ impl MappedAam {
         }
     }
 
-    /// O(1) open-addressing hash-table lookup over flat symbol entries.
     pub fn get(&self, key: &str) -> Option<&str> {
+        let archived = self.archived();
+        let table = archived.hash_table.as_slice();
+        if table.is_empty() {
+            return None;
+        }
+
+        let key_spans = archived.key_spans.as_slice();
+        let value_spans = archived.value_spans.as_slice();
+        let blob = archived.string_blob.as_slice();
+
         let key_bytes = key.as_bytes();
         let hash = hash64(key_bytes);
-        let node_index = self.find_symbol_index(hash, key_bytes)?;
-        self.value_for_node(node_index)
-    }
 
+        let mask = table.len() - 1;
+        let mut idx = (hash as usize) & mask;
+
+        loop {
+            let entry = unsafe { table.get_unchecked(idx) };
+            let node_idx = entry.node_index.to_native() as usize;
+
+            if node_idx == INVALID_INDEX as usize {
+                return None;
+            }
+
+            if entry.hash.to_native() == hash {
+                let span = unsafe { key_spans.get_unchecked(node_idx) };
+                let start = span.start.to_native() as usize;
+                let end = start + span.len.to_native() as usize;
+
+                if blob.get(start..end) == Some(key_bytes) {
+                    let val_span = unsafe { value_spans.get_unchecked(node_idx) };
+                    let v_start = val_span.start.to_native() as usize;
+                    let v_end = v_start + val_span.len.to_native() as usize;
+
+                    return Some(unsafe {
+                        std::str::from_utf8_unchecked(blob.get_unchecked(v_start..v_end))
+                    });
+                }
+            }
+            idx = (idx + 1) & mask;
+        }
+    }
     pub fn len(&self) -> usize {
         self.archived().hash_table.len()
     }

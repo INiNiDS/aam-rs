@@ -172,10 +172,8 @@ impl DefaultFormatter {
     }
 
     /// Formats an inline object node.
-    fn format_inline_object(
-        pairs: &[(String, String)],
-        options: &FormattingOptions,
-    ) -> String {
+    #[allow(dead_code)]
+    fn format_inline_object(pairs: &[(String, String)], _options: &FormattingOptions) -> String {
         if pairs.is_empty() {
             "{}".to_string()
         } else {
@@ -188,6 +186,7 @@ impl DefaultFormatter {
     }
 
     /// Formats an inline list node.
+    #[allow(dead_code)]
     fn format_inline_list(items: &[String]) -> String {
         if items.is_empty() {
             "[]".to_string()
@@ -348,14 +347,18 @@ mod tests {
             indent_size: 2,
             ..Default::default()
         };
-        let formatted =
-            DefaultFormatter::format_assignment("key", "value", 1, &options);
+        let formatted = DefaultFormatter::format_assignment("key", "value", 1, &options);
         assert_eq!(formatted, "  key = value");
     }
 
     #[test]
     fn test_format_directive() {
-        let formatted = DefaultFormatter::format_directive("import", "base.aam", 0, &FormattingOptions::default());
+        let formatted = DefaultFormatter::format_directive(
+            "import",
+            "base.aam",
+            0,
+            &FormattingOptions::default(),
+        );
         assert_eq!(formatted, "@import base.aam");
     }
 
@@ -365,7 +368,8 @@ mod tests {
             ("host".to_string(), "localhost".to_string()),
             ("port".to_string(), "8080".to_string()),
         ];
-        let formatted = DefaultFormatter::format_inline_object(&pairs, &FormattingOptions::default());
+        let formatted =
+            DefaultFormatter::format_inline_object(&pairs, &FormattingOptions::default());
         assert_eq!(formatted, "{ host = localhost, port = 8080 }");
     }
 
@@ -380,9 +384,7 @@ mod tests {
     fn test_normalize_whitespace() {
         let formatter = DefaultFormatter::new();
         let input = "key = value   \nfoo = bar  ";
-        let result = formatter
-            .normalize_whitespace(input)
-            .unwrap();
+        let result = formatter.normalize_whitespace(input).unwrap();
         assert_eq!(result, "key = value\nfoo = bar");
     }
 
@@ -400,6 +402,3 @@ mod tests {
         assert!(result.contains("name = test"));
     }
 }
-
-
-

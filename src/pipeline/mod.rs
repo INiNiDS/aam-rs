@@ -38,72 +38,7 @@ use bumpalo::Bump;
 use smol_str::SmolStr;
 use tinyvec::TinyVec;
 
-#[cfg(all(feature = "hash-std", feature = "hash-fx"))]
-compile_error!("Features 'hash-std' and 'hash-fx' are mutually exclusive for pipeline hashing.");
-
-#[cfg(all(feature = "hash-std", feature = "hash-ahash"))]
-compile_error!("Features 'hash-std' and 'hash-ahash' are mutually exclusive for pipeline hashing.");
-
-#[cfg(all(feature = "hash-fx", feature = "hash-ahash"))]
-compile_error!("Features 'hash-fx' and 'hash-ahash' are mutually exclusive for pipeline hashing.");
-
-#[cfg(all(feature = "hash-std", feature = "hash-rapidhash"))]
-compile_error!(
-    "Features 'hash-std' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-std", feature = "hash-ritehash"))]
-compile_error!(
-    "Features 'hash-std' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-std", feature = "hash-ripemd"))]
-compile_error!(
-    "Features 'hash-std' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-fx", feature = "hash-rapidhash"))]
-compile_error!(
-    "Features 'hash-fx' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-fx", feature = "hash-ritehash"))]
-compile_error!(
-    "Features 'hash-fx' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-fx", feature = "hash-ripemd"))]
-compile_error!("Features 'hash-fx' and 'hash-ripemd' are mutually exclusive for pipeline hashing.");
-
-#[cfg(all(feature = "hash-ahash", feature = "hash-rapidhash"))]
-compile_error!(
-    "Features 'hash-ahash' and 'hash-rapidhash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-ahash", feature = "hash-ritehash"))]
-compile_error!(
-    "Features 'hash-ahash' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-ahash", feature = "hash-ripemd"))]
-compile_error!(
-    "Features 'hash-ahash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-rapidhash", feature = "hash-ritehash"))]
-compile_error!(
-    "Features 'hash-rapidhash' and 'hash-ritehash' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-rapidhash", feature = "hash-ripemd"))]
-compile_error!(
-    "Features 'hash-rapidhash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
-);
-
-#[cfg(all(feature = "hash-ritehash", feature = "hash-ripemd"))]
-compile_error!(
-    "Features 'hash-ritehash' and 'hash-ripemd' are mutually exclusive for pipeline hashing."
-);
+// Hash backends are selected by cfg precedence below so `--all-features` remains compilable.
 
 #[cfg(feature = "hash-ripemd")]
 #[derive(Default, Clone)]
@@ -168,7 +103,6 @@ pub type PipelineBuildHasher = rapidhash::fast::RandomState;
     not(feature = "hash-fx"),
     not(feature = "hash-ahash"),
     not(feature = "hash-rapidhash"),
-    not(feature = "hash-ritehash"),
     feature = "hash-ripemd"
 ))]
 pub type PipelineBuildHasher = RipemdBuildHasher;
@@ -178,7 +112,6 @@ pub type PipelineBuildHasher = RipemdBuildHasher;
     feature = "hash-fx",
     feature = "hash-ahash",
     feature = "hash-rapidhash",
-    feature = "hash-ritehash",
     feature = "hash-ripemd"
 )))]
 pub type PipelineBuildHasher = std::collections::hash_map::RandomState;
@@ -330,11 +263,9 @@ impl Pipeline {
         #[cfg(not(feature = "parallel"))]
         let sequential_tasks = parse_tasks;
 
-        let parse_result = self.parser_executor.execute_batch(
-            &sequential_tasks,
-            arena,
-            descriptor.context_mut(),
-        );
+        let parse_result =
+            self.parser_executor
+                .execute_batch(&sequential_tasks, arena, descriptor.context_mut());
         if !parse_result.success {
             Self::collect_parse_errors(all_errors, parse_result.errors);
         }

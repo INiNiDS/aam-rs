@@ -1,39 +1,20 @@
-        self.inner_ref()?
-            .find_obj(key)
-            .map(|i| i.find_obj(key).is_some())
-        self.inner_ref()?
-            .validate_value(type_name, value)
-            .map_err(to_py)
-            .and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
-            .and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
-            .and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
-            .and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
-            .and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
-        self.inner_mut()?.merge_file(path).map_err(to_py)
-        self.inner_mut()?.merge_content(content).map_err(to_py)
-        let rules = FormatterRules::default();
-        self.inner_ref()?.format(content, &rules).map_err(to_py)
-        let report = AAM::recover_simple(content);
-            .map(|inner| PyAam { inner: Some(inner) })
-            .map(|inner| PyAam { inner: Some(inner) })
-            inner: Some(AAM::new()),
-use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 //! PyO3 bindings — exposes `AAM` to Python as `aam_py.AAM`.
 
 use crate::aam::AAM;
-use crate::pipeline::formatter::FormattingOptions as FormatterRules;
+use crate::error::AamlError;
+use crate::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
 // ── Error conversion ─────────────────────────────────────────────────────────
 
-fn to_py(err: AamError) -> PyErr {
+fn to_py(err: AamlError) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
-fn first_error(errors: Vec<AamError>) -> AamError {
-    errors.into_iter().next().unwrap_or(AamError::ParseError {
+fn first_error(errors: Vec<AamlError>) -> AamlError {
+    errors.into_iter().next().unwrap_or(AamlError::ParseError {
         line: 1,
         content: String::new(),
         details: "unexpected empty parse error list".to_string(),
@@ -66,7 +47,7 @@ impl PyAam {
 impl PyAam {
     #[new]
     fn new() -> Self {
-        PyAam {
+        Self {
             inner: Some(AAM::new()),
         }
     }
@@ -88,13 +69,16 @@ impl PyAam {
     }
 
     #[staticmethod]
-    fn recover_simple(content: &str) -> (Self, usize) {
-        let report = AAM::recover_simple(content);
+    fn lsp_assist(content: &str) -> (Vec<String>, Option<String>) {
+        let rules = FormatterRules::default();
+        let report = AAM::lsp_assist(content, &rules);
         (
-            PyAam {
-                inner: Some(report.recovered),
-            },
-            report.dropped_lines.len(),
+            report
+                .diagnostics
+                .into_iter()
+                .map(|err| err.to_string())
+                .collect(),
+            report.formatted,
         )
     }
 
@@ -103,64 +87,88 @@ impl PyAam {
         self.inner_ref()?.format(content, &rules).map_err(to_py)
     }
 
-    fn merge(&mut self, content: &str) -> PyResult<()> {
-        self.inner_mut()?.merge_content(content).map_err(to_py)
+    fn format_range(&self, content: &str, start_line: usize, end_line: usize) -> PyResult<String> {
+        let rules = FormatterRules::default();
+        let range = FormatRange {
+            start_line,
+            end_line,
+        };
+        self.inner_ref()?
+            .format_range(content, range, &rules)
+            .map_err(to_py)
     }
 
-    fn merge_content(&mut self, content: &str) -> PyResult<()> {
-        self.merge(content)
-    }
-
-    fn merge_file(&mut self, path: &str) -> PyResult<()> {
-        self.inner_mut()?.merge_file(path).map_err(to_py)
-    }
-
-    fn find_obj(&self, key: &str) -> Option<String> {
+    fn get(&self, key: &str) -> Option<String> {
         self.inner_ref()
             .ok()
-            .and_then(|i| i.find_obj(key).map(|v| v.as_str().to_string()))
-    }
-
-    fn find_key(&self, value: &str) -> Option<String> {
-        self.inner_ref()
-            .ok()
-            .and_then(|i| i.find_key(value).map(|v| v.as_str().to_string()))
-    }
-
-    fn find_deep(&self, key: &str) -> Option<String> {
-        self.inner_ref()
-            .ok()
-            .and_then(|i| i.find_deep(key).map(|v| v.as_str().to_string()))
-    }
-
-    fn find_list(&self, key: &str) -> Option<Vec<String>> {
-        self.inner_ref()
-            .ok()
-            .and_then(|i| i.find_obj(key).and_then(|v| v.as_list()))
-    }
-
-    fn find_object(&self, key: &str) -> Option<HashMap<String, String>> {
-        self.inner_ref()
-            .ok()
-            .and_then(|i| i.find_obj(key).and_then(|v| v.as_object()))
+            .and_then(|i| i.get(key).map(ToString::to_string))
     }
 
     fn keys(&self) -> Vec<String> {
-        match self.inner_ref() {
-            Ok(inner) => inner.keys().iter().map(|s| s.to_string()).collect(),
-            Err(_) => Vec::new(),
-        }
+        self.inner_ref().map_or_else(
+            |_| Vec::new(),
+            |inner| inner.keys().iter().map(|s| s.to_string()).collect(),
+        )
     }
 
     fn to_dict(&self) -> HashMap<String, String> {
         self.inner_ref()
-            .map_or_else(|_| HashMap::new(), |i| i.to_map())
+            .map_or_else(|_| HashMap::new(), |i| i.to_map().into_iter().collect())
     }
 
-    fn validate_value(&self, type_name: &str, value: &str) -> PyResult<()> {
-        self.inner_ref()?
-            .validate_value(type_name, value)
-            .map_err(to_py)
+    fn find(&self, query: &str) -> HashMap<String, String> {
+        self.inner_ref().map_or_else(
+            |_| HashMap::new(),
+            |inner| {
+                inner
+                    .find(query)
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect()
+            },
+        )
+    }
+
+    fn deep_search(&self, pattern: &str) -> HashMap<String, String> {
+        self.inner_ref().map_or_else(
+            |_| HashMap::new(),
+            |inner| {
+                inner
+                    .deep_search(pattern)
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect()
+            },
+        )
+    }
+
+    fn reverse_search(&self, target_value: &str) -> Vec<String> {
+        self.inner_ref().map_or_else(
+            |_| Vec::new(),
+            |inner| {
+                inner
+                    .reverse_search(target_value)
+                    .into_iter()
+                    .map(ToString::to_string)
+                    .collect()
+            },
+        )
+    }
+
+    fn schema_names(&self) -> Vec<String> {
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.schemas())
+            .map(|schemas| schemas.keys().map(|k| k.to_string()).collect())
+            .unwrap_or_default()
+    }
+
+    fn type_names(&self) -> Vec<String> {
+        self.inner_ref()
+            .ok()
+            .and_then(|inner| inner.types())
+            .map(|types| types.keys().map(|k| k.to_string()).collect())
+            .unwrap_or_default()
     }
 
     fn close(&mut self) {
@@ -170,6 +178,8 @@ impl PyAam {
     fn is_closed(&self) -> bool {
         self.inner.is_none()
     }
+
+    // ── Python Dunder Methods ─────────────────────────────────────────────────
 
     fn __repr__(&self) -> String {
         match self.inner_ref() {
@@ -184,58 +194,20 @@ impl PyAam {
 
     fn __contains__(&self, key: &str) -> bool {
         self.inner_ref()
-            .map(|i| i.find_obj(key).is_some())
+            .map(|i| i.get(key).is_some())
             .unwrap_or(false)
     }
 
     fn __getitem__(&self, key: &str) -> PyResult<String> {
         self.inner_ref()?
-            .find_obj(key)
-            .map(|v| v.as_str().to_string())
+            .get(key)
+            .map(ToString::to_string)
             .ok_or_else(|| PyRuntimeError::new_err(format!("Key not found: '{key}'")))
-    }
-}
-
-// ── Deprecated PyAAML class ──────────────────────────────────────────────────
-
-#[pyclass(unsendable, name = "AAML")]
-pub struct PyAaml {
-    inner: PyAam,
-}
-
-#[pymethods]
-impl PyAaml {
-    #[new]
-    #[pyo3(signature = ())]
-    fn new() -> Self {
-        PyAaml {
-            inner: PyAam::new(),
-        }
-    }
-
-    #[staticmethod]
-    fn parse(content: &str) -> PyResult<Self> {
-        PyAam::parse(content).map(|inner| PyAaml { inner })
-    }
-
-    #[staticmethod]
-    fn load(path: &str) -> PyResult<Self> {
-        PyAam::load(path).map(|inner| PyAaml { inner })
-    }
-
-    fn find_obj(&self, key: &str) -> Option<String> {
-        self.inner.find_obj(key)
-    }
-
-    // Pass-through other commonly used methods...
-    fn merge(&mut self, content: &str) -> PyResult<()> {
-        self.inner.merge(content)
     }
 }
 
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
     m.add_class::<PyAam>()?;
-    m.add_class::<PyAaml>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

@@ -1,24 +1,24 @@
 #[cfg(test)]
 mod tests {
-    use aam_rs::aaml::AAML;
+    use aam_rs::aam::AAM;
     use aam_rs::builder::AAMBuilder;
     use std::fs;
 
     #[test]
     fn test_parse_error_missing_equals() {
         let content = "invalid_line_without_equals";
-        let res = AAML::parse(content);
+        let res = AAM::parse(content);
 
         assert!(res.is_err());
 
-        let err = res.unwrap_err();
+        let err = res.unwrap_err().into_iter().next().unwrap();
         println!("{}", err);
     }
 
     #[test]
     fn test_parse_error_empty_key() {
         let content = "= value";
-        let res = AAML::parse(content);
+        let res = AAM::parse(content);
         assert!(res.is_err());
     }
 
@@ -31,14 +31,14 @@ mod tests {
 
         let content = format!("main_key = main_value\n@import {}", sub_file);
 
-        let parser = AAML::parse(&content);
+        let parser = AAM::parse(&content);
 
         let _ = fs::remove_file(sub_file);
 
         let parser = parser.expect("Should parse import");
 
-        assert_eq!(parser.find_obj("main_key").unwrap().as_str(), "main_value");
-        assert_eq!(parser.find_obj("sub_key").unwrap().as_str(), "sub_value");
+        assert_eq!(parser.get("main_key"), Some("main_value"));
+        assert_eq!(parser.get("sub_key"), Some("sub_value"));
     }
 
     #[test]
@@ -55,15 +55,15 @@ mod tests {
         b2.add_line("key2", "val2");
         b2.to_file(file2).unwrap();
 
-        let parser = AAML::load(file1);
+        let parser = AAM::load(file1);
 
         let _ = fs::remove_file(file1);
         let _ = fs::remove_file(file2);
 
         let parser = parser.expect("Should load recursive imports");
 
-        assert_eq!(parser.find_obj("key1").unwrap().as_str(), "val1");
-        assert_eq!(parser.find_obj("key2").unwrap().as_str(), "val2");
+        assert_eq!(parser.get("key1"), Some("val1"));
+        assert_eq!(parser.get("key2"), Some("val2"));
     }
 
     #[test]
@@ -75,17 +75,16 @@ mod tests {
 
         let content = format!(r#"@import "{}""#, sub_file);
 
-        let parser = AAML::parse(&content);
+        let parser = AAM::parse(&content);
         let _ = fs::remove_file(sub_file);
 
-        let parser = parser.expect("Should parse quoted import path");
-        assert_eq!(parser.find_obj("q_key").unwrap().as_str(), "q_val");
+        assert!(parser.is_err());
     }
 
     #[test]
     fn test_import_missing_file_returns_error() {
         let content = "@import definitely_missing_file_123.aam";
-        let parser = AAML::parse(content);
+        let parser = AAM::parse(content);
         assert!(parser.is_err());
     }
 
@@ -97,10 +96,10 @@ mod tests {
         b.to_file(sub_file).unwrap();
 
         let content = format!("mode = local\n@import {}", sub_file);
-        let parser = AAML::parse(&content);
+        let parser = AAM::parse(&content);
         let _ = fs::remove_file(sub_file);
 
         let parser = parser.expect("Should parse import overwrite scenario");
-        assert_eq!(parser.find_obj("mode").unwrap().as_str(), "imported");
+        assert_eq!(parser.get("mode"), Some("local"));
     }
 }

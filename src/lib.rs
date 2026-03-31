@@ -19,13 +19,15 @@
 //! println!("{}", cfg.find_obj("host").unwrap());
 //! ```
 
+#[allow(deprecated)]
 pub mod aaml;
 pub mod builder;
+#[allow(deprecated)]
 pub mod commands;
 pub mod error;
 pub mod found_value;
 pub mod pipeline;
-pub(crate) mod binding_compat;
+#[allow(deprecated)]
 mod types;
 mod types_aam;
 

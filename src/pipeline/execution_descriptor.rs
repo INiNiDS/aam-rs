@@ -371,7 +371,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "lsp")]
     fn test_execution_descriptor_task_management() {
         let mut desc = ExecutionDescriptor::new(vec![], "test.aam".to_string());
 

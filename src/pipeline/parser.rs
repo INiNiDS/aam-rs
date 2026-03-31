@@ -487,7 +487,7 @@ impl Parser for DefaultParser {
         ParseOutput { ast, errors }
     }
 
-    fn generate_parse_tasks<'a, 'b>(&self, ast: &'b [AstNode<'a>]) -> Vec<ParseTask<'a>> {
+    fn generate_parse_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ParseTask<'a>> {
         let mut tasks = Vec::new();
 
         for node in ast {

@@ -224,7 +224,7 @@ fn section_5_roundtrip_file() {
     let _ = std::fs::remove_file(tmp_path);
     println!("\n   ✔ Temporary file removed");
 
-    // 5b. Intentional error: required field missing — detected via completeness check
+    // 5b. Runtime schema completeness checks are not part of the new AAM API.
     println!(
         "\n   5b. Missing required 'enabled' → expect SchemaValidationError (completeness check)"
     );
@@ -240,24 +240,18 @@ fn section_5_roundtrip_file() {
     b2.add_line("plugin_name", "BrokenPlugin");
     // enabled is intentionally omitted
 
-    match AAM::parse(&b2.build()).map_err(first_error).and_then(|cfg| {
-        cfg.validate_schemas_completeness()?;
-        Ok(cfg)
-    }) {
-        Err(AamlError::SchemaValidationError {
-            schema,
-            field,
-            details,
-            ..
-        }) => println!("   ✔ Schema '{schema}', field '{field}': {details}"),
-        other => eprintln!("   ✘ Unexpected result: {other:?}"),
+    match AAM::parse(&b2.build()).map_err(first_error) {
+        Ok(_) => println!(
+            "   ~ Parsed. Completeness checking should be performed by your LSP/validator integration."
+        ),
+        Err(e) => eprintln!("   ✘ Parse error: {e}"),
     }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn print_key(cfg: &AAM, key: &str) {
-    match cfg.find_obj(key) {
+    match cfg.get(key) {
         Some(v) => println!("   {key:>15} = {v}"),
         None => println!("   {key:>15} = <not set>"),
     }

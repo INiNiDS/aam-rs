@@ -126,7 +126,7 @@ impl Type for ListType {
             expected: "[item, item, ...] format".to_string(),
             diagnostics: Some(crate::error::ErrorDiagnostics::new(
                 "Malformed list literal",
-                format!("List must be wrapped in square brackets: [item1, item2, ...]"),
+                "List must be wrapped in square brackets: [item1, item2, ...]".to_string(),
                 "Use format: [value1, value2, value3]",
             )),
         })?;
