@@ -42,6 +42,13 @@ impl RubyAam {
         Ok(Self { inner: doc })
     }
 
+    pub fn format(content: String) -> Result<String, Error> {
+        let doc = AAM::new();
+        let rules = FormatterRules::default();
+        doc.format(&content, &rules)
+            .map_err(|err| ruby_runtime_error(err.to_string()))
+    }
+
     pub fn get(&self, key: String) -> Option<String> {
         self.inner.get(&key).map(ToString::to_string)
     }

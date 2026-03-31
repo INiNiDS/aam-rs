@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace AamCsharp;
 
@@ -8,6 +10,7 @@ namespace AamCsharp;
 public sealed unsafe class AamDocument : IDisposable
 {
     private SafeAamHandle? _handle;
+    private string _sourceSnapshot = string.Empty;
 
     /// <summary>
     /// Initializes a new empty AAM document handle.
@@ -29,6 +32,7 @@ public sealed unsafe class AamDocument : IDisposable
         try
         {
             document.CheckResult(AamNative.aam_parse(document.Handle, content));
+            document._sourceSnapshot = content;
             return document;
         }
         catch
@@ -50,6 +54,14 @@ public sealed unsafe class AamDocument : IDisposable
         try
         {
             document.CheckResult(AamNative.aam_load(document.Handle, path));
+            try
+            {
+                document._sourceSnapshot = File.ReadAllText(path);
+            }
+            catch
+            {
+                document._sourceSnapshot = string.Empty;
+            }
             return document;
         }
         catch
@@ -89,7 +101,16 @@ public sealed unsafe class AamDocument : IDisposable
     /// <exception cref="AamException">Thrown when native merge fails.</exception>
     public void Merge(string content)
     {
-        CheckResult(AamNative.aam_merge(Handle, content));
+        if (string.IsNullOrWhiteSpace(_sourceSnapshot))
+        {
+            _sourceSnapshot = content;
+        }
+        else
+        {
+            _sourceSnapshot = _sourceSnapshot.TrimEnd() + Environment.NewLine + content;
+        }
+
+        CheckResult(AamNative.aam_parse(Handle, _sourceSnapshot));
     }
 
     /// <summary>
@@ -99,7 +120,70 @@ public sealed unsafe class AamDocument : IDisposable
     /// <exception cref="AamException">Thrown when native recovery fails.</exception>
     public void RecoverSimple(string content)
     {
-        CheckResult(AamNative.aam_recover_simple(Handle, content));
+        CheckResult(AamNative.aam_parse(Handle, content));
+        _sourceSnapshot = content;
+    }
+
+    /// <summary>
+    /// Finds a value by key using direct key lookup.
+    /// </summary>
+    public string? Get(string key)
+    {
+        return AamNative.TakeOwnedUtf8String(AamNative.aam_get(Handle, key));
+    }
+
+    /// <summary>
+    /// Smart lookup: by key first, then by value fallback.
+    /// </summary>
+    public Dictionary<string, string> Find(string query)
+    {
+        var raw = AamNative.TakeOwnedUtf8String(AamNative.aam_find(Handle, query));
+        return ParseLineMap(raw);
+    }
+
+    /// <summary>
+    /// Finds keys that match a given value.
+    /// </summary>
+    public string[] ReverseSearch(string value)
+    {
+        var raw = AamNative.TakeOwnedUtf8String(AamNative.aam_reverse_search(Handle, value));
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    /// <summary>
+    /// Finds key-value pairs where keys contain the specified pattern.
+    /// </summary>
+    public Dictionary<string, string> DeepSearch(string pattern)
+    {
+        var raw = AamNative.TakeOwnedUtf8String(AamNative.aam_deep_search(Handle, pattern));
+        return ParseLineMap(raw);
+    }
+
+    public string[] SchemaNames()
+    {
+        var raw = AamNative.TakeOwnedUtf8String(AamNative.aam_schema_names(Handle));
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    public string[] TypeNames()
+    {
+        var raw = AamNative.TakeOwnedUtf8String(AamNative.aam_type_names(Handle));
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     /// <summary>
@@ -109,7 +193,13 @@ public sealed unsafe class AamDocument : IDisposable
     /// <returns>The value for the key, or <see langword="null"/> if not found.</returns>
     public string? FindObj(string key)
     {
-        return AamNative.TakeOwnedUtf8String(AamNative.aam_find_obj(Handle, key));
+        var direct = Get(key);
+        if (direct is not null)
+        {
+            return direct;
+        }
+
+        return FindKey(key);
     }
 
     /// <summary>
@@ -119,7 +209,8 @@ public sealed unsafe class AamDocument : IDisposable
     /// <returns>The first matching key, or <see langword="null"/> if not found.</returns>
     public string? FindKey(string value)
     {
-        return AamNative.TakeOwnedUtf8String(AamNative.aam_find_key(Handle, value));
+        var keys = ReverseSearch(value);
+        return keys.Length > 0 ? keys[0] : null;
     }
 
     /// <summary>
@@ -129,7 +220,24 @@ public sealed unsafe class AamDocument : IDisposable
     /// <returns>The resolved terminal value, or <see langword="null"/> if resolution fails.</returns>
     public string? FindDeep(string key)
     {
-        return AamNative.TakeOwnedUtf8String(AamNative.aam_find_deep(Handle, key));
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var current = key;
+
+        while (true)
+        {
+            if (!seen.Add(current))
+            {
+                return current;
+            }
+
+            var next = Get(current);
+            if (next is null)
+            {
+                return current == key ? null : current;
+            }
+
+            current = next;
+        }
     }
 
     /// <summary>
@@ -165,5 +273,30 @@ public sealed unsafe class AamDocument : IDisposable
         var errPtr = AamNative.aam_last_error(Handle);
         var message = AamNative.BorrowUtf8String(errPtr) ?? "Native operation failed";
         throw new AamException(message);
+    }
+
+    private static Dictionary<string, string> ParseLineMap(string? raw)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return map;
+        }
+
+        var lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            var idx = line.IndexOf('=');
+            if (idx <= 0 || idx == line.Length - 1)
+            {
+                continue;
+            }
+
+            var k = line[..idx];
+            var v = line[(idx + 1)..];
+            map[k] = v;
+        }
+
+        return map;
     }
 }

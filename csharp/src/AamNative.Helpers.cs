@@ -18,7 +18,7 @@ internal sealed unsafe class SafeAamHandle : SafeHandleZeroOrMinusOneIsInvalid
 
     protected override bool ReleaseHandle()
     {
-        AamNative.aam_free((AamlHandle*)handle);
+        AamNative.aam_free((AamHandle*)handle);
         return true;
     }
 }
@@ -30,7 +30,7 @@ internal static unsafe partial class AamNative
         var utf8 = ToNullTerminatedUtf8(content);
         fixed (byte* ptr = utf8)
         {
-            return aam_parse((AamlHandle*)handle.DangerousGetHandle(), ptr);
+            return aam_parse((AamHandle*)handle.DangerousGetHandle(), ptr);
         }
     }
 
@@ -39,58 +39,96 @@ internal static unsafe partial class AamNative
         var utf8 = ToNullTerminatedUtf8(path);
         fixed (byte* ptr = utf8)
         {
-            return aam_load((AamlHandle*)handle.DangerousGetHandle(), ptr);
+            return aam_load((AamHandle*)handle.DangerousGetHandle(), ptr);
         }
     }
 
-    internal static int aam_merge(SafeAamHandle handle, string content)
+    internal static byte* aam_format(SafeAamHandle handle, string content)
     {
         var utf8 = ToNullTerminatedUtf8(content);
         fixed (byte* ptr = utf8)
         {
-            return aam_merge((AamlHandle*)handle.DangerousGetHandle(), ptr);
+            return aam_format((AamHandle*)handle.DangerousGetHandle(), ptr);
         }
     }
 
-    internal static int aam_recover_simple(SafeAamHandle handle, string content)
-    {
-        var utf8 = ToNullTerminatedUtf8(content);
-        fixed (byte* ptr = utf8)
-        {
-            return aam_recover_simple((AamlHandle*)handle.DangerousGetHandle(), ptr);
-        }
-    }
-
-    internal static byte* aam_find_obj(SafeAamHandle handle, string key)
+    internal static byte* aam_get(SafeAamHandle handle, string key)
     {
         var utf8 = ToNullTerminatedUtf8(key);
         fixed (byte* ptr = utf8)
         {
-            return aam_find_obj((AamlHandle*)handle.DangerousGetHandle(), ptr);
+            return aam_get((AamHandle*)handle.DangerousGetHandle(), ptr);
         }
     }
 
-    internal static byte* aam_find_key(SafeAamHandle handle, string value)
+    internal static byte* aam_find(SafeAamHandle handle, string query)
+    {
+        var utf8 = ToNullTerminatedUtf8(query);
+        fixed (byte* ptr = utf8)
+        {
+            return aam_find((AamHandle*)handle.DangerousGetHandle(), ptr);
+        }
+    }
+
+    internal static byte* aam_deep_search(SafeAamHandle handle, string pattern)
+    {
+        var utf8 = ToNullTerminatedUtf8(pattern);
+        fixed (byte* ptr = utf8)
+        {
+            return aam_deep_search((AamHandle*)handle.DangerousGetHandle(), ptr);
+        }
+    }
+
+    internal static byte* aam_reverse_search(SafeAamHandle handle, string value)
     {
         var utf8 = ToNullTerminatedUtf8(value);
         fixed (byte* ptr = utf8)
         {
-            return aam_find_key((AamlHandle*)handle.DangerousGetHandle(), ptr);
+            return aam_reverse_search((AamHandle*)handle.DangerousGetHandle(), ptr);
         }
     }
 
-    internal static byte* aam_find_deep(SafeAamHandle handle, string key)
+    internal static byte* aam_schema_names(SafeAamHandle handle)
     {
-        var utf8 = ToNullTerminatedUtf8(key);
-        fixed (byte* ptr = utf8)
-        {
-            return aam_find_deep((AamlHandle*)handle.DangerousGetHandle(), ptr);
-        }
+        return aam_schema_names((AamHandle*)handle.DangerousGetHandle());
+    }
+
+    internal static byte* aam_type_names(SafeAamHandle handle)
+    {
+        return aam_type_names((AamHandle*)handle.DangerousGetHandle());
     }
 
     internal static byte* aam_last_error(SafeAamHandle handle)
     {
-        return aam_last_error((AamlHandle*)handle.DangerousGetHandle());
+        return aam_last_error((AamHandle*)handle.DangerousGetHandle());
+    }
+
+    // Backward-compatible helpers used by existing higher-level C# API.
+    internal static int aam_merge(SafeAamHandle handle, string content)
+    {
+        // FFI v2 has no incremental merge; re-parse merged text at call sites if needed.
+        return aam_parse(handle, content);
+    }
+
+    internal static int aam_recover_simple(SafeAamHandle handle, string content)
+    {
+        // Best effort compatibility: route to parse.
+        return aam_parse(handle, content);
+    }
+
+    internal static byte* aam_find_obj(SafeAamHandle handle, string key)
+    {
+        return aam_get(handle, key);
+    }
+
+    internal static byte* aam_find_key(SafeAamHandle handle, string value)
+    {
+        return aam_reverse_search(handle, value);
+    }
+
+    internal static byte* aam_find_deep(SafeAamHandle handle, string key)
+    {
+        return aam_deep_search(handle, key);
     }
 
     internal static string? BorrowUtf8String(byte* ptr)
