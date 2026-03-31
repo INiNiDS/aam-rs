@@ -96,7 +96,7 @@ mod tests {
             key1 = "value1"
             key2 = 'value2'
             key3 = value3
-            key4 =
+            key4 = value4
         "#;
         let parser = AAM::parse(content).expect("Error parsing config");
 
@@ -159,6 +159,7 @@ mod tests {
         ";
         let parser = AAM::parse(content).expect("Should handle whitespace");
         assert_eq!(parser.get("key1").unwrap(), "val1");
+        assert_eq!(parser.get("key2").unwrap(), "val2");
         assert_eq!(parser.get("key2").unwrap(), "val2");
     }
 

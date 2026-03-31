@@ -177,9 +177,35 @@ impl DefaultParser {
                 Ok((list, consumed))
             }
             _ => {
-                // Literal value
-                let value = tokens[start].text.clone();
-                Ok((ValueNode::Literal(value), start + 1))
+                let end_pos = tokens[start..]
+                    .iter()
+                    .position(|t| {
+                        matches!(
+                            t.kind,
+                            TokenKind::Newline
+                                | TokenKind::RightBrace
+                                | TokenKind::RightBracket
+                                | TokenKind::Comma
+                        )
+                    })
+                    .map(|p| start + p)
+                    .unwrap_or(tokens.len());
+
+                if end_pos == start {
+                    return Err(AamlError::ParseError {
+                        line: tokens[start].line,
+                        content: "invalid value".to_string(),
+                        details: "Could not parse literal value".to_string(),
+                        diagnostics: None,
+                    });
+                }
+
+                let value_text: String = tokens[start..end_pos]
+                    .iter()
+                    .map(|t| t.text.as_ref())
+                    .collect();
+
+                Ok((ValueNode::Literal(value_text.into()), end_pos))
             }
         }
     }
@@ -518,10 +544,18 @@ impl Parser for DefaultParser {
                             .map(|(b, _)| b)
                             .unwrap_or("");
                         let parsed_fields = body
-                            .replace(',', " ")
-                            .split_whitespace()
-                            .filter_map(|t| t.split_once(':'))
-                            .map(|(k, v)| format!("{}:{}", k, v))
+                            .split(',')
+                            .filter_map(|field_def| {
+                                let (field_name, type_name) = field_def.split_once(':')?;
+                                let field_name = field_name.trim();
+                                let type_name = type_name.trim();
+
+                                if field_name.is_empty() || type_name.is_empty() {
+                                    return None;
+                                }
+
+                                Some(format!("{}:{}", field_name, type_name))
+                            })
                             .collect::<Vec<_>>()
                             .join(",");
 
@@ -571,11 +605,9 @@ impl Parser for DefaultParser {
                             line: *line,
                         });
                     } else if &**name == "derive" {
-                        // Assuming current_key is tracked or can be determined (using scope string temporarily for simple configs)
-                        // This would need a more sophisticated tracking to know the "current key" exactly if nested
                         tasks.push(ExecutionTask::ExecuteInheritance {
                             derive_path: args.clone(),
-                            child_key: std::borrow::Cow::Borrowed(""), // In a robust parser we track standard object parent scope
+                            child_key: std::borrow::Cow::Borrowed(""), // For AAM v2
                             line: *line,
                         });
                     }

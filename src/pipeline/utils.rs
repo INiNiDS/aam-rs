@@ -9,7 +9,11 @@ pub fn validate_type_value(
 ) -> Result<(), AamlError> {
     // 1. Registered custom type alias
     if let Some(custom_type) = context.types.get(type_name) {
-        return validate_type_value(value, &custom_type.spec, context);
+        // Built-in defaults are registered as identity specs (e.g., string -> string).
+        // Skip recursive alias expansion for self-mapped entries to avoid infinite recursion.
+        if custom_type.spec != type_name {
+            return validate_type_value(value, &custom_type.spec, context);
+        }
     }
 
     // 2. Nested schema — type_name matches a registered schema name

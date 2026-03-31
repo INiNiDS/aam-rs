@@ -280,3 +280,12 @@ See the `LICENSE` file.
 
 ## Full Documentation
 Full API documentation is available at [docs.rs/aaml](https://docs.rs/aaml/) or in [main documentation of AAM](https://aam.ininids.in.rs).
+
+# Coming Soon
+
+- AAM CLI for terminal
+- More languages
+- AAM v2
+- Performance optimizations
+- More examples
+- New documentation site update

@@ -289,6 +289,40 @@ impl Pipeline {
         if !validation_result.success {
             Self::collect_validation_errors(all_errors, validation_result.errors);
         }
+
+        for err in Self::validate_schema_field_types(descriptor.context()) {
+            all_errors.push(Some(err));
+        }
+    }
+
+    fn validate_schema_field_types(context: &ExecutionContext) -> Vec<AamlError> {
+        context
+            .map
+            .iter()
+            .filter_map(|(key, value)| {
+                let (schema_name, (type_name, _)) =
+                    context.schemas.iter().find_map(|(schema_name, schema)| {
+                        schema
+                            .fields
+                            .get(key.as_str())
+                            .map(|field_info| (schema_name, field_info))
+                    })?;
+
+                crate::pipeline::utils::validate_type_value(value, type_name, context)
+                    .err()
+                    .map(|e| AamlError::SchemaValidationError {
+                        schema: schema_name.to_string(),
+                        field: key.to_string(),
+                        type_name: type_name.to_string(),
+                        details: format!(
+                            "Type mismatch for field '{}': {}",
+                            key,
+                            e.short_message()
+                        ),
+                        diagnostics: None,
+                    })
+            })
+            .collect()
     }
 
     fn process_with_tasks<'a>(
