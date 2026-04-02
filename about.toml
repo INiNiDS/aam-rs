@@ -8,5 +8,5 @@ accepted = [
     "LGPL-2.1-or-later"
 ]
 
-[ignore]
-packages = ["aam-rs"]
+[[exclude]]
+name = "aam-rs"
