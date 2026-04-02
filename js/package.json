@@ -1,6 +1,6 @@
 {
   "name": "aam-nodejs",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Node.js bindings for the aam-rs AAML configuration parser",
   "license": "MIT OR Apache-2.0",
   "main": "loader.js",
