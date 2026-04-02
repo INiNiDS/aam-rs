@@ -1,8 +1,87 @@
 //! Error types for the AAML parser and validation pipeline with beautiful colored output.
 
 use colored::Colorize;
+use std::cell::RefCell;
 use std::fmt;
 use std::io;
+
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorRenderContext {
+    path: String,
+    source: String,
+}
+
+std::thread_local! {
+    static ERROR_RENDER_CONTEXT: RefCell<ErrorRenderContext> = RefCell::new(ErrorRenderContext {
+        path: "<raw_string>".to_string(),
+        source: String::new(),
+    });
+}
+
+pub(crate) struct ErrorRenderContextGuard {
+    previous: ErrorRenderContext,
+}
+
+impl Drop for ErrorRenderContextGuard {
+    fn drop(&mut self) {
+        let previous = self.previous.clone();
+        ERROR_RENDER_CONTEXT.with(|ctx| {
+            *ctx.borrow_mut() = previous;
+        });
+    }
+}
+
+pub fn set_error_render_context(path: impl Into<String>, source: impl Into<String>) {
+    let path = path.into();
+    let source = source.into();
+    ERROR_RENDER_CONTEXT.with(|ctx| {
+        let mut ctx_mut = ctx.borrow_mut();
+        ctx_mut.path = path;
+        ctx_mut.source = source;
+    });
+}
+
+pub(crate) fn push_error_render_context(
+    path: impl Into<String>,
+    source: impl Into<String>,
+) -> ErrorRenderContextGuard {
+    let previous = get_error_render_context();
+    set_error_render_context(path, source);
+    ErrorRenderContextGuard { previous }
+}
+
+fn get_error_render_context() -> ErrorRenderContext {
+    ERROR_RENDER_CONTEXT.with(|ctx| ctx.borrow().clone())
+}
+
+fn source_line(source: &str, line: usize) -> Option<&str> {
+    if line == 0 {
+        return None;
+    }
+    source.lines().nth(line - 1)
+}
+
+fn type_alias_line_info(source: &str, alias_name: &str) -> Option<(usize, String, usize)> {
+    for (idx, raw) in source.lines().enumerate() {
+        let line_num = idx + 1;
+        let trimmed = raw.trim_start();
+        if !trimmed.starts_with("@type") {
+            continue;
+        }
+
+        let rest = trimmed.trim_start_matches("@type").trim_start();
+        let Some((lhs, _rhs)) = rest.split_once('=') else {
+            continue;
+        };
+        if lhs.trim() != alias_name {
+            continue;
+        }
+
+        let col = raw.find(alias_name).map(|p| p + 1).unwrap_or(1);
+        return Some((line_num, raw.to_string(), col));
+    }
+    None
+}
 
 /// Error diagnostics with "What", "Why", and "Fix" guidance (inspired by Cargo).
 #[derive(Debug, Clone)]
@@ -176,6 +255,264 @@ pub enum AamlError {
 pub type AamError = AamlError;
 
 impl AamlError {
+    fn code(&self) -> &'static str {
+        match self {
+            AamlError::CircularDependency { .. } => "E001",
+            AamlError::ParseError { .. } => "E002",
+            AamlError::InvalidType { .. } => "E003",
+            AamlError::SchemaValidationError { .. } => "E004",
+            AamlError::MissingRequiredField { .. } => "E005",
+            AamlError::NotFound { .. } => "E006",
+            AamlError::DirectiveError { .. } => "E007",
+            AamlError::DirectiveSyntaxError { .. } => "E008",
+            AamlError::MalformedLiteral { .. } => "E009",
+            AamlError::TypeRegistrationConflict { .. } => "E010",
+            AamlError::TypeConversionError { .. } => "E011",
+            AamlError::InvalidValue { .. } => "E012",
+            AamlError::NestingDepthExceeded { .. } => "E013",
+            AamlError::LexError { .. } => "E014",
+            AamlError::IoError { .. } => "E015",
+        }
+    }
+
+    fn title(&self) -> &'static str {
+        match self {
+            AamlError::CircularDependency { .. } => "cyclic dependency detected",
+            AamlError::ParseError { .. } => "parse error",
+            AamlError::InvalidType { .. } => "type validation failed",
+            AamlError::SchemaValidationError { .. } => "schema validation failed",
+            AamlError::MissingRequiredField { .. } => "missing required field",
+            AamlError::NotFound { .. } => "entry not found",
+            AamlError::DirectiveError { .. } => "directive execution failed",
+            AamlError::DirectiveSyntaxError { .. } => "directive syntax error",
+            AamlError::MalformedLiteral { .. } => "malformed literal",
+            AamlError::TypeRegistrationConflict { .. } => "type registration conflict",
+            AamlError::TypeConversionError { .. } => "type conversion failed",
+            AamlError::InvalidValue { .. } => "invalid value",
+            AamlError::NestingDepthExceeded { .. } => "nesting depth exceeded",
+            AamlError::LexError { .. } => "lexical analysis failed",
+            AamlError::IoError { .. } => "I/O operation failed",
+        }
+    }
+
+    fn default_help(&self) -> &'static str {
+        match self {
+            AamlError::CircularDependency { .. } => {
+                "types in AAM must be acyclic. Consider using a primitive type or breaking the loop."
+            }
+            AamlError::ParseError { .. } => {
+                "check assignment/directive syntax near the highlighted line."
+            }
+            AamlError::InvalidType { .. } => {
+                "ensure the value matches the declared type or update the type declaration."
+            }
+            AamlError::SchemaValidationError { .. } | AamlError::MissingRequiredField { .. } => {
+                "fill required fields and ensure each field value matches its declared type."
+            }
+            AamlError::NotFound { .. } => {
+                "verify the referenced key/type/schema exists and is in scope."
+            }
+            AamlError::DirectiveError { .. } | AamlError::DirectiveSyntaxError { .. } => {
+                "check directive name and argument format."
+            }
+            AamlError::MalformedLiteral { .. } => {
+                "ensure object/list literals are balanced and well-formed."
+            }
+            AamlError::TypeRegistrationConflict { .. } => {
+                "rename the type or remove duplicate @type declarations."
+            }
+            AamlError::TypeConversionError { .. } => {
+                "provide a value that can be converted to the requested type."
+            }
+            AamlError::InvalidValue { .. } => "provide a value in the expected format.",
+            AamlError::NestingDepthExceeded { .. } => {
+                "reduce recursion depth or split nested data."
+            }
+            AamlError::LexError { .. } => "remove or replace unsupported characters.",
+            AamlError::IoError { .. } => "check file path and permissions.",
+        }
+    }
+
+    fn render_compiler_style(&self) -> String {
+        let ctx = get_error_render_context();
+        let mut out = String::new();
+        out.push_str(&format!(
+            "{}[{}]: {}\n",
+            "error".red().bold(),
+            self.code().red().bold(),
+            self.title().bold()
+        ));
+
+        match self {
+            AamlError::CircularDependency { path, .. } => {
+                let nodes: Vec<String> = path
+                    .split("->")
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(ToString::to_string)
+                    .collect();
+                let cycle_start = nodes
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
+                let chain = if nodes.is_empty() {
+                    path.to_string()
+                } else {
+                    nodes.join(" -> ")
+                };
+
+                let first_alias = nodes.first().cloned().unwrap_or_else(|| "?".to_string());
+                let first_loc = type_alias_line_info(&ctx.source, &first_alias);
+
+                if let Some((line, _, col)) = first_loc {
+                    out.push_str(&format!(
+                        " {} {}:{}:{}\n",
+                        "-->".blue().bold(),
+                        ctx.path,
+                        line,
+                        col
+                    ));
+                } else {
+                    out.push_str(&format!(" {} {}:?:?\n", "-->".blue().bold(), ctx.path));
+                }
+                out.push_str(&format!(" {}\n", "|".blue().bold()));
+
+                for (idx, alias) in nodes.iter().enumerate() {
+                    if let Some((line, src, col)) = type_alias_line_info(&ctx.source, alias) {
+                        out.push_str(&format!(
+                            " {} {} {}\n",
+                            line.to_string().blue().bold(),
+                            "|".blue().bold(),
+                            src
+                        ));
+                        let marker = if idx == 0 {
+                            "cycle starts here"
+                        } else if idx == nodes.len().saturating_sub(1) {
+                            "cycle closes here"
+                        } else {
+                            "part of cycle"
+                        };
+                        out.push_str(&format!(
+                            " {} {}{} {}\n",
+                            "|".blue().bold(),
+                            " ".repeat(col.saturating_sub(1)),
+                            "^".red().bold(),
+                            marker
+                        ));
+                    }
+                }
+
+                out.push_str(&format!(" {}\n", "|".blue().bold()));
+                out.push_str(&format!(
+                    " {} {} {}\n",
+                    "=".blue().bold(),
+                    "cycle:".bold(),
+                    chain
+                ));
+                out.push_str(&format!(
+                    " {} returns to '{}'\n",
+                    "=".blue().bold(),
+                    cycle_start
+                ));
+            }
+            AamlError::ParseError {
+                line,
+                content,
+                details,
+                ..
+            } => {
+                out.push_str(&format!(
+                    " {} {}:{}:{}\n",
+                    "-->".blue().bold(),
+                    ctx.path,
+                    line,
+                    1
+                ));
+                out.push_str(&format!(" {}\n", "|".blue().bold()));
+                let display_line = source_line(&ctx.source, *line).unwrap_or(content.as_str());
+                let caret_col = display_line
+                    .find(content.trim())
+                    .map(|v| v + 1)
+                    .unwrap_or(1);
+                out.push_str(&format!(
+                    " {} {} {}\n",
+                    line.to_string().blue().bold(),
+                    "|".blue().bold(),
+                    display_line
+                ));
+                out.push_str(&format!(
+                    " {} {} {}\n",
+                    "|".blue().bold(),
+                    "^".red().bold(),
+                    details
+                ));
+                out.push_str(&format!(
+                    " {} {}{}\n",
+                    "|".blue().bold(),
+                    " ".repeat(caret_col.saturating_sub(1)),
+                    "^-- here".red().bold()
+                ));
+            }
+            AamlError::LexError {
+                line,
+                column,
+                character,
+                ..
+            } => {
+                out.push_str(&format!(
+                    " {} {}:{}:{}\n",
+                    "-->".blue().bold(),
+                    ctx.path,
+                    line,
+                    column
+                ));
+                if let Some(src) = source_line(&ctx.source, *line) {
+                    out.push_str(&format!(
+                        " {} {} {}\n",
+                        line.to_string().blue().bold(),
+                        "|".blue().bold(),
+                        src
+                    ));
+                    out.push_str(&format!(
+                        " {} {}{} invalid character '{}'\n",
+                        "|".blue().bold(),
+                        " ".repeat(column.saturating_sub(1)),
+                        "^--".red().bold(),
+                        character
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        " {} invalid character '{}'\n",
+                        "|".blue().bold(),
+                        character
+                    ));
+                }
+            }
+            _ => {
+                out.push_str(&format!(" {} {}:?:?\n", "-->".blue().bold(), ctx.path));
+                out.push_str(&format!(
+                    " {} {}\n",
+                    "|".blue().bold(),
+                    self.short_message()
+                ));
+            }
+        }
+
+        if let Some(diag) = self.diagnostics() {
+            out.push_str(&format!(" {}\n", "|".blue().bold()));
+            out.push_str(&format!(" {} {}\n", "help:".green().bold(), diag.fix));
+        } else {
+            out.push_str(&format!(" {}\n", "|".blue().bold()));
+            out.push_str(&format!(
+                " {} {}\n",
+                "help:".green().bold(),
+                self.default_help()
+            ));
+        }
+
+        out
+    }
+
     /// Get the primary error message (short form).
     pub fn short_message(&self) -> String {
         match self {
@@ -319,14 +656,7 @@ impl AamlError {
 
 impl fmt::Display for AamlError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let short = self.short_message();
-        write!(f, "{}", short.red().bold())?;
-
-        if let Some(diag) = self.diagnostics() {
-            write!(f, "\n{}", diag.pretty_print())?;
-        }
-
-        Ok(())
+        write!(f, "{}", self.render_compiler_style())
     }
 }
 

@@ -36,6 +36,7 @@ pub use validator::{DefaultValidator, Validator};
 use crate::error::AamlError;
 use bumpalo::Bump;
 use smol_str::SmolStr;
+use std::collections::HashSet;
 use tinyvec::TinyVec;
 
 // Hash backends are selected by cfg precedence below so `--all-features` remains compilable.
@@ -290,9 +291,193 @@ impl Pipeline {
             Self::collect_validation_errors(all_errors, validation_result.errors);
         }
 
+        for err in Self::validate_registered_types(descriptor.context()) {
+            all_errors.push(Some(err));
+        }
+
+        for err in Self::validate_schema_declared_types(descriptor.context()) {
+            all_errors.push(Some(err));
+        }
+
+        for err in Self::validate_schema_required_fields(descriptor.context()) {
+            all_errors.push(Some(err));
+        }
+
         for err in Self::validate_schema_field_types(descriptor.context()) {
             all_errors.push(Some(err));
         }
+    }
+
+    fn validate_type_reference(
+        type_name: &str,
+        context: &ExecutionContext,
+        trail: &mut Vec<String>,
+    ) -> Result<(), AamlError> {
+        if let Some(inner) = crate::types_aam::list::ListType::parse_inner(type_name) {
+            return Self::validate_type_reference(inner.trim(), context, trail);
+        }
+
+        if crate::types_aam::resolve_builtin(type_name).is_ok()
+            || context.schemas.contains_key(type_name)
+        {
+            return Ok(());
+        }
+
+        let Some(type_info) = context.types.get(type_name) else {
+            return Err(AamlError::InvalidType {
+                type_name: type_name.to_string(),
+                details: format!("Unknown type '{}'", type_name),
+                provided: String::new(),
+                diagnostics: None,
+            });
+        };
+
+        if type_info.spec == "schema" {
+            return Ok(());
+        }
+
+        if let Some(cycle_start) = trail.iter().position(|n| n == type_name) {
+            let mut cycle = trail[cycle_start..].to_vec();
+            cycle.push(type_name.to_string());
+            return Err(AamlError::CircularDependency {
+                path: cycle.join(" -> "),
+                diagnostics: None,
+            });
+        }
+
+        if type_info.spec == type_name {
+            return Err(AamlError::InvalidType {
+                type_name: type_name.to_string(),
+                details: format!("Unknown type '{}'", type_name),
+                provided: String::new(),
+                diagnostics: None,
+            });
+        }
+
+        trail.push(type_name.to_string());
+        let result = Self::validate_type_reference(type_info.spec.as_str(), context, trail);
+        trail.pop();
+        result
+    }
+
+    fn validate_registered_types(context: &ExecutionContext) -> Vec<AamlError> {
+        context
+            .types
+            .iter()
+            .filter(|(_, type_info)| type_info.line > 0 && type_info.spec != "schema")
+            .filter_map(|(_, type_info)| {
+                let mut trail = Vec::new();
+                Self::validate_type_reference(type_info.spec.as_str(), context, &mut trail)
+                    .err()
+                    .map(|err| match err {
+                        AamlError::CircularDependency { .. } => err,
+                        _ => AamlError::InvalidType {
+                            type_name: type_info.name.to_string(),
+                            details: format!(
+                                "Type '{}' references unknown definition '{}'",
+                                type_info.name, type_info.spec
+                            ),
+                            provided: err.short_message(),
+                            diagnostics: None,
+                        },
+                    })
+            })
+            .collect()
+    }
+
+    fn validate_schema_declared_types(context: &ExecutionContext) -> Vec<AamlError> {
+        context
+            .schemas
+            .iter()
+            .flat_map(|(schema_name, schema)| {
+                schema
+                    .fields
+                    .iter()
+                    .filter_map(move |(field, (type_name, _))| {
+                        let mut trail = Vec::new();
+                        Self::validate_type_reference(type_name, context, &mut trail)
+                            .err()
+                            .map(|_| AamlError::SchemaValidationError {
+                                schema: schema_name.to_string(),
+                                field: field.to_string(),
+                                type_name: type_name.to_string(),
+                                details: format!(
+                                    "Unknown type '{}' declared for field '{}'",
+                                    type_name, field
+                                ),
+                                diagnostics: None,
+                            })
+                    })
+            })
+            .collect()
+    }
+
+    fn validate_schema_required_fields(context: &ExecutionContext) -> Vec<AamlError> {
+        let referenced_schemas: HashSet<&str> = context
+            .schemas
+            .values()
+            .flat_map(|schema| schema.fields.values())
+            .filter_map(|(type_name, _)| {
+                if context.schemas.contains_key(type_name.as_str()) {
+                    Some(type_name.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        context
+            .schemas
+            .iter()
+            .filter(|(schema_name, _)| !referenced_schemas.contains(schema_name.as_str()))
+            .flat_map(|(schema_name, schema)| {
+                schema
+                    .fields
+                    .iter()
+                    .filter_map(move |(field, (type_name, is_optional))| {
+                        if *is_optional || context.map.contains_key(field.as_str()) {
+                            return None;
+                        }
+
+                        let mut seen_aliases = HashSet::new();
+                        if Self::is_schema_type_reference(type_name, context, &mut seen_aliases) {
+                            return None;
+                        }
+
+                        Some(AamlError::SchemaValidationError {
+                            schema: schema_name.to_string(),
+                            field: field.to_string(),
+                            type_name: type_name.to_string(),
+                            details: format!("Missing required field '{}'", field),
+                            diagnostics: None,
+                        })
+                    })
+            })
+            .collect()
+    }
+
+    fn is_schema_type_reference(
+        type_name: &str,
+        context: &ExecutionContext,
+        seen_aliases: &mut HashSet<String>,
+    ) -> bool {
+        if context.schemas.contains_key(type_name) {
+            return true;
+        }
+
+        let Some(type_info) = context.types.get(type_name) else {
+            return false;
+        };
+
+        if type_info.spec == "schema" {
+            return true;
+        }
+
+        if type_info.spec == type_name || !seen_aliases.insert(type_name.to_string()) {
+            return false;
+        }
+
+        Self::is_schema_type_reference(type_info.spec.as_str(), context, seen_aliases)
     }
 
     fn validate_schema_field_types(context: &ExecutionContext) -> Vec<AamlError> {

@@ -1,4 +1,4 @@
-use crate::error::AamlError;
+use crate::error::{AamlError, set_error_render_context};
 use crate::pipeline::{
     DefaultLexer, DefaultParser, FormatRange, FormattingOptions, Lexer, Parser, Pipeline,
     PipelineHashMap, PipelineOutput, SchemaInfo, TypeInfo,
@@ -37,6 +37,16 @@ pub struct AamLspAssist {
 }
 
 impl AAM {
+    fn parse_with_source_name(source_name: &str, text: &str) -> Result<Self, Vec<AamlError>> {
+        set_error_render_context(source_name.to_string(), text);
+        let pipeline = Pipeline::new();
+        let output = pipeline.process(text)?;
+
+        Ok(Self {
+            backend: AamBackend::Dynamic(output),
+        })
+    }
+
     /// Creates an empty dynamic AAM document.
     pub fn new() -> Self {
         Self {
@@ -46,17 +56,13 @@ impl AAM {
 
     /// Parses an AAM string using the default Pipeline and returns a new [`AAM`] instance.
     pub fn parse(text: &str) -> Result<Self, Vec<AamlError>> {
-        let pipeline = Pipeline::new();
-        let output = pipeline.process(text)?;
-
-        Ok(Self {
-            backend: AamBackend::Dynamic(output),
-        })
+        Self::parse_with_source_name("raw_string", text)
     }
 
     /// Creates an [`AAM`] instance from a custom configured Pipeline.
     /// Use this if you need to register custom commands, parsers, or validators.
     pub fn from_pipeline(pipeline: Pipeline, text: &str) -> Result<Self, Vec<AamlError>> {
+        set_error_render_context("raw_string", text);
         let output = pipeline.process(text)?;
         Ok(Self {
             backend: AamBackend::Dynamic(output),
@@ -86,12 +92,13 @@ impl AAM {
                 }]
             })?;
 
-            Self::parse(&content)
+            Self::parse_with_source_name(&path.as_ref().display().to_string(), &content)
         }
     }
 
     /// Formats arbitrary AAM content using parser + pipeline formatter.
     pub fn format(&self, content: &str, options: &FormattingOptions) -> Result<String, AamlError> {
+        set_error_render_context("<format>", content);
         let lexer = DefaultLexer::new();
         let parser = DefaultParser::new();
         let tokens = lexer.tokenize(content)?;
@@ -112,6 +119,7 @@ impl AAM {
         range: FormatRange,
         options: &FormattingOptions,
     ) -> Result<String, AamlError> {
+        set_error_render_context("<format>", content);
         let lexer = DefaultLexer::new();
         let parser = DefaultParser::new();
         let tokens = lexer.tokenize(content)?;
@@ -127,6 +135,7 @@ impl AAM {
 
     /// Convenience method for LSP servers: parse with recovery and optional formatting result.
     pub fn lsp_assist(content: &str, options: &FormattingOptions) -> AamLspAssist {
+        set_error_render_context("<lsp>", content);
         let lexer = DefaultLexer::new();
         let parser = DefaultParser::new();
 

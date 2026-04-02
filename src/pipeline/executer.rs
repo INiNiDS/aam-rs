@@ -238,6 +238,8 @@ impl DefaultExecuter {
                 )),
             })?;
 
+        let _ctx_guard = crate::error::push_error_render_context(file_path.as_ref(), &content);
+
         let sub_pipeline = crate::pipeline::Pipeline::new();
         let arena = Bump::new();
         let sub_output = match sub_pipeline.process_with_arena(&content, &arena) {

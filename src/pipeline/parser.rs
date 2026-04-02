@@ -111,7 +111,7 @@ impl DefaultParser {
     ) -> Result<(std::borrow::Cow<'a, str>, ValueNode<'a>, usize), AamlError> {
         use crate::pipeline::lexer::TokenKind;
 
-        if tokens.len() < start + 3 {
+        if start >= tokens.len() {
             return Err(AamlError::ParseError {
                 line: tokens.get(start).map(|t| t.line).unwrap_or(1),
                 content: "incomplete assignment".to_string(),
@@ -124,29 +124,89 @@ impl DefaultParser {
             });
         }
 
-        let key = match &tokens[start].kind {
-            TokenKind::Identifier => tokens[start].text.clone(),
-            _ => {
-                return Err(AamlError::ParseError {
-                    line: tokens[start].line,
-                    content: format!("Expected identifier, got {:?}", tokens[start].kind),
-                    details: "First token of assignment must be an identifier".to_string(),
-                    diagnostics: None,
-                });
-            }
-        };
-
-        if tokens[start + 1].kind != TokenKind::Assign {
+        if tokens[start].kind != TokenKind::Identifier {
             return Err(AamlError::ParseError {
-                line: tokens[start + 1].line,
-                content: format!("Expected '=', got '{}'", tokens[start + 1].text),
+                line: tokens[start].line,
+                content: format!("Expected identifier, got {:?}", tokens[start].kind),
+                details: "First token of assignment must be an identifier".to_string(),
+                diagnostics: None,
+            });
+        }
+
+        let mut assign_pos = start + 1;
+        while assign_pos < tokens.len()
+            && tokens[assign_pos].kind != TokenKind::Assign
+            && tokens[assign_pos].kind != TokenKind::Newline
+        {
+            assign_pos += 1;
+        }
+
+        if assign_pos >= tokens.len() || tokens[assign_pos].kind != TokenKind::Assign {
+            let got = tokens
+                .get(start + 1)
+                .map(|t| t.text.as_ref())
+                .unwrap_or("<eof>");
+            return Err(AamlError::ParseError {
+                line: tokens
+                    .get(start + 1)
+                    .map(|t| t.line)
+                    .unwrap_or(tokens[start].line),
+                content: format!("Expected '=', got '{}'", got),
                 details: "Assignment operator '=' expected after key".to_string(),
                 diagnostics: None,
             });
         }
 
-        let (value, consumed) = Self::parse_value(tokens, start + 2)?;
+        let key = if assign_pos == start + 1 {
+            tokens[start].text.clone()
+        } else {
+            let key_text = tokens[start..assign_pos]
+                .iter()
+                .map(|t| t.text.as_ref())
+                .collect::<Vec<_>>()
+                .join(" ");
+            key_text.into()
+        };
+
+        let (value, consumed) = Self::parse_value(tokens, assign_pos + 1)?;
         Ok((key, value, consumed))
+    }
+
+    fn parse_braced_literal<'a, 'b>(
+        tokens: &'b [&'b Token<'a>],
+        start: usize,
+    ) -> Result<(ValueNode<'a>, usize), AamlError> {
+        use crate::pipeline::lexer::TokenKind;
+
+        let mut depth = 0_i32;
+        let mut pos = start;
+
+        while pos < tokens.len() {
+            match tokens[pos].kind {
+                TokenKind::LeftBrace => depth += 1,
+                TokenKind::RightBrace => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let text: String = tokens[start..=pos]
+                            .iter()
+                            .map(|t| t.text.as_ref())
+                            .collect();
+                        let normalized = text.replace(',', ", ");
+                        return Ok((ValueNode::Literal(normalized.into()), pos + 1));
+                    }
+                }
+                TokenKind::Newline if depth == 0 => break,
+                _ => {}
+            }
+            pos += 1;
+        }
+
+        Err(AamlError::ParseError {
+            line: tokens[start].line,
+            content: "unclosed brace".to_string(),
+            details: "Expected '}' to close inline object".to_string(),
+            diagnostics: None,
+        })
     }
 
     /// Parses a value (which may be literal, inline object, or inline list)
@@ -167,9 +227,11 @@ impl DefaultParser {
 
         match &tokens[start].kind {
             TokenKind::LeftBrace => {
-                // Inline object
-                let (obj, consumed) = Self::parse_inline_object(tokens, start)?;
-                Ok((obj, consumed))
+                // Prefer structured inline object; fallback to raw braced literal for nested schema-like values.
+                match Self::parse_inline_object(tokens, start) {
+                    Ok((obj, consumed)) => Ok((obj, consumed)),
+                    Err(_) => Self::parse_braced_literal(tokens, start),
+                }
             }
             TokenKind::LeftBracket => {
                 // Inline list
@@ -525,15 +587,14 @@ impl Parser for DefaultParser {
                     name, args, line, ..
                 } => {
                     if &**name == "type" {
-                        // Assuming args contains the full type definition
+                        let (type_name, type_spec) = args
+                            .split_once('=')
+                            .map(|(lhs, rhs)| (lhs.trim(), rhs.trim()))
+                            .unwrap_or(("", ""));
+
                         tasks.push(ParseTask::RegisterType {
-                            type_name: args
-                                .split_whitespace()
-                                .next()
-                                .unwrap_or("")
-                                .to_string()
-                                .into(),
-                            type_spec: args.clone(),
+                            type_name: type_name.to_string().into(),
+                            type_spec: type_spec.to_string().into(),
                             line: *line,
                         });
                     } else if &**name == "schema" {
@@ -544,13 +605,13 @@ impl Parser for DefaultParser {
                             .map(|(b, _)| b)
                             .unwrap_or("");
                         let parsed_fields = body
-                            .split(',')
+                            .split(|c: char| c == ',' || c == '\n')
                             .filter_map(|field_def| {
                                 let (field_name, type_name) = field_def.split_once(':')?;
                                 let field_name = field_name.trim();
                                 let type_name = type_name.trim();
 
-                                if field_name.is_empty() || type_name.is_empty() {
+                                if field_name.is_empty() {
                                     return None;
                                 }
 

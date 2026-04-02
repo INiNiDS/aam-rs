@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -13,6 +17,24 @@ permissions:
   packages: write
 
 jobs:
+  generate-credits:
+    name: Generate Licenses (CREDITS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-about
+        run: cargo binstall cargo-about -y
+      - name: Generate CREDITS.html
+        run: cargo about generate about.hbs > CREDITS.html
+      - name: Upload CREDITS
+        uses: actions/upload-artifact@v4
+        with:
+          name: credits-html
+          path: CREDITS.html
+          retention-days: 1
+
   validate:
     name: Tests, Formatting & Security
     runs-on: ubuntu-latest
@@ -43,22 +65,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-
       - name: Build Rust library with FFI
         run: cargo build --release --features ffi
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: "stable"
           cache-dependency-path: go/go.sum
-
       - name: Test Go bindings
         working-directory: ./go
         run: go test -v ./...
@@ -71,26 +88,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 22
-
       - name: Install Node.js dependencies
         working-directory: ./js
         run: npm install
-
       - name: Build Node.js bindings
         working-directory: ./js
         run: npm run build
-
       - name: Run Node.js tests
         working-directory: ./js
         run: npm test
@@ -101,29 +112,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-
       - name: Build Rust library with FFI
         run: cargo build --release --features ffi,csharp
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-
       - name: Restore C# dependencies
         working-directory: ./csharp
         run: dotnet restore AamCsharp.sln
-
       - name: Build C# project
         working-directory: ./csharp
         run: dotnet build AamCsharp.sln --configuration Release --no-restore
-
       - name: Run C# tests
         working-directory: ./csharp/
         run: dotnet test AamCsharp.sln --configuration Release --no-build -v normal
@@ -136,19 +140,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
-
       - name: Build WASM package
         working-directory: ./wasm
         run: wasm-pack build --release --target nodejs --out-dir pkg
-
       - name: Run WASM tests
         working-directory: ./wasm
         run: |
@@ -161,23 +161,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
-
       - name: Build Ruby extension
         run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-
       - name: Run Rust tests for Ruby extension
         run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
-
+      - name: Fix Ruby Extension Naming (Patching)
+        run: |
+          # Убираем системный префикс lib, чтобы Ruby нашел точку входа Init_aam_ruby
+          mv ruby/ext/aam_rs/target/release/libaam_ruby.so ruby/ext/aam_rs/target/release/aam_ruby.so 2>/dev/null || true
+          mv ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/ext/aam_rs/target/release/aam_rs_ruby.so 2>/dev/null || true
+          # Патчим импорт в рубишном файле на лету
+          sed -i 's/libaam_ruby/aam_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
+          sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
       - name: Run Ruby smoke test
         run: ruby ruby/tests/test_aam_rs.rb
 
@@ -187,20 +190,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
           coverage: none
           ini-values: ffi.enable=1
-
       - name: Build Rust library with FFI
         run: cargo build --release --features ffi
-
       - name: Run PHP smoke test
         env:
           AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
@@ -240,7 +239,7 @@ jobs:
 
   build-node-bindings:
     name: Build Node.js Native Addons
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       matrix:
@@ -263,31 +262,27 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-
       - name: Install Node.js dependencies
         working-directory: ./js
         run: npm install
-
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Build release addon
         working-directory: ./js
         run: npm run build
-
       - name: Upload addon artifact
         uses: actions/upload-artifact@v7
         with:
@@ -307,7 +302,6 @@ jobs:
           pattern: node-binding-*
           merge-multiple: true
           path: node-artifacts
-
       - name: Upload Node.js addons to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -316,7 +310,7 @@ jobs:
 
   build-wasm-bindings:
     name: Build & Test WASM Bindings
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -335,11 +329,13 @@ jobs:
         run: |
           cargo test
           wasm-pack test --node
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html wasm/pkg/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html wasm/pkg/
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v7
         with:
@@ -370,7 +366,7 @@ jobs:
 
   build-ruby-bindings:
     name: Build & Test Ruby Bindings
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -383,18 +379,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build Ruby extension
         run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
-      - name: Run Rust tests for Ruby extension
-        run: cargo test --manifest-path ruby/ext/aam_rs/Cargo.toml
-      - name: Run Ruby smoke test
-        run: ruby ruby/tests/test_aam_rs.rb
-      - name: Generate and copy licenses
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html ruby/
+      - name: Fix Ruby Naming and Prepare Payload
         run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html ruby/
-      - name: Prepare Ruby gem payload
-        run: |
-          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
+          # Фикс имени для сборки гема + патч файла
+          cp ruby/ext/aam_rs/target/release/libaam_ruby.so ruby/lib/aam_ruby.so 2>/dev/null || true
+          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so 2>/dev/null || true
+          sed -i 's/libaam_ruby/aam_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
+          sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
           gem build ruby/aam-ruby.gemspec --output aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
@@ -431,12 +429,10 @@ jobs:
         with:
           name: ruby-gem
           path: ruby-artifacts
-
       - name: Publish to RubyGems
         env:
           GEM_HOST_API_KEY: ${{ secrets.RUBY_GEMS_TOKEN }}
         run: gem push ruby-artifacts/aam-ruby.gem
-
       - name: Publish to GitHub Packages (RubyGems)
         env:
           GEM_HOST_API_KEY: ${{ secrets.GITHUB_TOKEN }}
@@ -446,7 +442,7 @@ jobs:
 
   build-php-bindings:
     name: Build & Test PHP Bindings
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -461,14 +457,13 @@ jobs:
           ini-values: ffi.enable=1
       - name: Build native library for PHP FFI
         run: cargo build --release --features ffi
-      - name: Run PHP smoke test
-        env:
-          AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
-        run: php php/tests/smoke.php
-      - name: Generate and copy licenses
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
         run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
           mkdir -p php-pkg
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html php-pkg/
       - name: Package PHP artifacts
@@ -516,7 +511,6 @@ jobs:
         with:
           name: php-package
           path: php-artifact
-
       - name: Push to PHP Mirror Repository
         env:
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
@@ -525,27 +519,21 @@ jobs:
         run: |
           mkdir php-repo
           cd php-repo
-
           unzip ../php-artifact/aam-php-package.zip
-
           git init 
           git branch -M main
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add .
           git commit -m "Release $TAG_NAME"
           git tag "$TAG_NAME"
-
           git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${TARGET_REPO}.git"
-
           git push origin main --force
           git push origin "$TAG_NAME" --force
 
   publish-npm:
     name: Publish to npm
-    needs: [ release-please, build-node-bindings ]
+    needs: [ release-please, build-node-bindings, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     defaults:
@@ -553,38 +541,35 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-
       - name: Download Node.js addon artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: node-binding-*
           merge-multiple: true
           path: node-artifacts
-
       - name: Install Node.js dependencies
         working-directory: ./js
         run: npm install
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Populate platform packages
         run: |
           cp node-artifacts/aam_rs_node.linux-x64-gnu.node js/npm/linux-x64-gnu/
           cp node-artifacts/aam_rs_node.darwin-x64.node js/npm/darwin-x64/
           cp node-artifacts/aam_rs_node.darwin-arm64.node js/npm/darwin-arm64/
           cp node-artifacts/aam_rs_node.win32-x64-msvc.node js/npm/win32-x64-msvc/
-
       - name: Publish platform packages
         working-directory: ./js
         env:
@@ -594,7 +579,6 @@ jobs:
           npm publish ./npm/darwin-x64 --access public
           npm publish ./npm/darwin-arm64 --access public
           npm publish ./npm/win32-x64-msvc --access public
-
       - name: Publish main package
         working-directory: ./js
         run: npm publish --access public
@@ -603,29 +587,28 @@ jobs:
 
   publish-npm-github:
     name: Publish Node package to GitHub Packages
-    needs: [ release-please, build-node-bindings ]
+    needs: [ release-please, build-node-bindings, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Node.js for GitHub Packages
         uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
-
       - name: Install Node.js dependencies
         working-directory: ./js
         run: npm install
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
       - name: Publish scoped package to GitHub Packages
         working-directory: ./js
         env:
@@ -646,13 +629,11 @@ jobs:
         with:
           name: wasm-pkg
           path: wasm-pkg
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-
       - name: Publish WASM package to npm
         working-directory: ./wasm-pkg
         env:
@@ -660,7 +641,7 @@ jobs:
         run: npm publish --access public
 
   build-c-libs:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       matrix:
@@ -706,11 +687,13 @@ jobs:
           else
             cp target/release/libaam_rs.so package/lib/libaam-c.so
           fi
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html package/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html package/
       - name: Zip Package
         run: |
           cd package
@@ -763,7 +746,7 @@ jobs:
           retention-days: 1
 
   linux:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -786,10 +769,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - name: Generate CREDITS.html
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -811,7 +795,7 @@ jobs:
           path: dist
 
   musllinux:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -830,10 +814,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - name: Generate CREDITS.html
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -855,7 +840,7 @@ jobs:
           path: dist
 
   windows:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -876,10 +861,11 @@ jobs:
         with:
           python-version: 3.13
           architecture: ${{ matrix.platform.python_arch }}
-      - name: Generate CREDITS.html
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -903,7 +889,7 @@ jobs:
           path: dist
 
   macos:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -918,10 +904,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - name: Generate CREDITS.html
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -941,15 +928,16 @@ jobs:
           path: dist
 
   sdist:
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Generate CREDITS.html
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -973,7 +961,6 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-
       - name: Upload Wheels and sdist to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -1025,7 +1012,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact: jni-windows-x86_64
             file: aam_rs.dll
-
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -1035,7 +1021,6 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Build JNI release library
         run: cargo build --release --target ${{ matrix.target }}
-
       - name: Upload JNI artifact
         uses: actions/upload-artifact@v7
         with:
@@ -1051,14 +1036,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
       - name: Download all JNI artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: jni-*
           path: jni-artifacts
           merge-multiple: true
-
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1068,7 +1051,7 @@ jobs:
 
   build-go-libs:
     name: Build Go Native Libs
-    needs: release-please
+    needs: [ release-please, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       matrix:
@@ -1091,19 +1074,19 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - name: Build Rust library with FFI (static + dynamic)
         run: cargo build --release --features ffi --target ${{ matrix.target }}
-
-      - name: Generate and copy licenses
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
         run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
           mkdir -p go-pkg
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html go-pkg/
       - name: Package Go bindings
@@ -1122,7 +1105,6 @@ jobs:
             cp target/${{ matrix.target }}/release/libaam_rs.so go-pkg/lib/ 2>/dev/null || true
           fi
           cd go-pkg && zip -r ../${{ matrix.artifact }}.zip ./*
-
       - name: Upload Go package to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -1131,19 +1113,17 @@ jobs:
 
   publish-java:
     name: Publish Fat JAR & Upload to Release
-    needs: [ release-please, build-jni-libs ]
+    needs: [ release-please, build-jni-libs, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: "17"
           cache: "gradle"
-
       - uses: actions/download-artifact@v8
         with:
           name: jni-linux-x86_64
@@ -1160,13 +1140,15 @@ jobs:
         with:
           name: jni-windows-x86_64
           path: java/src/main/resources/natives/windows-x86_64
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Generate and copy licenses
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
         run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
           mkdir -p java/src/main/resources/META-INF
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html java/src/main/resources/META-INF/
       - name: Build and Publish locally
@@ -1176,13 +1158,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
-
       - name: Create Zip Bundle for Central Portal
         working-directory: ./java
         run: |
           cd build/staging-repo 
           zip -r ../bundle.zip .
-
       - name: Upload Bundle to Maven Central
         working-directory: ./java
         env:
@@ -1196,7 +1176,6 @@ jobs:
             --header 'Accept: application/json' \
             --form bundle=@build/bundle.zip \
             --fail
-
       - name: Upload JAR to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -1205,17 +1184,15 @@ jobs:
 
   publish-csharp:
     name: Publish C# Package to NuGet
-    needs: [ release-please, build-csharp-libs ]
+    needs: [ release-please, build-csharp-libs, generate-credits ]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-
       - uses: actions/download-artifact@v8
         with:
           name: csharp-linux-x64
@@ -1232,7 +1209,6 @@ jobs:
         with:
           name: csharp-win-x64
           path: csharp/runtimes/win-x64/native
-
       - name: Resolve package version
         id: csharp_version
         shell: bash
@@ -1240,22 +1216,21 @@ jobs:
           TAG="${{ needs.release-please.outputs.tag_name }}"
           VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Generate and copy licenses
-        run: |
-          cargo binstall cargo-about -y
-          cargo about generate about.hbs > CREDITS.html
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html csharp/
+      - name: Download CREDITS.html
+        uses: actions/download-artifact@v4
+        with:
+          name: credits-html
+          path: ./
+      - name: Copy licenses
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html csharp/
       - name: Pack NuGet package
         working-directory: ./csharp
         run: dotnet pack AamCsharp.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
-
       - name: Publish NuGet package
         working-directory: ./csharp
         run: dotnet nuget push "artifacts/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
-
       - name: Publish NuGet package to GitHub Packages
         working-directory: ./csharp
         run: |
@@ -1265,7 +1240,6 @@ jobs:
             --password "${{ secrets.GITHUB_TOKEN }}" \
             --store-password-in-clear-text
           dotnet nuget push "artifacts/*.nupkg" --source github --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
-
       - name: Upload NuGet package to Release
         uses: softprops/action-gh-release@v2
         with:

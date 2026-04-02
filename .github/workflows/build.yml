@@ -423,9 +423,17 @@ jobs:
           cargo binstall cargo-about -y
           cargo about generate about.hbs > CREDITS.html
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html ruby/
-      - name: Package Ruby gem
+      - name: Fix Naming & Package Ruby gem
         run: |
-          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so
+          # Сносим системный префикс lib, шоб руби не душнила
+          cp ruby/ext/aam_rs/target/release/libaam_ruby.so ruby/lib/aam_ruby.so 2>/dev/null || true
+          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so 2>/dev/null || true
+          
+          # Патчим импорт на лету прям как ниндзя 🥷
+          sed -i 's/libaam_ruby/aam_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
+          sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
+          
+          # Билдим готовый гемчик
           gem build ruby/aam-ruby.gemspec --output aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
@@ -552,7 +560,6 @@ jobs:
       - name: Push to PHP Mirror Repository
         env:
           TAG_NAME: ${{ needs.get-latest-tag.outputs.tag_name }}
-
           TARGET_REPO: "ininids/aam-php"
           MIRROR_TOKEN: ${{ secrets.PHP_MIRROR_TOKEN }}
         run: |
