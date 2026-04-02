@@ -3,16 +3,26 @@
     ".": {
       "release-type": "rust",
       "extra-files": [
+        "Cargo.toml",
+        "README.md",
+        "README_PY.md",
         "java/build.gradle.kts",
         "csharp/aam-csharp.csproj",
         "ruby/aam-ruby.gemspec",
         "js/Cargo.toml",
+        "ruby/ext/aam_rs/Cargo.toml",
         "js/package.json",
         "js/npm/linux-x64-gnu/package.json",
         "js/npm/darwin-x64/package.json",
         "js/npm/darwin-arm64/package.json",
         "js/npm/win32-x64-msvc/package.json",
-        "wasm/Cargo.toml"
+        "wasm/Cargo.toml",
+        "wasm/README.md",
+        "js/README.md",
+        "ruby/README.md",
+        "php/README.md",
+        "go/README.md",
+        "csharp/README.md"
       ]
     }
   }

@@ -29,7 +29,7 @@ jobs:
       - name: Generate CREDITS.html
         run: cargo about generate about.hbs > CREDITS.html
       - name: Upload CREDITS
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: credits-html
           path: CREDITS.html
@@ -393,7 +393,8 @@ jobs:
           cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so 2>/dev/null || true
           sed -i 's/libaam_ruby/aam_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
           sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
-          gem build ruby/aam-ruby.gemspec --output aam-ruby.gem
+          cd ruby
+          gem build aam-ruby.gemspec --output ../aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
         with:
@@ -469,7 +470,7 @@ jobs:
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
-          cp php/src/AamRs.php php-pkg/src/
+          cp php/src/AamPhp.php php-pkg/src/
           cp php/tests/smoke.php php-pkg/tests/
           cp php/README.md php-pkg/ 2>/dev/null || true
           cp php/composer.json php-pkg/ 2>/dev/null || true 
@@ -573,17 +574,17 @@ jobs:
       - name: Publish platform packages
         working-directory: ./js
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
         run: |
-          npm publish ./npm/linux-x64-gnu --access public
-          npm publish ./npm/darwin-x64 --access public
-          npm publish ./npm/darwin-arm64 --access public
-          npm publish ./npm/win32-x64-msvc --access public
+          npm publish ./npm/linux-x64-gnu --access public --provenance
+          npm publish ./npm/darwin-x64 --access public --provenance
+          npm publish ./npm/darwin-arm64 --access public --provenance
+          npm publish ./npm/win32-x64-msvc --access public --provenance
       - name: Publish main package
         working-directory: ./js
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
 
   publish-npm-github:
     name: Publish Node package to GitHub Packages
@@ -637,8 +638,8 @@ jobs:
       - name: Publish WASM package to npm
         working-directory: ./wasm-pkg
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
 
   build-c-libs:
     needs: [ release-please, generate-credits ]
@@ -695,9 +696,15 @@ jobs:
       - name: Copy licenses
         run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html package/
       - name: Zip Package
+        if: runner.os != 'Windows'
         run: |
           cd package
           zip -r ../${{ matrix.artifact_name }}.zip ./*
+      - name: Zip Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path package\* -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
       - name: Upload Release Artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -1090,6 +1097,7 @@ jobs:
           mkdir -p go-pkg
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html go-pkg/
       - name: Package Go bindings
+        if: runner.os != 'Windows'
         run: |
           mkdir -p go-pkg/lib go-pkg/include go-pkg/src
           cp include/aam.h go-pkg/include/
@@ -1105,6 +1113,16 @@ jobs:
             cp target/${{ matrix.target }}/release/libaam_rs.so go-pkg/lib/ 2>/dev/null || true
           fi
           cd go-pkg && zip -r ../${{ matrix.artifact }}.zip ./*
+      - name: Package Go bindings (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path go-pkg/lib,go-pkg/include,go-pkg/src -Force | Out-Null
+          Copy-Item include/aam.h go-pkg/include/
+          Copy-Item go go-pkg/src -Recurse
+          Copy-Item "target/${{ matrix.target }}/release/aam_rs.dll" go-pkg/lib/ -ErrorAction SilentlyContinue
+          Copy-Item "target/${{ matrix.target }}/release/aam_rs.dll.lib" go-pkg/lib/aam_rs.lib -ErrorAction SilentlyContinue
+          Compress-Archive -Path go-pkg\* -DestinationPath "${{ matrix.artifact }}.zip" -Force
       - name: Upload Go package to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -1214,7 +1232,11 @@ jobs:
         shell: bash
         run: |
           TAG="${{ needs.release-please.outputs.tag_name }}"
-          VERSION="${TAG#v}"
+          VERSION="${TAG##*-v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Could not parse semantic version from tag: $TAG"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
