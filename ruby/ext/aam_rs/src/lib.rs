@@ -3,6 +3,7 @@ use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
 use magnus::{Error, Module, Object, Ruby, function, method};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 fn ruby_runtime_error(message: String) -> Error {
@@ -24,92 +25,22 @@ pub struct RubyAam {
     inner: AAM,
 }
 
-#[magnus::wrap(class = "AamRb::SchemaField", free_immediately, size)]
-pub struct RubySchemaField {
-    inner: SchemaField,
-}
-
-impl RubySchemaField {
-    pub fn required(name: String, type_name: String) -> Self {
-        Self {
-            inner: SchemaField::required(name, type_name),
-        }
-    }
-
-    pub fn optional(name: String, type_name: String) -> Self {
-        Self {
-            inner: SchemaField::optional(name, type_name),
-        }
-    }
-}
-
-#[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
-pub struct RubyAamBuilder {
-    inner: AAMBuilder,
+impl RubyAam {
     pub fn new() -> Self {
-        Self {
-    inner: RefCell::new(AAMBuilder::new()),
-        }
+        Self { inner: AAM::new() }
     }
 
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-    inner: RefCell::new(AAMBuilder::with_capacity(capacity)),
-    }
-    }
-
-    pub fn add_line( & self,
-    key: String,
-    value: String) {
-    self.inner.borrow_mut().add_line(& key, & value);
-    }
-
-    pub fn comment( & self,
-    text: String) {
-    self.inner.borrow_mut().comment(& text);
-    }
-
-    pub fn schema( & self,
-    name: String,
-    fields: Vec<String>) {
-    self.inner
-    .borrow_mut()
-    .schema(& name, parse_schema_fields(fields));
-    }
-
-    inner: AAMBuilder::new(),
-    self.inner
-    .borrow_mut()
-            inner: AAMBuilder::with_capacity(capacity),
-    }
-
-pub fn derive(&self, path: String, schemas: Vec<String>) {
-    pub fn add_line(&mut self, key: String, value: String) {
-        self.inner.add_line(&key, &value);
-    pub fn comment(&mut self, text: String) {
-        self.inner.comment(&text);
-    pub fn schema(&mut self, name: String, fields: Vec<&RubySchemaField>) {}
-
-        pub fn as_string(&self) -> String {
-            .schema(&name, fields.into_iter().map(|field| field.inner.clone()));
-    }
-    }
-
-    pub fn schema_multiline(&mut self, name: String, fields: Vec<&RubySchemaField>) {
-            .schema_multiline(&name, fields.into_iter().map(|field| field.inner.clone()));
-    }
-
-    pub fn derive(&mut self, path: String, schemas: Vec<String>) {
-        self.inner.derive(&path, schemas);
-    pub fn import(&mut self, path: String) {
-        self.inner.import(&path);
+    pub fn parse(content: String) -> Result<Self, Error> {
+        let mut doc = AAM::new();
+        doc.parse(&content)
+            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
-    pub fn type_alias(&mut self, alias: String, type_name: String) {
-        self.inner.type_alias(&alias, &type_name);
-        .map_err(first_error)
-        self.inner.as_string()
+    pub fn load(path: String) -> Result<Self, Error> {
+        let mut doc = AAM::new();
+        doc.load(&path)
+            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
@@ -121,14 +52,14 @@ pub fn derive(&self, path: String, schemas: Vec<String>) {
     }
 
     pub fn get(&self, key: String) -> Option<String> {
-        self.inner.get(&key).map(ToString::to_string)
+        self.inner.get(&key).map(|v| v.to_string())
     }
 
     pub fn keys(&self) -> Vec<String> {
         self.inner
             .keys()
             .into_iter()
-            .map(ToString::to_string)
+            .map(|k| k.to_string())
             .collect()
     }
 
@@ -156,53 +87,122 @@ pub fn derive(&self, path: String, schemas: Vec<String>) {
         self.inner
             .reverse_search(&value)
             .into_iter()
-            .map(ToString::to_string)
+            .map(|k| k.to_string())
             .collect()
     }
 
     pub fn schema_names(&self) -> Vec<String> {
         self.inner
             .schemas()
-            .map(|schemas| schemas.keys().map(ToString::to_string).collect())
+            .map(|schemas| schemas.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
     }
 
     pub fn type_names(&self) -> Vec<String> {
         self.inner
             .types()
-            .map(|types| types.keys().map(ToString::to_string).collect())
+            .map(|types| types.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
+    }
+}
+
+#[magnus::wrap(class = "AamRb::SchemaField", free_immediately, size)]
+pub struct RubySchemaField {
+    pub(crate) inner: SchemaField,
+}
+
+impl RubySchemaField {
+    pub fn required(name: String, type_name: String) -> Self {
+        Self {
+            inner: SchemaField::required(name, type_name),
+        }
+    }
+
+    pub fn optional(name: String, type_name: String) -> Self {
+        Self {
+            inner: SchemaField::optional(name, type_name),
+        }
+    }
+}
+
+#[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
+pub struct RubyAamBuilder {
+    inner: RefCell<AAMBuilder>,
+}
+
+impl RubyAamBuilder {
+    pub fn new() -> Self {
+        Self {
+            inner: RefCell::new(AAMBuilder::new()),
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: RefCell::new(AAMBuilder::with_capacity(capacity)),
+        }
+    }
+
+    pub fn add_line(&self, key: String, value: String) {
+        self.inner.borrow_mut().add_line(&key, &value);
+    }
+
+    pub fn comment(&self, text: String) {
+        self.inner.borrow_mut().comment(&text);
+    }
+
+    pub fn schema(&self, name: String, fields: Vec<&RubySchemaField>) {
+        let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
+        self.inner.borrow_mut().schema(&name, fields_raw);
+    }
+
+    pub fn schema_multiline(&self, name: String, fields: Vec<&RubySchemaField>) {
+        let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
+        self.inner.borrow_mut().schema_multiline(&name, fields_raw);
+    }
+
+    pub fn derive(&self, path: String, schemas: Vec<String>) {
+        self.inner.borrow_mut().derive(&path, schemas);
+    }
+
+    pub fn import(&self, path: String) {
+        self.inner.borrow_mut().import(&path);
+    }
+
+    pub fn type_alias(&self, alias: String, type_name: String) {
+        self.inner.borrow_mut().type_alias(&alias, &type_name);
+    }
+
+    pub fn as_string(&self) -> String {
+        self.inner.borrow().as_string()
     }
 }
 
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("AamRb")?;
-    let aam_class = module.define_class("AAM", ruby.class_object())?;
-    let schema_field_class = module.define_class("SchemaField", ruby.class_object())?;
-    let builder_class = module.define_class("AAMBuilder", ruby.class_object())?;
 
+    let aam_class = module.define_class("AAM", ruby.class_object())?;
     aam_class.define_singleton_method("new", function!(RubyAam::new, 0))?;
     aam_class.define_singleton_method("parse", function!(RubyAam::parse, 1))?;
     aam_class.define_singleton_method("load", function!(RubyAam::load, 1))?;
     aam_class.define_singleton_method("format", function!(RubyAam::format, 1))?;
     aam_class.define_method("get", method!(RubyAam::get, 1))?;
-
     aam_class.define_method("keys", method!(RubyAam::keys, 0))?;
     aam_class.define_method("to_map", method!(RubyAam::to_map, 0))?;
-
     aam_class.define_method("find", method!(RubyAam::find, 1))?;
     aam_class.define_method("deep_search", method!(RubyAam::deep_search, 1))?;
     aam_class.define_method("reverse_search", method!(RubyAam::reverse_search, 1))?;
-
     aam_class.define_method("schema_names", method!(RubyAam::schema_names, 0))?;
     aam_class.define_method("type_names", method!(RubyAam::type_names, 0))?;
 
+    let schema_field_class = module.define_class("SchemaField", ruby.class_object())?;
     schema_field_class
         .define_singleton_method("required", function!(RubySchemaField::required, 2))?;
     schema_field_class
         .define_singleton_method("optional", function!(RubySchemaField::optional, 2))?;
 
+    let builder_class = module.define_class("AAMBuilder", ruby.class_object())?;
     builder_class.define_singleton_method("new", function!(RubyAamBuilder::new, 0))?;
     builder_class
         .define_singleton_method("with_capacity", function!(RubyAamBuilder::with_capacity, 1))?;
