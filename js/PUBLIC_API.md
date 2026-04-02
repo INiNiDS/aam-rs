@@ -12,6 +12,7 @@ Source of truth: `js/index.d.ts`.
 ## Main Class
 
 - `class AAM`
+- `class AAMBuilder`
 
 ## Instance Methods
 
@@ -28,6 +29,18 @@ Source of truth: `js/index.d.ts`.
 - `validateValue(typeName: string, value: string): void`
 - `close(): void`
 - `isClosed(): boolean`
+
+## AAMBuilder Methods
+
+- `new AAMBuilder()`
+- `addLine(key: string, value: string): void`
+- `comment(text: string): void`
+- `schema(name: string, fields: string[]): void` (`"field: type"` or `"field*: type"`)
+- `schemaMultiline(name: string, fields: string[]): void`
+- `derive(path: string, schemas: string[]): void`
+- `import(path: string): void`
+- `typeAlias(alias: string, typeName: string): void`
+- `asString(): string`
 
 ## Aliases
 

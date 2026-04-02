@@ -169,3 +169,84 @@ final class AamDocument
         }
     }
 }
+
+final class SchemaField
+{
+    private function __construct(
+        public readonly string $name,
+        public readonly string $typeName,
+        public readonly bool $optional,
+    ) {
+    }
+
+    public static function required(string $name, string $typeName): self
+    {
+        return new self($name, $typeName, false);
+    }
+
+    public static function optional(string $name, string $typeName): self
+    {
+        return new self($name, $typeName, true);
+    }
+
+    public function toAam(): string
+    {
+        return $this->optional ? "{$this->name}*: {$this->typeName}" : "{$this->name}: {$this->typeName}";
+    }
+}
+
+final class AamBuilder
+{
+    /** @var list<string> */
+    private array $lines = [];
+
+    public function addLine(string $key, string $value): self
+    {
+        $this->lines[] = "$key = $value";
+        return $this;
+    }
+
+    public function comment(string $text): self
+    {
+        $this->lines[] = "# $text";
+        return $this;
+    }
+
+    /** @param list<SchemaField> $fields */
+    public function schema(string $name, array $fields): self
+    {
+        $rendered = array_map(static fn (SchemaField $field): string => $field->toAam(), $fields);
+        $this->lines[] = '@schema ' . $name . ' { ' . implode(', ', $rendered) . ' }';
+        return $this;
+    }
+
+    /** @param list<string> $schemas */
+    public function derive(string $path, array $schemas = []): self
+    {
+        $suffix = $schemas === [] ? '' : '::' . implode('::', $schemas);
+        $this->lines[] = '@derive ' . $path . $suffix;
+        return $this;
+    }
+
+    public function import(string $path): self
+    {
+        $this->lines[] = '@import ' . $path;
+        return $this;
+    }
+
+    public function typeAlias(string $alias, string $typeName): self
+    {
+        $this->lines[] = '@type ' . $alias . ' = ' . $typeName;
+        return $this;
+    }
+
+    public function build(): string
+    {
+        return implode("\n", $this->lines);
+    }
+
+    public function toFile(string $path): void
+    {
+        file_put_contents($path, $this->build());
+    }
+}

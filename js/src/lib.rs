@@ -1,4 +1,5 @@
 use aam_rs::aam::{AAM, AamLspAssist};
+use aam_rs::builder::{AAMBuilder as CoreAamBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::found_value::FoundValue;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
@@ -28,6 +29,78 @@ fn closed_error() -> Error {
 pub struct JsLspResult {
     pub diagnostics: Vec<String>,
     pub formatted: Option<String>,
+}
+
+#[napi(js_name = "AAMBuilder")]
+pub struct JsAamBuilder {
+    inner: CoreAamBuilder,
+}
+
+fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
+    fields
+        .into_iter()
+        .filter_map(|field| {
+            let mut parts = field.splitn(2, ':');
+            let name = parts.next()?.trim();
+            let type_name = parts.next()?.trim();
+            if let Some(optional_name) = name.strip_suffix('*') {
+                Some(SchemaField::optional(optional_name.trim(), type_name))
+            } else {
+                Some(SchemaField::required(name, type_name))
+            }
+        })
+        .collect()
+}
+
+#[napi]
+impl JsAamBuilder {
+    #[napi(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: CoreAamBuilder::new(),
+        }
+    }
+
+    #[napi(js_name = "addLine")]
+    pub fn add_line(&mut self, key: String, value: String) {
+        self.inner.add_line(&key, &value);
+    }
+
+    #[napi]
+    pub fn comment(&mut self, text: String) {
+        self.inner.comment(&text);
+    }
+
+    #[napi]
+    pub fn schema(&mut self, name: String, fields: Vec<String>) {
+        self.inner.schema(&name, parse_schema_fields(fields));
+    }
+
+    #[napi(js_name = "schemaMultiline")]
+    pub fn schema_multiline(&mut self, name: String, fields: Vec<String>) {
+        self.inner
+            .schema_multiline(&name, parse_schema_fields(fields));
+    }
+
+    #[napi]
+    pub fn derive(&mut self, path: String, schemas: Vec<String>) {
+        self.inner.derive(&path, schemas);
+    }
+
+    #[napi]
+    pub fn import(&mut self, path: String) {
+        self.inner.import(&path);
+    }
+
+    #[napi(js_name = "typeAlias")]
+    pub fn type_alias(&mut self, alias: String, type_name: String) {
+        self.inner.type_alias(&alias, &type_name);
+    }
+
+    #[napi(js_name = "asString")]
+    pub fn as_string(&self) -> String {
+        self.inner.as_string()
+    }
 }
 
 impl From<AamLspAssist> for JsLspResult {
@@ -68,7 +141,6 @@ impl JsAam {
             inner: Some(AAM::new()),
         }
     }
-
 
     #[napi(js_name = "format")]
     pub fn format(&self, content: String) -> Result<String> {

@@ -5,12 +5,17 @@ Source of truth: `go/aam/aam.go`.
 ## Main Type
 
 - `type AAM struct`
+- `type AAMBuilder struct`
+- `type SchemaField struct`
 
 ## Constructors
 
 - `New() (*AAM, error)`
 - `Parse(content string) (*AAM, error)`
 - `Load(path string) (*AAM, error)`
+- `NewBuilder() *AAMBuilder`
+- `RequiredField(name, typeName string) SchemaField`
+- `OptionalField(name, typeName string) SchemaField`
 
 ## Instance Methods
 
@@ -23,6 +28,17 @@ Source of truth: `go/aam/aam.go`.
 - `TypeNames() []string`
 - `LastError() string`
 - `Close()`
+
+## Builder Methods
+
+- `AddLine(key, value string) *AAMBuilder`
+- `Comment(text string) *AAMBuilder`
+- `Schema(name string, fields []SchemaField) *AAMBuilder`
+- `Derive(path string, schemas []string) *AAMBuilder`
+- `Import(path string) *AAMBuilder`
+- `TypeAlias(alias, typeName string) *AAMBuilder`
+- `Build() string`
+- `ToFile(path string) error`
 
 ## Notes
 

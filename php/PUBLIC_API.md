@@ -2,22 +2,40 @@
 
 Source of truth: `php/src/AamPhp.php`.
 
-## Main Class
+## Main Classes
 
-- `AamPhp`
+- `AamDocument`
+- `AamBuilder`
+- `SchemaField`
 
-## Construction
+## AamDocument Construction
 
-- `new AamPhp(?string $libraryPath = null)`
+- `new AamDocument(string $content, ?string $libPath = null)`
 
-## Exposed Method
+## AamDocument Methods
 
-- `parseFindObj(string $content, string $query): ?string`
+- `reload(string $content): void`
+- `format(string $content): string`
+- `get(string $key): ?string`
+- `find(string $query): array`
+- `deepSearch(string $pattern): array`
+- `reverseSearch(string $value): array`
+- `schemaNames(): array`
+- `typeNames(): array`
 
-Behavior:
+## Builder API
 
-- Parses input content and performs `find_obj` style lookup.
-- Supports reverse lookup fallback when query is not a key.
+- `SchemaField::required(string $name, string $typeName): SchemaField`
+- `SchemaField::optional(string $name, string $typeName): SchemaField`
+- `SchemaField::toAam(): string`
+- `AamBuilder::addLine(string $key, string $value): AamBuilder`
+- `AamBuilder::comment(string $text): AamBuilder`
+- `AamBuilder::schema(string $name, array $fields): AamBuilder`
+- `AamBuilder::derive(string $path, array $schemas = []): AamBuilder`
+- `AamBuilder::import(string $path): AamBuilder`
+- `AamBuilder::typeAlias(string $alias, string $typeName): AamBuilder`
+- `AamBuilder::build(): string`
+- `AamBuilder::toFile(string $path): void`
 
 ## Runtime Notes
 

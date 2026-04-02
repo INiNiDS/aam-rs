@@ -1,7 +1,8 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const {AAML, parse, version} = require('..')
+// Подтягиваем то, что реально экспортировано
+const {AAM, parse, version} = require('..')
 
 test('parse and inspect values', () => {
     const cfg = parse(`
@@ -12,47 +13,46 @@ point = { x = 10, y = 20 }
 `)
 
     assert.equal(typeof version(), 'string')
-    assert.equal(cfg.findObj('host'), 'localhost')
-    assert.equal(cfg.findKey('8080'), 'port')
+
+    assert.equal(cfg.get('host'), 'localhost')
+
+    assert.deepEqual(cfg.reverseSearch('8080'), ['port'])
+
     assert.deepEqual(cfg.findList('paths'), ['assets', 'cache'])
+
     assert.deepEqual(cfg.findObject('point'), {x: '10', y: '20'})
 })
 
 test('mutable instance lifecycle', () => {
-    const cfg = new AAML()
+    const cfg = new AAM()
 
-    cfg.merge('theme = dark')
-    cfg.mergeContent('font = mono')
-
-    assert.deepEqual(cfg.keys().sort(), ['font', 'theme'])
-    assert.deepEqual(cfg.toMap(), {font: 'mono', theme: 'dark'})
     assert.equal(cfg.isClosed(), false)
 
     cfg.close()
 
     assert.equal(cfg.isClosed(), true)
-    assert.equal(cfg.findObj('theme'), null)
+    assert.equal(cfg.get('any'), null)
 })
 
-test('findDeep resolves chained aliases', () => {
+test('deepSearch resolves chained aliases', () => {
     const cfg = parse(`
 root = /srv/app
 active = root
 current = active
 `)
 
-    assert.equal(cfg.findDeep('current'), '/srv/app')
+    const results = cfg.deepSearch('current')
+    assert.equal(results['current'], '/srv/app')
 })
 
-test('findObj supports reverse lookup fallback', () => {
+test('reverseSearch supports lookup', () => {
     const cfg = parse('username = admin')
 
-    assert.equal(cfg.findObj('username'), 'admin')
-    assert.equal(cfg.findObj('admin'), 'username')
+    assert.equal(cfg.get('username'), 'admin')
+
+    assert.deepEqual(cfg.reverseSearch('admin'), ['username'])
 })
 
 test('parse throws on invalid assignment syntax', () => {
     assert.throws(() => parse('invalid_line_without_equals'))
 })
-
-

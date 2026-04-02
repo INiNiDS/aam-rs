@@ -5,6 +5,7 @@ Source of truth: `wasm/src/lib.rs`.
 ## Exported Class
 
 - `AAM` (JS name for `AamDocument`)
+- `AAMBuilder` (JS name for `WasmAamBuilder`)
 
 ## Construction
 
@@ -26,3 +27,17 @@ Source of truth: `wasm/src/lib.rs`.
 ## Static Helper
 
 - `AAM.lspAssist(content: string): { diagnostics: string[]; formatted: string | null }`
+
+## Builder Methods
+
+- `new AAMBuilder()`
+- `AAMBuilder.withCapacity(capacity: number): AAMBuilder`
+- `addLine(key: string, value: string): void`
+- `comment(text: string): void`
+- `schema(name: string, fields: string[]): void` (`"field: type"` or `"field*: type"`)
+- `schemaMultiline(name: string, fields: string[]): void`
+- `derive(path: string, schemas: string[]): void`
+- `import(path: string): void`
+- `typeAlias(alias: string, typeName: string): void`
+- `asString(): string`
+

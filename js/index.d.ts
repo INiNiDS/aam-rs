@@ -31,6 +31,26 @@ export declare class AAM {
     isClosed(): boolean
 }
 
+export declare class AAMBuilder {
+    constructor()
+
+    addLine(key: string, value: string): void
+
+    comment(text: string): void
+
+    schema(name: string, fields: Array<string>): void
+
+    schemaMultiline(name: string, fields: Array<string>): void
+
+    derive(path: string, schemas: Array<string>): void
+
+    import(path: string): void
+
+    typeAlias(alias: string, typeName: string): void
+
+    asString(): string
+}
+
 export type AAML = AAM
 
 export type JsAam = AAM

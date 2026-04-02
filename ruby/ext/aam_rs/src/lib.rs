@@ -1,7 +1,8 @@
 use aam_rs::aam::AAM;
+use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
-use magnus::{Error, Ruby, function, method, Module, Object};
+use magnus::{Error, Module, Object, Ruby, function, method};
 use std::collections::BTreeMap;
 
 fn ruby_runtime_error(message: String) -> Error {
@@ -21,6 +22,78 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 #[magnus::wrap(class = "AamRb::AAM", free_immediately, size)]
 pub struct RubyAam {
     inner: AAM,
+}
+
+#[magnus::wrap(class = "AamRb::SchemaField", free_immediately, size)]
+pub struct RubySchemaField {
+    inner: SchemaField,
+}
+
+impl RubySchemaField {
+    pub fn required(name: String, type_name: String) -> Self {
+        Self {
+            inner: SchemaField::required(name, type_name),
+        }
+    }
+
+    pub fn optional(name: String, type_name: String) -> Self {
+        Self {
+            inner: SchemaField::optional(name, type_name),
+        }
+    }
+}
+
+#[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
+pub struct RubyAamBuilder {
+    inner: AAMBuilder,
+}
+
+impl RubyAamBuilder {
+    pub fn new() -> Self {
+        Self {
+            inner: AAMBuilder::new(),
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: AAMBuilder::with_capacity(capacity),
+        }
+    }
+
+    pub fn add_line(&mut self, key: String, value: String) {
+        self.inner.add_line(&key, &value);
+    }
+
+    pub fn comment(&mut self, text: String) {
+        self.inner.comment(&text);
+    }
+
+    pub fn schema(&mut self, name: String, fields: Vec<&RubySchemaField>) {
+        self.inner
+            .schema(&name, fields.into_iter().map(|field| field.inner.clone()));
+    }
+
+    pub fn schema_multiline(&mut self, name: String, fields: Vec<&RubySchemaField>) {
+        self.inner
+            .schema_multiline(&name, fields.into_iter().map(|field| field.inner.clone()));
+    }
+
+    pub fn derive(&mut self, path: String, schemas: Vec<String>) {
+        self.inner.derive(&path, schemas);
+    }
+
+    pub fn import(&mut self, path: String) {
+        self.inner.import(&path);
+    }
+
+    pub fn type_alias(&mut self, alias: String, type_name: String) {
+        self.inner.type_alias(&alias, &type_name);
+    }
+
+    pub fn as_string(&self) -> String {
+        self.inner.as_string()
+    }
 }
 
 impl RubyAam {
@@ -108,6 +181,8 @@ impl RubyAam {
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("AamRb")?;
     let aam_class = module.define_class("AAM", ruby.class_object())?;
+    let schema_field_class = module.define_class("SchemaField", ruby.class_object())?;
+    let builder_class = module.define_class("AAMBuilder", ruby.class_object())?;
 
     aam_class.define_singleton_method("new", function!(RubyAam::new, 0))?;
     aam_class.define_singleton_method("parse", function!(RubyAam::parse, 1))?;
@@ -124,6 +199,26 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
 
     aam_class.define_method("schema_names", method!(RubyAam::schema_names, 0))?;
     aam_class.define_method("type_names", method!(RubyAam::type_names, 0))?;
+
+    schema_field_class
+        .define_singleton_method("required", function!(RubySchemaField::required, 2))?;
+    schema_field_class
+        .define_singleton_method("optional", function!(RubySchemaField::optional, 2))?;
+
+    builder_class.define_singleton_method("new", function!(RubyAamBuilder::new, 0))?;
+    builder_class
+        .define_singleton_method("with_capacity", function!(RubyAamBuilder::with_capacity, 1))?;
+    builder_class.define_method("add_line", method!(RubyAamBuilder::add_line, 2))?;
+    builder_class.define_method("comment", method!(RubyAamBuilder::comment, 1))?;
+    builder_class.define_method("schema", method!(RubyAamBuilder::schema, 2))?;
+    builder_class.define_method(
+        "schema_multiline",
+        method!(RubyAamBuilder::schema_multiline, 2),
+    )?;
+    builder_class.define_method("derive", method!(RubyAamBuilder::derive, 2))?;
+    builder_class.define_method("import", method!(RubyAamBuilder::import, 1))?;
+    builder_class.define_method("type_alias", method!(RubyAamBuilder::type_alias, 2))?;
+    builder_class.define_method("as_string", method!(RubyAamBuilder::as_string, 0))?;
 
     Ok(())
 }

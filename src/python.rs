@@ -1,6 +1,7 @@
 //! PyO3 bindings — exposes `AAM` to Python as `aam_py.AAM`.
 
 use crate::aam::AAM;
+use crate::builder::{AAMBuilder, SchemaField};
 use crate::error::AamlError;
 use crate::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use pyo3::exceptions::PyRuntimeError;
@@ -27,6 +28,93 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 #[pyclass(unsendable, name = "AAM")]
 pub struct PyAam {
     inner: Option<AAM>,
+}
+
+#[pyclass(name = "SchemaField")]
+#[derive(Clone)]
+pub struct PySchemaField {
+    inner: SchemaField,
+}
+
+#[pymethods]
+impl PySchemaField {
+    #[staticmethod]
+    fn required(name: &str, type_name: &str) -> Self {
+        Self {
+            inner: SchemaField::required(name, type_name),
+        }
+    }
+
+    #[staticmethod]
+    fn optional(name: &str, type_name: &str) -> Self {
+        Self {
+            inner: SchemaField::optional(name, type_name),
+        }
+    }
+}
+
+#[pyclass(unsendable, name = "AAMBuilder")]
+pub struct PyAamBuilder {
+    inner: AAMBuilder,
+}
+
+#[pymethods]
+impl PyAamBuilder {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: AAMBuilder::new(),
+        }
+    }
+
+    #[staticmethod]
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: AAMBuilder::with_capacity(capacity),
+        }
+    }
+
+    fn add_line(&mut self, key: &str, value: &str) {
+        self.inner.add_line(key, value);
+    }
+
+    fn comment(&mut self, text: &str) {
+        self.inner.comment(text);
+    }
+
+    fn schema(&mut self, name: &str, fields: Vec<PySchemaField>) {
+        self.inner
+            .schema(name, fields.into_iter().map(|field| field.inner));
+    }
+
+    fn schema_multiline(&mut self, name: &str, fields: Vec<PySchemaField>) {
+        self.inner
+            .schema_multiline(name, fields.into_iter().map(|field| field.inner));
+    }
+
+    fn derive(&mut self, path: &str, schemas: Vec<String>) {
+        self.inner.derive(path, schemas);
+    }
+
+    fn import(&mut self, path: &str) {
+        self.inner.import(path);
+    }
+
+    fn type_alias(&mut self, alias: &str, type_name: &str) {
+        self.inner.type_alias(alias, type_name);
+    }
+
+    fn as_string(&self) -> String {
+        self.inner.as_string()
+    }
+
+    fn __str__(&self) -> String {
+        self.inner.as_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("AAMBuilder(len={})", self.inner.as_string().len())
+    }
 }
 
 impl PyAam {
@@ -208,6 +296,8 @@ impl PyAam {
 
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
     m.add_class::<PyAam>()?;
+    m.add_class::<PyAamBuilder>()?;
+    m.add_class::<PySchemaField>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

@@ -14,6 +14,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"unsafe"
@@ -205,4 +206,115 @@ func parseCMap(cStr *C.char) map[string]string {
 		}
 	}
 	return res
+}
+
+// SchemaField declares a field used in @schema directives.
+type SchemaField struct {
+	Name     string
+	TypeName string
+	Optional bool
+}
+
+// RequiredField creates a required schema field.
+func RequiredField(name, typeName string) SchemaField {
+	return SchemaField{Name: name, TypeName: typeName, Optional: false}
+}
+
+// OptionalField creates an optional schema field.
+func OptionalField(name, typeName string) SchemaField {
+	return SchemaField{Name: name, TypeName: typeName, Optional: true}
+}
+
+// AAMBuilder builds AAM content in-memory.
+type AAMBuilder struct {
+	buffer strings.Builder
+}
+
+// NewBuilder creates an empty builder.
+func NewBuilder() *AAMBuilder {
+	return &AAMBuilder{}
+}
+
+func (b *AAMBuilder) pushSep() {
+	if b.buffer.Len() > 0 {
+		b.buffer.WriteByte('\n')
+	}
+}
+
+// AddLine appends "key = value".
+func (b *AAMBuilder) AddLine(key, value string) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString(key)
+	b.buffer.WriteString(" = ")
+	b.buffer.WriteString(value)
+	return b
+}
+
+// Comment appends "# text".
+func (b *AAMBuilder) Comment(text string) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString("# ")
+	b.buffer.WriteString(text)
+	return b
+}
+
+// Schema appends an inline @schema directive.
+func (b *AAMBuilder) Schema(name string, fields []SchemaField) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString("@schema ")
+	b.buffer.WriteString(name)
+	b.buffer.WriteString(" { ")
+	for i, field := range fields {
+		if i > 0 {
+			b.buffer.WriteString(", ")
+		}
+		b.buffer.WriteString(field.Name)
+		if field.Optional {
+			b.buffer.WriteByte('*')
+		}
+		b.buffer.WriteString(": ")
+		b.buffer.WriteString(field.TypeName)
+	}
+	b.buffer.WriteString(" }")
+	return b
+}
+
+// Derive appends @derive path and optional schemas.
+func (b *AAMBuilder) Derive(path string, schemas []string) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString("@derive ")
+	b.buffer.WriteString(path)
+	for _, schema := range schemas {
+		b.buffer.WriteString("::")
+		b.buffer.WriteString(schema)
+	}
+	return b
+}
+
+// Import appends @import path.
+func (b *AAMBuilder) Import(path string) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString("@import ")
+	b.buffer.WriteString(path)
+	return b
+}
+
+// TypeAlias appends @type alias = typeName.
+func (b *AAMBuilder) TypeAlias(alias, typeName string) *AAMBuilder {
+	b.pushSep()
+	b.buffer.WriteString("@type ")
+	b.buffer.WriteString(alias)
+	b.buffer.WriteString(" = ")
+	b.buffer.WriteString(typeName)
+	return b
+}
+
+// Build returns the accumulated content.
+func (b *AAMBuilder) Build() string {
+	return b.buffer.String()
+}
+
+// ToFile writes the accumulated content to path.
+func (b *AAMBuilder) ToFile(path string) error {
+	return os.WriteFile(path, []byte(b.buffer.String()), 0o644)
 }

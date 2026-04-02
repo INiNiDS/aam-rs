@@ -711,11 +711,11 @@ impl DefaultParserExecutor {
                     )),
                 })?;
 
+            let lexer = crate::pipeline::lexer::DefaultLexer::new();
+            let parser = crate::pipeline::parser::DefaultParser::new();
             let _ctx_guard = crate::error::push_error_render_context(&file_path, &content_string);
 
             let content = arena.alloc_str(&content_string);
-            let lexer = crate::pipeline::lexer::DefaultLexer::new();
-            let parser = crate::pipeline::parser::DefaultParser::new();
 
             let tokens = lexer.tokenize(content)?;
             let parse_output = parser.parse_with_recovery(&tokens);

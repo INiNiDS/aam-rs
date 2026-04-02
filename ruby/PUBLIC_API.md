@@ -5,12 +5,18 @@ Source of truth: `ruby/ext/aam_rs/src/lib.rs`.
 ## Main Namespace
 
 - `AamRb::AAM`
+- `AamRb::AAMBuilder`
+- `AamRb::SchemaField`
 
 ## Class Methods
 
 - `AamRb::AAM.new`
 - `AamRb::AAM.parse(content)`
 - `AamRb::AAM.load(path)`
+- `AamRb::AAMBuilder.new`
+- `AamRb::AAMBuilder.with_capacity(capacity)`
+- `AamRb::SchemaField.required(name, type_name)`
+- `AamRb::SchemaField.optional(name, type_name)`
 
 ## Instance Methods
 
@@ -22,6 +28,17 @@ Source of truth: `ruby/ext/aam_rs/src/lib.rs`.
 - `reverse_search(value)`
 - `schema_names`
 - `type_names`
+
+## AAMBuilder Instance Methods
+
+- `add_line(key, value)`
+- `comment(text)`
+- `schema(name, fields)`
+- `schema_multiline(name, fields)`
+- `derive(path, schemas)`
+- `import(path)`
+- `type_alias(alias, type_name)`
+- `as_string`
 
 ## Error Model
 

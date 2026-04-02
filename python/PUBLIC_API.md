@@ -5,6 +5,8 @@ Source of truth: `src/python.rs` (PyO3 class exported as `aam_py.AAM`).
 ## Main Class
 
 - `AAM`
+- `AAMBuilder`
+- `SchemaField`
 
 ## Construction
 
@@ -34,3 +36,19 @@ Source of truth: `src/python.rs` (PyO3 class exported as `aam_py.AAM`).
 ## Python Protocol Methods
 
 - `__repr__`, `__len__`, `__contains__`, `__getitem__`
+
+## Builder API
+
+- `SchemaField.required(name: str, type_name: str) -> SchemaField`
+- `SchemaField.optional(name: str, type_name: str) -> SchemaField`
+- `AAMBuilder()`
+- `AAMBuilder.with_capacity(capacity: int) -> AAMBuilder`
+- `add_line(key: str, value: str) -> None`
+- `comment(text: str) -> None`
+- `schema(name: str, fields: list[SchemaField]) -> None`
+- `schema_multiline(name: str, fields: list[SchemaField]) -> None`
+- `derive(path: str, schemas: list[str]) -> None`
+- `import(path: str) -> None`
+- `type_alias(alias: str, type_name: str) -> None`
+- `as_string() -> str`
+

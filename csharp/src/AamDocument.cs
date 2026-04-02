@@ -94,35 +94,7 @@ public sealed unsafe class AamDocument : IDisposable
         return AamNative.TakeOwnedUtf8String(ptr)!;
     }
 
-    /// <summary>
-    /// Merges AAM content into the current document.
-    /// </summary>
-    /// <param name="content">AAM text to merge.</param>
-    /// <exception cref="AamException">Thrown when native merge fails.</exception>
-    public void Merge(string content)
-    {
-        if (string.IsNullOrWhiteSpace(_sourceSnapshot))
-        {
-            _sourceSnapshot = content;
-        }
-        else
-        {
-            _sourceSnapshot = _sourceSnapshot.TrimEnd() + Environment.NewLine + content;
-        }
 
-        CheckResult(AamNative.aam_parse(Handle, _sourceSnapshot));
-    }
-
-    /// <summary>
-    /// Performs best-effort recovery for simple malformed input.
-    /// </summary>
-    /// <param name="content">AAM text to recover.</param>
-    /// <exception cref="AamException">Thrown when native recovery fails.</exception>
-    public void RecoverSimple(string content)
-    {
-        CheckResult(AamNative.aam_parse(Handle, content));
-        _sourceSnapshot = content;
-    }
 
     /// <summary>
     /// Finds a value by key using direct key lookup.

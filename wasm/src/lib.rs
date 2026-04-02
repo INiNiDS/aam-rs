@@ -1,4 +1,5 @@
 use aam_rs::aam::{AAM, AamLspAssist};
+use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use wasm_bindgen::prelude::*;
@@ -16,6 +17,82 @@ fn first_js_error(errors: Vec<AamlError>) -> JsValue {
 #[wasm_bindgen(js_name = AAM)]
 pub struct AamDocument {
     inner: AAM,
+}
+
+#[wasm_bindgen(js_name = AAMBuilder)]
+pub struct WasmAamBuilder {
+    inner: AAMBuilder,
+}
+
+fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
+    fields
+        .into_iter()
+        .filter_map(|field| {
+            let mut parts = field.splitn(2, ':');
+            let name = parts.next()?.trim();
+            let type_name = parts.next()?.trim();
+            if let Some(optional_name) = name.strip_suffix('*') {
+                Some(SchemaField::optional(optional_name.trim(), type_name))
+            } else {
+                Some(SchemaField::required(name, type_name))
+            }
+        })
+        .collect()
+}
+
+#[wasm_bindgen]
+impl WasmAamBuilder {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WasmAamBuilder {
+        Self {
+            inner: AAMBuilder::new(),
+        }
+    }
+
+    #[wasm_bindgen(js_name = withCapacity)]
+    pub fn with_capacity(capacity: usize) -> WasmAamBuilder {
+        Self {
+            inner: AAMBuilder::with_capacity(capacity),
+        }
+    }
+
+    #[wasm_bindgen(js_name = addLine)]
+    pub fn add_line(&mut self, key: &str, value: &str) {
+        self.inner.add_line(key, value);
+    }
+
+    pub fn comment(&mut self, text: &str) {
+        self.inner.comment(text);
+    }
+
+    pub fn schema(&mut self, name: &str, fields: Vec<String>) {
+        self.inner.schema(name, parse_schema_fields(fields));
+    }
+
+    #[wasm_bindgen(js_name = schemaMultiline)]
+    pub fn schema_multiline(&mut self, name: &str, fields: Vec<String>) {
+        self.inner
+            .schema_multiline(name, parse_schema_fields(fields));
+    }
+
+    pub fn derive(&mut self, path: &str, schemas: Vec<String>) {
+        self.inner.derive(path, schemas);
+    }
+
+    #[wasm_bindgen(js_name = import)]
+    pub fn import_path(&mut self, path: &str) {
+        self.inner.import(path);
+    }
+
+    #[wasm_bindgen(js_name = typeAlias)]
+    pub fn type_alias(&mut self, alias: &str, type_name: &str) {
+        self.inner.type_alias(alias, type_name);
+    }
+
+    #[wasm_bindgen(js_name = asString)]
+    pub fn as_string(&self) -> String {
+        self.inner.as_string()
+    }
 }
 
 #[wasm_bindgen]

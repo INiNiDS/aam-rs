@@ -92,6 +92,12 @@ mod tests {
 
     #[test]
     fn type_in_type() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let base_path = dir.path();
+
+        let file_path = base_path.join("type_in_type.aam");
+        let child_path = base_path.join("type_in_type_child.aam");
+
         let mut builder = AAMBuilder::new();
         builder.type_alias("A", "i32");
         builder.type_alias("B", "A");
@@ -104,16 +110,21 @@ mod tests {
                 SchemaField::required("field2", "C"),
             ],
         );
+
         builder
-            .to_file("tmp/type_in_type.aam")
+            .to_file(&file_path)
             .expect("Failed to write AAM file");
+
         let mut builder = AAMBuilder::new();
         builder.add_line("field1", "[[1, 2], [3, 4]]");
         builder.add_line("field2", "[1, 2, 3, 4]");
+
         builder
-            .to_file("tmp/type_in_type_child.aam")
+            .to_file(&child_path)
             .expect("Failed to write AAM file");
-        let doc = AAM::load("tmp/type_in_type_child.aam").expect("Failed to load AAM file");
+
+        let doc = AAM::load(&child_path).expect("Failed to load AAM file");
+
         assert_eq!(doc.get("field1"), Some("[[1, 2], [3, 4]]"));
         assert_eq!(doc.get("field2"), Some("[1, 2, 3, 4]"));
     }

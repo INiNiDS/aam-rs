@@ -88,7 +88,7 @@ impl DefaultLexer {
 
     /// Checks if a character can start an identifier
     fn is_id_start(c: char) -> bool {
-        c.is_alphabetic() || c == '_' || c == '@' || c == '#'
+        c.is_alphabetic() || c == '_' || c == '@' || c == '#' || c == '/'
     }
 
     /// Checks if a character can continue an identifier
@@ -527,6 +527,18 @@ mod tests {
             tokens
                 .iter()
                 .any(|t| t.kind == TokenKind::Identifier && t.text == "https://localhost/test")
+        );
+    }
+
+    #[test]
+    fn test_absolute_path_tokenize() {
+        let lexer = DefaultLexer::new();
+        let tokens = lexer.tokenize("root = /srv/app").unwrap();
+
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.kind == TokenKind::Identifier && t.text == "/srv/app")
         );
     }
 }
