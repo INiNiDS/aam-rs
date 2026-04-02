@@ -2,7 +2,7 @@ use aam_rs::aam::AAM;
 use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
-use magnus::{Error, Module, Object, Ruby, function, method};
+use magnus::{Error, Module, Object, RArray, Ruby, TryConvert, function, method};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -12,14 +12,18 @@ fn ruby_runtime_error(message: String) -> Error {
 }
 
 fn first_error(errors: Vec<AamlError>) -> AamlError {
-    errors.into_iter().next().unwrap_or(AamlError::ParseError {
-        line: 1,
-        content: String::new(),
-        details: "unexpected empty parse error list".to_string(),
-        diagnostics: None,
-    })
+    errors
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| AamlError::ParseError {
+            line: 1,
+            content: String::new(),
+            details: "unexpected empty parse error list".to_string(),
+            diagnostics: None,
+        })
 }
 
+// --- RubyAam ---
 #[magnus::wrap(class = "AamRb::AAM", free_immediately, size)]
 pub struct RubyAam {
     inner: AAM,
@@ -31,20 +35,20 @@ impl RubyAam {
     }
 
     pub fn parse(content: String) -> Result<Self, Error> {
-        let mut doc =
+        let doc =
             AAM::parse(&content).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
     pub fn load(path: String) -> Result<Self, Error> {
-        let doc = AAM::load(path).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
+        let doc = AAM::load(&path).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
     pub fn format(content: String) -> Result<String, Error> {
-        let doc = AAM::new();
         let rules = FormatterRules::default();
-        doc.format(&content, &rules)
+        AAM::new()
+            .format(&content, &rules)
             .map_err(|err| ruby_runtime_error(err.to_string()))
     }
 
@@ -103,6 +107,7 @@ impl RubyAam {
     }
 }
 
+// --- RubySchemaField ---
 #[magnus::wrap(class = "AamRb::SchemaField", free_immediately, size)]
 pub struct RubySchemaField {
     pub(crate) inner: SchemaField,
@@ -122,6 +127,7 @@ impl RubySchemaField {
     }
 }
 
+// --- RubyAamBuilder ---
 #[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
 pub struct RubyAamBuilder {
     inner: RefCell<AAMBuilder>,
@@ -148,14 +154,32 @@ impl RubyAamBuilder {
         self.inner.borrow_mut().comment(&text);
     }
 
-    pub fn schema(&self, name: String, fields: Vec<RubySchemaField>) {
-        let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
+    pub fn schema(&self, name: String, fields: RArray) -> Result<(), Error> {
+        let fields_raw: Vec<SchemaField> = fields
+            .into_iter()
+            .map(|item| {
+                // Вызываем try_convert у целевого типа, передавая Value
+                let f = <&RubySchemaField>::try_convert(item)?;
+                Ok(f.inner.clone())
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
         self.inner.borrow_mut().schema(&name, fields_raw);
+        Ok(())
     }
 
-    pub fn schema_multiline(&self, name: String, fields: Vec<RubySchemaField>) {
-        let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
+    pub fn schema_multiline(&self, name: String, fields: RArray) -> Result<(), Error> {
+        let fields_raw: Vec<SchemaField> = fields
+            .into_iter()
+            .map(|item| {
+                // Аналогично для schema_multiline
+                let f = <&RubySchemaField>::try_convert(item)?;
+                Ok(f.inner.clone())
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
         self.inner.borrow_mut().schema_multiline(&name, fields_raw);
+        Ok(())
     }
 
     pub fn derive(&self, path: String, schemas: Vec<String>) {
@@ -175,6 +199,7 @@ impl RubyAamBuilder {
     }
 }
 
+// --- Init ---
 #[magnus::init]
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("AamRb")?;
