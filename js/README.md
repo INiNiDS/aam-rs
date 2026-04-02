@@ -1,6 +1,6 @@
 # aam-nodejs
 
-Node.js bindings for the `aam-rs` AAML parser, powered by N-API.
+Node.js bindings for the `aam-rs` AAM parser, powered by N-API.
 
 ## Installation
 
@@ -18,7 +18,7 @@ Prebuilt binaries are published for:
 ## Usage
 
 ```js
-const {AAML, parse, version} = require('aam-nodejs')
+const {AAM, parse, version} = require('aam-nodejs')
 
 const cfg = parse(`
 host = localhost
@@ -28,12 +28,11 @@ point = { x = 10, y = 20 }
 `)
 
 console.log(version())
-console.log(cfg.findObj('host'))
-console.log(cfg.findList('paths'))
-console.log(cfg.findObject('point'))
+console.log(cfg.get('host'))
+console.log(cfg.find('host'))
+console.log(cfg.deepSearch('po'))
 
-const runtime = new AAML()
-runtime.merge('theme = dark')
+const runtime = new AAM()
 console.log(runtime.toMap())
 ```
 
@@ -49,10 +48,10 @@ roles = [api, worker]
 meta = { owner = team-a, region = eu }
 `)
 
-console.log(cfg.findDeep('active'))   // /srv/app
-console.log(cfg.findList('roles'))    // ['api', 'worker']
-console.log(cfg.findObject('meta'))   // { owner: 'team-a', region: 'eu' }
-console.log(cfg.findObj('team-a'))    // owner (reverse lookup fallback)
+console.log(cfg.find('root'))               // { root: '/srv/app' }
+console.log(cfg.find('team-a'))             // { owner: 'team-a' } when matched by value
+console.log(cfg.deepSearch('act'))          // { active: 'root' }
+console.log(cfg.reverseSearch('/srv/app'))  // ['root']
 ```
 
 ## Local build & test
@@ -66,30 +65,30 @@ npm test
 
 ## API
 
-### `new AAML()`
+### `new AAM()`
 
 Creates an empty configuration.
 
 ### `parse(content)`
 
-Parses an AAML string and returns an `AAML` instance.
+Parses an AAM string and returns an `AAM` instance.
 
 ### `load(path)`
 
-Loads a `.aam` file from disk and returns an `AAML` instance.
+Loads a `.aam` file from disk and returns an `AAM` instance.
 
 ### Instance methods
 
-- `merge(content)` / `mergeContent(content)`
-- `mergeFile(path)`
-- `findObj(key)`
-- `findKey(value)`
-- `findDeep(key)`
-- `findList(key)`
-- `findObject(key)`
+- `format(content)`
+- `formatRange(content, startLine, endLine)`
+- `get(key)`
+- `find(query)`
+- `deepSearch(pattern)`
+- `reverseSearch(value)`
 - `keys()`
 - `toMap()`
-- `validateValue(typeName, value)`
+- `schemaNames()`
+- `typeNames()`
 - `close()`
 - `isClosed()`
 

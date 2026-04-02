@@ -18,12 +18,12 @@ public sealed class AamDocumentTests
     }
 
     [Fact]
-    public void ParseAndFindObj_ReturnsValue_WhenNativeLibraryIsAvailable()
+    public void ParseAndGet_ReturnsValue_WhenNativeLibraryIsAvailable()
     {
         SkipIfNativeMissing(() =>
         {
             using var doc = AamDocument.Parse("host = localhost\nport = 8080");
-            Assert.Equal("localhost", doc.FindObj("host"));
+            Assert.Equal("localhost", doc.Get("host"));
         });
     }
 
@@ -38,9 +38,9 @@ version = 1.0.0
 debug = true
 ";
             using var doc = AamDocument.Parse(content);
-            Assert.Equal("MyApp", doc.FindObj("name"));
-            Assert.Equal("1.0.0", doc.FindObj("version"));
-            Assert.Equal("true", doc.FindObj("debug"));
+            Assert.Equal("MyApp", doc.Get("name"));
+            Assert.Equal("1.0.0", doc.Get("version"));
+            Assert.Equal("true", doc.Get("debug"));
         });
     }
 
@@ -56,26 +56,14 @@ host = localhost
 port = 8080
 ";
             using var doc = AamDocument.Parse(content);
-            Assert.Equal("localhost", doc.FindObj("host"));
-            Assert.Equal("8080", doc.FindObj("port"));
+            Assert.Equal("localhost", doc.Get("host"));
+            Assert.Equal("8080", doc.Get("port"));
         });
     }
 
-    [Fact]
-    public void Merge_CombinesConfigurations()
-    {
-        SkipIfNativeMissing(() =>
-        {
-            using var doc = AamDocument.Parse("host = localhost\nport = 8080");
-            doc.Merge("port = 9090\ndebug = true");
-            Assert.Equal("localhost", doc.FindObj("host"));
-            Assert.Equal("9090", doc.FindObj("port"));
-            Assert.Equal("true", doc.FindObj("debug"));
-        });
-    }
 
     [Fact]
-    public void FindKey_SearchesByValue()
+    public void ReverseSearch_FindsKeysByValue()
     {
         SkipIfNativeMissing(() =>
         {
@@ -85,9 +73,8 @@ cache = redis
 messaging = rabbitmq
 ";
             using var doc = AamDocument.Parse(content);
-            var result = doc.FindKey("postgres");
-            Assert.NotNull(result);
-            Assert.Equal("database", result);
+            var result = doc.ReverseSearch("postgres");
+            Assert.Contains("database", result);
         });
     }
 
@@ -97,7 +84,7 @@ messaging = rabbitmq
         SkipIfNativeMissing(() =>
         {
             using var doc = AamDocument.Parse("");
-            Assert.Null(doc.FindObj("nonexistent"));
+            Assert.Null(doc.Get("nonexistent"));
         });
     }
 
@@ -111,28 +98,31 @@ name   =   MyApp
 port   =   8080
 ";
             using var doc = AamDocument.Parse(content);
-            Assert.Equal("MyApp", doc.FindObj("name"));
-            Assert.Equal("8080", doc.FindObj("port"));
+            Assert.Equal("MyApp", doc.Get("name"));
+            Assert.Equal("8080", doc.Get("port"));
         });
     }
 
     [Fact]
-    public void FindObj_PerformsReverseLookupFallback()
+    public void Find_PerformsKeyAndValueLookup()
     {
         SkipIfNativeMissing(() =>
         {
             using var doc = AamDocument.Parse("username = admin");
-            Assert.Equal("username", doc.FindObj("admin"));
+            Assert.Equal("admin", doc.Find("username")["username"]);
+            Assert.Equal("admin", doc.Find("admin")["username"]);
         });
     }
 
     [Fact]
-    public void FindDeep_ResolvesChain()
+    public void DeepSearch_ReturnsMatchingPairs()
     {
         SkipIfNativeMissing(() =>
         {
-            using var doc = AamDocument.Parse("root = /srv\ncurrent = root");
-            Assert.Equal("/srv", doc.FindDeep("current"));
+            using var doc = AamDocument.Parse("root_path = srv\ncurrent_path = root_path\nmode = active");
+            var result = doc.DeepSearch("path");
+            Assert.Equal("srv", result["root_path"]);
+            Assert.Equal("root_path", result["current_path"]);
         });
     }
 
@@ -150,18 +140,6 @@ port   =   8080
             {
                 // Expected.
             }
-        });
-    }
-
-    [Fact]
-    public void ClosedDocument_ThrowsOnMerge()
-    {
-        SkipIfNativeMissing(() =>
-        {
-            var doc = AamDocument.Parse("a = 1");
-            doc.Dispose();
-            Assert.True(doc.IsClosed);
-            Assert.Throws<ObjectDisposedException>(() => doc.Merge("b = 2"));
         });
     }
 }

@@ -3,7 +3,7 @@ using System;
 namespace AamCsharp;
 
 /// <summary>
-/// Represents an error returned by the native AAML engine.
+/// Represents an error returned by the native AAM engine.
 /// </summary>
 public sealed class AamException : Exception
 {

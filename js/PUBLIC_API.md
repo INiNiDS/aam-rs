@@ -6,7 +6,8 @@ Source of truth: `js/index.d.ts`.
 
 - `parse(content: string): AAM`
 - `load(path: string): AAM`
-- `recoverSimple(content: string): AAM`
+- `format(content: string): string`
+- `lspAssist(content: string): JsLspResult`
 - `version(): string`
 
 ## Main Class
@@ -16,17 +17,16 @@ Source of truth: `js/index.d.ts`.
 
 ## Instance Methods
 
-- `merge(content: string): void`
-- `mergeContent(content: string): void`
-- `mergeFile(path: string): void`
-- `findObj(key: string): string | null`
-- `findKey(value: string): string | null`
-- `findDeep(key: string): string | null`
-- `findList(key: string): string[] | null`
-- `findObject(key: string): Record<string, string> | null`
+- `format(content: string): string`
+- `formatRange(content: string, startLine: number, endLine: number): string`
+- `get(key: string): string | null`
+- `find(query: string): Record<string, string>`
+- `deepSearch(pattern: string): Record<string, string>`
+- `reverseSearch(value: string): string[]`
 - `keys(): string[]`
 - `toMap(): Record<string, string>`
-- `validateValue(typeName: string, value: string): void`
+- `schemaNames(): string[]`
+- `typeNames(): string[]`
 - `close(): void`
 - `isClosed(): boolean`
 
@@ -44,4 +44,4 @@ Source of truth: `js/index.d.ts`.
 
 ## Aliases
 
-- `AAML`, `JsAam`, and `JsAaml` are type aliases to `AAM`.
+- `JsAam` and `JsAamBuilder` are type aliases for compatibility.

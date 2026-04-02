@@ -8,7 +8,6 @@ test('parse and inspect values', () => {
     const cfg = parse(`
 host = localhost
 port = 8080
-paths = [assets, cache]
 point = { x = 10, y = 20 }
 `)
 
@@ -18,9 +17,9 @@ point = { x = 10, y = 20 }
 
     assert.deepEqual(cfg.reverseSearch('8080'), ['port'])
 
-    assert.deepEqual(cfg.findList('paths'), ['assets', 'cache'])
-
-    assert.deepEqual(cfg.findObject('point'), {x: '10', y: '20'})
+    assert.deepEqual(cfg.find('host'), {host: 'localhost'})
+    assert.deepEqual(cfg.find('localhost'), {host: 'localhost'})
+    assert.equal(cfg.get('point'), '{ x = 10, y = 20 }')
 })
 
 test('mutable instance lifecycle', () => {
@@ -34,15 +33,17 @@ test('mutable instance lifecycle', () => {
     assert.equal(cfg.get('any'), null)
 })
 
-test('deepSearch resolves chained aliases', () => {
+test('deepSearch matches by key pattern', () => {
     const cfg = parse(`
-root = /srv/app
-active = root
-current = active
+root_path = srv_app
+active_path = root_path
+mode = active
 `)
 
-    const results = cfg.deepSearch('current')
-    assert.equal(results['current'], '/srv/app')
+    assert.deepEqual(cfg.deepSearch('path'), {
+        root_path: 'srv_app',
+        active_path: 'root_path',
+    })
 })
 
 test('reverseSearch supports lookup', () => {

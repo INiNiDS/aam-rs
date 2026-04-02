@@ -1,7 +1,6 @@
 use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder as CoreAamBuilder, SchemaField};
 use aam_rs::error::AamlError;
-use aam_rs::found_value::FoundValue;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -34,22 +33,6 @@ pub struct JsLspResult {
 #[napi(js_name = "AAMBuilder")]
 pub struct JsAamBuilder {
     inner: CoreAamBuilder,
-}
-
-fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
-    fields
-        .into_iter()
-        .filter_map(|field| {
-            let mut parts = field.splitn(2, ':');
-            let name = parts.next()?.trim();
-            let type_name = parts.next()?.trim();
-            if let Some(optional_name) = name.strip_suffix('*') {
-                Some(SchemaField::optional(optional_name.trim(), type_name))
-            } else {
-                Some(SchemaField::required(name, type_name))
-            }
-        })
-        .collect()
 }
 
 #[napi]
@@ -101,6 +84,22 @@ impl JsAamBuilder {
     pub fn as_string(&self) -> String {
         self.inner.as_string()
     }
+}
+
+fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
+    fields
+        .into_iter()
+        .filter_map(|field| {
+            let mut parts = field.splitn(2, ':');
+            let name = parts.next()?.trim();
+            let type_name = parts.next()?.trim();
+            if let Some(optional_name) = name.strip_suffix('*') {
+                Some(SchemaField::optional(optional_name.trim(), type_name))
+            } else {
+                Some(SchemaField::required(name, type_name))
+            }
+        })
+        .collect()
 }
 
 impl From<AamLspAssist> for JsLspResult {
@@ -184,18 +183,6 @@ impl JsAam {
             |_| HashMap::new(),
             |inner| inner.to_map().into_iter().collect(),
         )
-    }
-
-    #[napi(js_name = "findList")]
-    pub fn find_list(&self, key: String) -> Option<Vec<String>> {
-        self.get(key).and_then(|v| FoundValue::new(&v).as_list())
-    }
-
-    #[napi(js_name = "findObject")]
-    pub fn find_object(&self, key: String) -> Option<HashMap<String, String>> {
-        self.get(key)
-            .and_then(|v| FoundValue::new(&v).as_object())
-            .map(|m| m.into_iter().collect())
     }
 
     #[napi]

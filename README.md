@@ -42,14 +42,14 @@ The package ships prebuilt native addons for:
 - Windows x64
 
 ```js
-const {parse, AAML} = require('aam-nodejs')
+const {parse, AAMBuilder} = require('aam-nodejs')
 
 const cfg = parse('host = localhost\nport = 8080')
-console.log(cfg.findObj('host'))
+console.log(cfg.get('host'))
 
-const empty = new AAML()
-empty.merge('theme = dark')
-console.log(empty.toMap())
+const b = new AAMBuilder()
+b.addLine('theme', 'dark')
+console.log(b.asString())
 ```
 
 ### C# / .NET

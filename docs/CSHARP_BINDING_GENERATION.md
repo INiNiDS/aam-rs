@@ -192,12 +192,12 @@ Let's say we want to add a "validate" operation:
 ### 1. Add to FFI (`src/ffi.rs`)
 
 ```rust
-/// Validates an AAML document against a schema.
+/// Validates an AAM document against a schema.
 ///
 /// Returns 0 on success, -1 on validation error.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aam_validate(
-    handle: *mut AamlHandle,
+   handle: *mut AamHandle,
     schema_name: *const c_char,
 ) -> i32 {
     if handle.is_null() || schema_name.is_null() {

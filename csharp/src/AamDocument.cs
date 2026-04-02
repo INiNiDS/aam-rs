@@ -1,16 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 
 namespace AamCsharp;
 
 /// <summary>
-/// Represents an AAM document and provides operations for parsing, loading, querying, formatting and merging data.
+/// Represents an AAM document and provides operations for parsing, loading, querying and formatting data.
 /// </summary>
 public sealed unsafe class AamDocument : IDisposable
 {
     private SafeAamHandle? _handle;
-    private string _sourceSnapshot = string.Empty;
 
     /// <summary>
     /// Initializes a new empty AAM document handle.
@@ -32,7 +30,6 @@ public sealed unsafe class AamDocument : IDisposable
         try
         {
             document.CheckResult(AamNative.aam_parse(document.Handle, content));
-            document._sourceSnapshot = content;
             return document;
         }
         catch
@@ -54,14 +51,6 @@ public sealed unsafe class AamDocument : IDisposable
         try
         {
             document.CheckResult(AamNative.aam_load(document.Handle, path));
-            try
-            {
-                document._sourceSnapshot = File.ReadAllText(path);
-            }
-            catch
-            {
-                document._sourceSnapshot = string.Empty;
-            }
             return document;
         }
         catch
@@ -158,59 +147,6 @@ public sealed unsafe class AamDocument : IDisposable
         return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    /// <summary>
-    /// Finds a value by key.
-    /// </summary>
-    /// <param name="key">Key to search for.</param>
-    /// <returns>The value for the key, or <see langword="null"/> if not found.</returns>
-    public string? FindObj(string key)
-    {
-        var direct = Get(key);
-        if (direct is not null)
-        {
-            return direct;
-        }
-
-        return FindKey(key);
-    }
-
-    /// <summary>
-    /// Finds a key by its value.
-    /// </summary>
-    /// <param name="value">Value to search for.</param>
-    /// <returns>The first matching key, or <see langword="null"/> if not found.</returns>
-    public string? FindKey(string value)
-    {
-        var keys = ReverseSearch(value);
-        return keys.Length > 0 ? keys[0] : null;
-    }
-
-    /// <summary>
-    /// Resolves a value through chained key lookups until a terminal value is reached.
-    /// </summary>
-    /// <param name="key">Starting key for deep resolution.</param>
-    /// <returns>The resolved terminal value, or <see langword="null"/> if resolution fails.</returns>
-    public string? FindDeep(string key)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var current = key;
-
-        while (true)
-        {
-            if (!seen.Add(current))
-            {
-                return current;
-            }
-
-            var next = Get(current);
-            if (next is null)
-            {
-                return current == key ? null : current;
-            }
-
-            current = next;
-        }
-    }
 
     /// <summary>
     /// Releases native resources associated with this document.

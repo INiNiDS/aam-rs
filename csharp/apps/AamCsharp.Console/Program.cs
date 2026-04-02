@@ -34,7 +34,7 @@ catch (DllNotFoundException ex)
 }
 catch (AamException ex)
 {
-    Console.WriteLine($"AAML error: {ex.Message}");
+    Console.WriteLine($"AAM error: {ex.Message}");
     Environment.ExitCode = 3;
 }
 

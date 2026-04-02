@@ -123,3 +123,5 @@ full_project_code.txt
 
 *.bin
 tmp/*
+
+Cargo.lock

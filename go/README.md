@@ -1,6 +1,6 @@
 # aam-go
 
-CGo bindings for the [aam-rs](https://github.com/INiNiDS/aam-rs) AAML parser.
+CGo bindings for the [aam-rs](https://github.com/INiNiDS/aam-rs) AAM parser.
 
 ## Prerequisites
 
@@ -47,51 +47,43 @@ func main() {
     }
     defer doc.Close()
 
-    if val, ok := doc.FindObj("host"); ok {
+    if val, ok := doc.Get("host"); ok {
         fmt.Println("host:", val) // host: localhost
     }
 
-    if key, ok := doc.FindKey("8080"); ok {
-        fmt.Println("key for 8080:", key) // key for 8080: port
-    }
+    fmt.Println("reverse:", doc.ReverseSearch("8080"))
 }
 ```
 
 ## More examples
 
 ```go
-doc, err := aam.Parse("a = b\nb = c\nc = done\n")
+doc, err := aam.Parse("root_path = srv\nactive_path = root_path\nmode = active\n")
 if err != nil {
     panic(err)
 }
 defer doc.Close()
 
-if v, ok := doc.FindDeep("a"); ok {
-    fmt.Println(v) // done
-}
-
-if err := doc.Merge("env = production\nrole = api\n"); err != nil {
-    panic(err)
-}
-
-if k, ok := doc.FindObj("production"); ok {
-    fmt.Println(k) // env (reverse lookup fallback)
-}
+fmt.Println(doc.DeepSearch("path"))
+fmt.Println(doc.Find("active"))
 ```
 
 ## API
 
-| Function / Method                              | Description                            |
-|------------------------------------------------|----------------------------------------|
-| `New() (*AAML, error)`                         | Creates an empty AAML handle           |
-| `Parse(content string) (*AAML, error)`         | Parses AAML content from a string      |
-| `Load(path string) (*AAML, error)`             | Loads and parses a `.aam` file         |
-| `(*AAML) Merge(content string) error`          | Merges additional content (child-wins) |
-| `(*AAML) FindObj(key string) (string, bool)`   | Forward then reverse key lookup        |
-| `(*AAML) FindKey(value string) (string, bool)` | Reverse lookup (value → key)           |
-| `(*AAML) FindDeep(key string) (string, bool)`  | Follows reference chain to terminal    |
-| `(*AAML) LastError() string`                   | Returns last error message             |
-| `(*AAML) Close()`                              | Frees the native handle (idempotent)   |
+| Function / Method                                     | Description                             |
+|-------------------------------------------------------|-----------------------------------------|
+| `New() (*AAM, error)`                                 | Creates an empty AAM handle             |
+| `Parse(content string) (*AAM, error)`                 | Parses AAM content from a string        |
+| `Load(path string) (*AAM, error)`                     | Loads and parses a `.aam` file          |
+| `(*AAM) Format(content string) (string, error)`       | Formats arbitrary AAM text              |
+| `(*AAM) Get(key string) (string, bool)`               | Direct key lookup                       |
+| `(*AAM) Find(query string) map[string]string`         | Key lookup with value fallback          |
+| `(*AAM) DeepSearch(pattern string) map[string]string` | Pattern search by key                   |
+| `(*AAM) ReverseSearch(value string) []string`         | Reverse lookup (value -> matching keys) |
+| `(*AAM) SchemaNames() []string`                       | Returns schema names                    |
+| `(*AAM) TypeNames() []string`                         | Returns type names                      |
+| `(*AAM) LastError() string`                           | Returns last native error string        |
+| `(*AAM) Close()`                                      | Frees the native handle (idempotent)    |
 
 ## Running tests
 
@@ -104,6 +96,6 @@ cd go
 go test -v ./...
 ```
 
-The test suite includes parse/load, merge semantics, deep resolution, reverse lookup fallback, and closed-handle
+The test suite includes parse/load, lookup behavior, deep-search by pattern, reverse search, and closed-handle
 behavior.
 

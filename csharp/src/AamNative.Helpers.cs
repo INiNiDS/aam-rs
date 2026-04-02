@@ -12,7 +12,7 @@ internal sealed unsafe class SafeAamHandle : SafeHandleZeroOrMinusOneIsInvalid
         SetHandle((IntPtr)AamNative.aam_new());
         if (IsInvalid)
         {
-            throw new InvalidOperationException("Failed to allocate native AAML handle");
+            throw new InvalidOperationException("Failed to allocate native AAM handle");
         }
     }
 
@@ -103,33 +103,6 @@ internal static unsafe partial class AamNative
         return aam_last_error((AamHandle*)handle.DangerousGetHandle());
     }
 
-    // Backward-compatible helpers used by existing higher-level C# API.
-    internal static int aam_merge(SafeAamHandle handle, string content)
-    {
-        // FFI v2 has no incremental merge; re-parse merged text at call sites if needed.
-        return aam_parse(handle, content);
-    }
-
-    internal static int aam_recover_simple(SafeAamHandle handle, string content)
-    {
-        // Best effort compatibility: route to parse.
-        return aam_parse(handle, content);
-    }
-
-    internal static byte* aam_find_obj(SafeAamHandle handle, string key)
-    {
-        return aam_get(handle, key);
-    }
-
-    internal static byte* aam_find_key(SafeAamHandle handle, string value)
-    {
-        return aam_reverse_search(handle, value);
-    }
-
-    internal static byte* aam_find_deep(SafeAamHandle handle, string key)
-    {
-        return aam_deep_search(handle, key);
-    }
 
     internal static string? BorrowUtf8String(byte* ptr)
     {

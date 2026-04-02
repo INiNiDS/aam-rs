@@ -21,8 +21,8 @@ wasm-pack test --node wasm
 ```javascript
 const wasm = require('./pkg/aam_wasm.js')
 
-const doc = new wasm.AamDocument('host = localhost\nport = 8080')
-console.log(doc.findObj('host'))
+const doc = new wasm.AAM('host = localhost\nport = 8080')
+console.log(doc.get('host'))
 ```
 
 ## More examples
@@ -30,11 +30,9 @@ console.log(doc.findObj('host'))
 ```javascript
 const wasm = require('./pkg/aam_wasm.js')
 
-const doc = new wasm.AamDocument('a = b\nb = c\nc = done')
-console.log(doc.findDeep('a')) // done
-
-doc.merge('env = production\nrole = api')
-console.log(doc.findKey('api')) // role
+const doc = new wasm.AAM('root_path = srv_app\nactive_path = root_path\nmode = active')
+console.log(doc.deepSearch('path'))
+console.log(doc.reverseSearch('active'))
 ```
 
 ## Notes

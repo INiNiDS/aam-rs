@@ -1,10 +1,10 @@
 # aam-rs for C#
 
-C# bindings for the `aam-rs` AAML parser using the stable C FFI.
+C# bindings for the `aam-rs` AAM parser using the stable C FFI.
 
 ## Features
 
-- **AAML Parsing**: Parse and manipulate `.aam` configuration files
+- **AAM Parsing**: Parse and query `.aam` configuration files
 - **Cross-platform**: Supports Windows, macOS, and Linux (x64, ARM64)
 - **Type-safe**: Strongly-typed C# API with proper resource management
 - **Zero-copy**: Efficient bindings using P/Invoke
@@ -59,63 +59,40 @@ Then set the library path:
 ```csharp
 using AamCsharp;
 
-// Parse AAML content
+// Parse AAM content
 using var doc = AamDocument.Parse("host = localhost\nport = 8080");
 
 // Look up values
-string host = doc.FindObj("host");      // "localhost"
-string port = doc.FindObj("port");      // "8080"
+string? host = doc.Get("host");         // "localhost"
+string? port = doc.Get("port");         // "8080"
 ```
 
-### Merging Configurations
+### Find / ReverseSearch
 
 ```csharp
-using var doc = AamDocument.Parse("host = localhost\nport = 8080");
-
-// Merge additional configuration
-doc.Merge("port = 9090\ndebug = true");
-
-var port = doc.FindObj("port");   // "9090"
-var debug = doc.FindObj("debug"); // "true"
+using var doc = AamDocument.Parse("host = localhost\nport = 8080\nalias = localhost");
+var byKey = doc.Find("host");
+var byValue = doc.Find("localhost");
+var keys = doc.ReverseSearch("localhost");
 ```
 
-### Finding Keys by Value
+### DeepSearch by key pattern
 
 ```csharp
 using var doc = AamDocument.Parse(@"
-database = postgres
-cache = redis
-messaging = rabbitmq
+root_path = srv
+current_path = root_path
+mode = active
 ");
 
-// Search by value to find its key
-string key = doc.FindKey("postgres"); // "database"
+var matches = doc.DeepSearch("path");
+Console.WriteLine(matches["root_path"]); // srv
 ```
 
 ### Loading from Files
 
 ```csharp
 using var doc = AamDocument.Load("config.aam");
-```
-
-### Deep Lookup / Aliases
-
-```csharp
-using var doc = AamDocument.Parse(@"
-root = /srv/app
-active = root
-");
-
-Console.WriteLine(doc.FindDeep("active")); // /srv/app
-```
-
-### Reverse Lookup Fallback
-
-```csharp
-using var doc = AamDocument.Parse("env = production");
-
-Console.WriteLine(doc.FindObj("production")); // env
-Console.WriteLine(doc.FindKey("production")); // env
 ```
 
 ## Building and Testing
@@ -170,31 +147,31 @@ skip with `DllNotFoundException`.
 
 ### `AamDocument`
 
-Main class for AAML document handling.
+Main class for AAM document handling.
 
 #### `Parse(string content): AamDocument`
 
-Parses AAML content from a string.
+Parses AAM content from a string.
 
 #### `Load(string path): AamDocument`
 
-Loads an AAML file from disk.
+Loads an AAM file from disk.
 
-#### `FindObj(string key): string?`
+#### `Get(string key): string?`
 
-Finds an object/value by key.
+Returns a value by key.
 
-#### `FindKey(string value): string?`
+#### `Find(string query): Dictionary<string, string>`
 
-Finds a key by its value.
+Finds matching pairs by key, then by value fallback.
 
-#### `FindDeep(string path): string?`
+#### `DeepSearch(string pattern): Dictionary<string, string>`
 
-Finds a nested value using dot notation (e.g., "parent.child").
+Finds key-value pairs where keys contain a pattern.
 
-#### `Merge(string content): void`
+#### `ReverseSearch(string value): string[]`
 
-Merges additional AAML content into the current document.
+Finds keys for a value.
 
 #### `Dispose(): void`
 

@@ -12,47 +12,39 @@ debug = true
 try
 {
     using var doc = AamDocument.Parse(basicContent);
-    Console.WriteLine($"Host: {doc.FindObj("host")}");
-    Console.WriteLine($"Port: {doc.FindObj("port")}");
-    Console.WriteLine($"Debug: {doc.FindObj("debug")}");
+    Console.WriteLine($"Host: {doc.Get("host")}");
+    Console.WriteLine($"Port: {doc.Get("port")}");
+    Console.WriteLine($"Debug: {doc.Get("debug")}");
 }
 catch (DllNotFoundException ex)
 {
     Console.WriteLine($"Native library not found: {ex.Message}");
 }
 
-// Example 2: Merging configurations
-Console.WriteLine("\n=== Example 2: Merging Configurations ===");
+// Example 2: Pattern search
+Console.WriteLine("\n=== Example 2: Deep Search by Key Pattern ===");
 var baseConfig = @"
-database = postgres
+database_host = localhost
+database_port = 5432
 cache = redis
-";
-
-var overrides = @"
-database = mysql
-debug = true
 ";
 
 try
 {
     using var doc = AamDocument.Parse(baseConfig);
-    Console.WriteLine("Base configuration:");
-    Console.WriteLine($"  Database: {doc.FindObj("database")}");
-    Console.WriteLine($"  Cache: {doc.FindObj("cache")}");
-
-    doc.Merge(overrides);
-    Console.WriteLine("\nAfter merge:");
-    Console.WriteLine($"  Database: {doc.FindObj("database")}");
-    Console.WriteLine($"  Cache: {doc.FindObj("cache")}");
-    Console.WriteLine($"  Debug: {doc.FindObj("debug")}");
+    var dbEntries = doc.DeepSearch("database");
+    foreach (var entry in dbEntries)
+    {
+        Console.WriteLine($"  {entry.Key}: {entry.Value}");
+    }
 }
 catch (DllNotFoundException ex)
 {
     Console.WriteLine($"Native library not found: {ex.Message}");
 }
 
-// Example 3: Finding keys by value
-Console.WriteLine("\n=== Example 3: Finding Keys by Value ===");
+// Example 3: Reverse search
+Console.WriteLine("\n=== Example 3: Reverse Search ===");
 var registryContent = @"
 primary_db = postgresql
 backup_db = mysql
@@ -63,10 +55,10 @@ message_queue = rabbitmq
 try
 {
     using var doc = AamDocument.Parse(registryContent);
-    var key = doc.FindKey("redis");
-    if (key != null)
+    var keys = doc.ReverseSearch("redis");
+    if (keys.Length > 0)
     {
-        Console.WriteLine($"Found key for 'redis': {key}");
+        Console.WriteLine($"Found keys for 'redis': {string.Join(", ", keys)}");
     }
     else
     {

@@ -46,72 +46,70 @@ impl RubySchemaField {
 #[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
 pub struct RubyAamBuilder {
     inner: AAMBuilder,
-}
-
-impl RubyAamBuilder {
     pub fn new() -> Self {
         Self {
-            inner: AAMBuilder::new(),
+    inner: RefCell::new(AAMBuilder::new()),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            inner: AAMBuilder::with_capacity(capacity),
-        }
+    inner: RefCell::new(AAMBuilder::with_capacity(capacity)),
+    }
     }
 
+    pub fn add_line( & self,
+    key: String,
+    value: String) {
+    self.inner.borrow_mut().add_line(& key, & value);
+    }
+
+    pub fn comment( & self,
+    text: String) {
+    self.inner.borrow_mut().comment(& text);
+    }
+
+    pub fn schema( & self,
+    name: String,
+    fields: Vec<String>) {
+    self.inner
+    .borrow_mut()
+    .schema(& name, parse_schema_fields(fields));
+    }
+
+    inner: AAMBuilder::new(),
+    self.inner
+    .borrow_mut()
+            inner: AAMBuilder::with_capacity(capacity),
+    }
+
+pub fn derive(&self, path: String, schemas: Vec<String>) {
     pub fn add_line(&mut self, key: String, value: String) {
         self.inner.add_line(&key, &value);
-    }
-
     pub fn comment(&mut self, text: String) {
         self.inner.comment(&text);
-    }
+    pub fn schema(&mut self, name: String, fields: Vec<&RubySchemaField>) {}
 
-    pub fn schema(&mut self, name: String, fields: Vec<&RubySchemaField>) {
-        self.inner
+        pub fn as_string(&self) -> String {
             .schema(&name, fields.into_iter().map(|field| field.inner.clone()));
+    }
     }
 
     pub fn schema_multiline(&mut self, name: String, fields: Vec<&RubySchemaField>) {
-        self.inner
             .schema_multiline(&name, fields.into_iter().map(|field| field.inner.clone()));
     }
 
     pub fn derive(&mut self, path: String, schemas: Vec<String>) {
         self.inner.derive(&path, schemas);
-    }
-
     pub fn import(&mut self, path: String) {
         self.inner.import(&path);
+        Ok(Self { inner: doc })
     }
 
     pub fn type_alias(&mut self, alias: String, type_name: String) {
         self.inner.type_alias(&alias, &type_name);
-    }
-
-    pub fn as_string(&self) -> String {
+        .map_err(first_error)
         self.inner.as_string()
-    }
-}
-
-impl RubyAam {
-    pub fn new() -> Self {
-        Self { inner: AAM::new() }
-    }
-
-    pub fn parse(content: String) -> Result<Self, Error> {
-        let doc = AAM::parse(&content)
-            .map_err(first_error)
-            .map_err(|err| ruby_runtime_error(err.to_string()))?;
-        Ok(Self { inner: doc })
-    }
-
-    pub fn load(path: String) -> Result<Self, Error> {
-        let doc = AAM::load(&path)
-            .map_err(first_error)
-            .map_err(|err| ruby_runtime_error(err.to_string()))?;
         Ok(Self { inner: doc })
     }
 

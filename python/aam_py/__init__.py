@@ -1,12 +1,9 @@
 """aam_rs — compatibility shim for the aam-py Python bindings.
 
-The compiled Rust extension is ``aam_py``.  This package re-exports
-everything from there so users can use whichever name they prefer::
-
-    from aam_py import AAML   # primary
-    from aam_rs import AAML   # backward-compatible alias
+The compiled Rust extension is ``aam_py``. This package re-exports the
+current AAM API for compatibility with ``import aam_rs``.
 """
 
-from aam_py import AAML, __version__  # noqa: F401
+from aam_py import AAM, AAMBuilder, SchemaField, __version__  # noqa: F401
 
-__all__ = ["AAML", "__version__"]
+__all__ = ["AAM", "AAMBuilder", "SchemaField", "__version__"]

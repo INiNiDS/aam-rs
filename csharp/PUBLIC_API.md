@@ -21,9 +21,6 @@ Source of truth: `csharp/src/AamDocument.cs`, `csharp/src/AamBuilder.cs`.
 - `string[] ReverseSearch(string value)`
 - `string[] SchemaNames()`
 - `string[] TypeNames()`
-- `string? FindObj(string key)`
-- `string? FindKey(string value)`
-- `string? FindDeep(string key)`
 
 ## Builder API
 
@@ -50,5 +47,5 @@ Source of truth: `csharp/src/AamDocument.cs`, `csharp/src/AamBuilder.cs`.
 
 ## Error Model
 
-- Throws `AamException` for native parse/load/merge/format/recovery failures.
+- Throws `AamException` for native parse/load/format/query failures.
 - Throws `ObjectDisposedException` when using a closed instance.

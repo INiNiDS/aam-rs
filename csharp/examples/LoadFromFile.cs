@@ -1,6 +1,6 @@
 using AamCsharp;
 
-Console.WriteLine("=== C# AAML Configuration Example ===\n");
+Console.WriteLine("=== C# AAM Configuration Example ===\n");
 
 try
 {
@@ -9,43 +9,36 @@ try
     using var config = AamDocument.Load("config.aam");
 
     Console.WriteLine("\n--- Application Info ---");
-    Console.WriteLine($"Application: {config.FindObj("app_name")} v{config.FindObj("app_version")}");
-    Console.WriteLine($"Environment: {config.FindObj("environment")}");
+    Console.WriteLine($"Application: {config.Get("app_name")} v{config.Get("app_version")}");
+    Console.WriteLine($"Environment: {config.Get("environment")}");
 
     Console.WriteLine("\n--- Server Configuration ---");
-    Console.WriteLine($"Host: {config.FindObj("server_host")}");
-    Console.WriteLine($"Port: {config.FindObj("server_port")}");
-    Console.WriteLine($"Timeout: {config.FindObj("server_timeout")}ms");
+    Console.WriteLine($"Host: {config.Get("server_host")}");
+    Console.WriteLine($"Port: {config.Get("server_port")}");
+    Console.WriteLine($"Timeout: {config.Get("server_timeout")}ms");
 
     Console.WriteLine("\n--- Database Configuration ---");
-    Console.WriteLine($"Type: {config.FindObj("db_type")}");
-    Console.WriteLine($"Host: {config.FindObj("db_host")}:{config.FindObj("db_port")}");
-    Console.WriteLine($"Database: {config.FindObj("db_name")}");
-    Console.WriteLine($"Max Connections: {config.FindObj("db_max_connections")}");
+    Console.WriteLine($"Type: {config.Get("db_type")}");
+    Console.WriteLine($"Host: {config.Get("db_host")}:{config.Get("db_port")}");
+    Console.WriteLine($"Database: {config.Get("db_name")}");
+    Console.WriteLine($"Max Connections: {config.Get("db_max_connections")}");
 
     Console.WriteLine("\n--- Logging Settings ---");
-    Console.WriteLine($"Level: {config.FindObj("log_level")}");
-    Console.WriteLine($"Format: {config.FindObj("log_format")}");
-    Console.WriteLine($"Output: {config.FindObj("log_output")}");
+    Console.WriteLine($"Level: {config.Get("log_level")}");
+    Console.WriteLine($"Format: {config.Get("log_format")}");
+    Console.WriteLine($"Output: {config.Get("log_output")}");
 
     Console.WriteLine("\n--- Feature Flags ---");
-    Console.WriteLine($"Analytics: {config.FindObj("feature_analytics")}");
-    Console.WriteLine($"Caching: {config.FindObj("feature_caching")}");
-    Console.WriteLine($"Debug Mode: {config.FindObj("feature_debug_mode")}");
+    Console.WriteLine($"Analytics: {config.Get("feature_analytics")}");
+    Console.WriteLine($"Caching: {config.Get("feature_caching")}");
+    Console.WriteLine($"Debug Mode: {config.Get("feature_debug_mode")}");
 
-    // Dynamic merging example
-    Console.WriteLine("\n--- Runtime Configuration Override ---");
-    var overrides = @"
-server_port = 9090
-environment = staging
-feature_debug_mode = true
-";
-
-    config.Merge(overrides);
-
-    Console.WriteLine($"Port after override: {config.FindObj("server_port")}");
-    Console.WriteLine($"Environment after override: {config.FindObj("environment")}");
-    Console.WriteLine($"Debug Mode after override: {config.FindObj("feature_debug_mode")}");
+    Console.WriteLine("\n--- Query by value with Find(...) ---");
+    var envMatches = config.Find("production");
+    foreach (var entry in envMatches)
+    {
+        Console.WriteLine($"{entry.Key}: {entry.Value}");
+    }
 }
 catch (DllNotFoundException ex)
 {

@@ -26,21 +26,21 @@ catch (DllNotFoundException ex)
 }
 catch (AamException ex)
 {
-    Console.WriteLine($"AAML error: {ex.Message}");
+    Console.WriteLine($"AAM error: {ex.Message}");
     Environment.ExitCode = 3;
 }
 
 static void RunBasic()
 {
     using var doc = AamDocument.Parse("host = localhost\nport = 8080");
-    Console.WriteLine($"host={doc.FindObj("host")}");
-    Console.WriteLine($"port={doc.FindObj("port")}");
+    Console.WriteLine($"host={doc.Get("host")}");
+    Console.WriteLine($"port={doc.Get("port")}");
 }
 
 static void RunLoad()
 {
     using var doc = AamDocument.Load("config.aam");
-    Console.WriteLine($"app_name={doc.FindObj("app_name")}");
-    Console.WriteLine($"environment={doc.FindObj("environment")}");
+    Console.WriteLine($"app_name={doc.Get("app_name")}");
+    Console.WriteLine($"environment={doc.Get("environment")}");
 }
 
