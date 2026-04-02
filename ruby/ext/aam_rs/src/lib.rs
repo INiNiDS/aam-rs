@@ -31,16 +31,13 @@ impl RubyAam {
     }
 
     pub fn parse(content: String) -> Result<Self, Error> {
-        let mut doc = AAM::new();
-        doc.parse(&content)
-            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
+        let mut doc =
+            AAM::parse(&content).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
     pub fn load(path: String) -> Result<Self, Error> {
-        let mut doc = AAM::new();
-        doc.load(&path)
-            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
+        let doc = AAM::load(path).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
         Ok(Self { inner: doc })
     }
 
@@ -151,12 +148,12 @@ impl RubyAamBuilder {
         self.inner.borrow_mut().comment(&text);
     }
 
-    pub fn schema(&self, name: String, fields: Vec<&RubySchemaField>) {
+    pub fn schema(&self, name: String, fields: Vec<RubySchemaField>) {
         let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
         self.inner.borrow_mut().schema(&name, fields_raw);
     }
 
-    pub fn schema_multiline(&self, name: String, fields: Vec<&RubySchemaField>) {
+    pub fn schema_multiline(&self, name: String, fields: Vec<RubySchemaField>) {
         let fields_raw: Vec<SchemaField> = fields.into_iter().map(|f| f.inner.clone()).collect();
         self.inner.borrow_mut().schema_multiline(&name, fields_raw);
     }
