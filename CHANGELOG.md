@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.1](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.0...aam-rs-v2.0.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* Fixed paths in release.yml ([907be1a](https://github.com/INiNiDS/aam-rs/commit/907be1a9e70416a0bde5f68ac87412eaaca7b663))
+* fixed versions ([64d3190](https://github.com/INiNiDS/aam-rs/commit/64d31908536498eb20a2b4313c9e0274e91d3e4e))
+* update README and release-please config for version 2.0.0 ([5d53957](https://github.com/INiNiDS/aam-rs/commit/5d539577b2b63c9c1fc4eb6841c9e55091c541d8))
+
 ## [2.0.0](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v1.4.0...aam-rs-v2.0.0) (2026-04-02)
 
 

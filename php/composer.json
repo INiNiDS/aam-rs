@@ -1,6 +1,6 @@
 {
   "name": "ininids/aam-php",
-  "version": "1.4.0",
+  "version": "2.0.1",
   "description": "AAM PHP bindings",
   "type": "library",
   "license": "MIT OR Apache-2.0",

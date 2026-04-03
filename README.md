@@ -25,7 +25,7 @@ Add the library to your `Cargo.toml`:
 <!-- x-release-please-start-version -->
 ```toml
 [dependencies]
-aam-rs = "2.0.0"
+aam-rs = "2.0.1"
 ```
 
 <!-- x-release-please-start-version -->
@@ -192,7 +192,7 @@ builder.comment("Server configuration")
            SchemaField::required("port",  "port_t"),
            SchemaField::optional("debug", "bool"),
        ])
-       .add_line("host", "127.0.0.1")
+       .add_line("host", "2.0.1.1")
        .add_line("port", "8000");
 
 // Save to file
