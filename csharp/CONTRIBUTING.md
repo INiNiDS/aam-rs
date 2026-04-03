@@ -145,7 +145,7 @@ The version is automatically managed by `release-please`. The version is specifi
 
 ```xml
 
-<Version>1.4.0</Version> <!-- x-release-please-version -->
+<Version>2.0.1</Version> <!-- x-release-please-version -->
 ```
 
 ## CI/CD
