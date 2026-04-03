@@ -4,25 +4,52 @@
       "release-type": "rust",
       "extra-files": [
         "Cargo.toml",
-        "README.md",
-        "README_PY.md",
         "java/build.gradle.kts",
         "csharp/aam-csharp.csproj",
         "ruby/aam-ruby.gemspec",
-        "js/Cargo.toml",
-        "ruby/ext/aam_rs/Cargo.toml",
         "js/package.json",
-        "js/npm/linux-x64-gnu/package.json",
-        "js/npm/darwin-x64/package.json",
-        "js/npm/darwin-arm64/package.json",
-        "js/npm/win32-x64-msvc/package.json",
-        "wasm/Cargo.toml",
-        "wasm/README.md",
-        "js/README.md",
-        "ruby/README.md",
-        "php/README.md",
-        "go/README.md",
-        "csharp/README.md"
+        {
+          "type": "json",
+          "path": "js/package.json",
+          "jsonpath": "$.optionalDependencies['aam-nodejs-darwin-arm64']"
+        },
+        {
+          "type": "json",
+          "path": "js/package.json",
+          "jsonpath": "$.optionalDependencies['aam-nodejs-linux-x64-gnu']"
+        },
+        {
+          "type": "json",
+          "path": "js/package.json",
+          "jsonpath": "$.optionalDependencies['aam-nodejs-win32-x64-msvc']"
+        },
+        {
+          "type": "json",
+          "path": "js/package.json",
+          "jsonpath": "$.optionalDependencies['aam-nodejs-darwin-x64']"
+        },
+        {
+          "type": "toml",
+          "path": "js/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "ruby/ext/aam_rs/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "wasm/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "json",
+          "path": "php/composer.json",
+          "jsonpath": "$.version"
+        },
+        "csharp/CONTRIBUTING.md",
+        "README.md"
       ]
     }
   }

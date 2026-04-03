@@ -21,10 +21,14 @@ You can find documentation and examples for the format in the [docs](https://aam
 
 Add the library to your `Cargo.toml`:
 
+
+<!-- x-release-please-start-version -->
 ```toml
 [dependencies]
-aam-rs = "1.4.0" 
+aam-rs = "2.0.0"
 ```
+
+<!-- x-release-please-start-version -->
 
 ### Node.js / N-API
 
