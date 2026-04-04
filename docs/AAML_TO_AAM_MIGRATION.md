@@ -36,7 +36,7 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
         content: String::new(),
         details: "unknown parse error".to_string(),
         diagnostics: None,
-    })
+    }) // It's highly recommended to handle all errors properly instead of just taking the first one, but this is a simple helper for quick migration.
 }
 
 let cfg = AAM::parse(src).map_err(first_error)?;

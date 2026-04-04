@@ -1,295 +1,244 @@
 # AAM (Abstract Alias Mapping)
 
-A robust and lightweight configuration parser for Rust that supports key-value pairs, recursive dependency resolution, file imports, and bidirectional lookups. Designed for applications that need flexible configuration files with references, aliases, and a modular structure.
+A robust and lightweight configuration library for Rust built around the new pipeline-backed `AAM` API.
+It parses `.aam` files (`key = value`), supports directives (`@import`, `@derive`, `@schema`, `@type`), and provides
+fast query and formatting utilities.
+
+## What changed in 2.x
+
+- `AAM` is now the primary API.
+- Parsing/loading returns `Result<_, Vec<AamlError>>` to preserve full diagnostics.
+- Query methods are now centered around `get`, `find`, `find_by`, `deep_search`, and `reverse_search`.
+- Pipeline formatter and LSP helper methods are available directly on `AAM`.
+- `AAML` remains available for backward compatibility, but is deprecated.
 
 ## Features
 
-- **Simple syntax**: A `key = value` format that is easy to read and write.
-- **Import support**: The `@import` directive lets you split configuration into multiple files.
-- **Comments support**: Lines starting with `#` are treated as comments.
-- **Deep resolution (`find_deep`)**: Automatically resolves chains of references (e.g., `A -> B -> C`) to find the final value.
-- **Loop detection**: Safely handles circular dependencies (e.g., `A -> B -> A`) without stack overflows.
-- **Bidirectional lookup (`find_obj`)**: Looks up a value by key, or performs a reverse lookup (finds a key by value) when the key is missing.
-- **Config builder (`AAMBuilder`)**: Programmatically generate and save `.aam` files.
-- **Configuration merging**: Supports the `+` operator to combine two `AAML` instances.
-- **Typed errors**: Detailed parsing and I/O error handling via `AamlError`.
+- Simple `key = value` syntax.
+- Directive support: `@import`, `@derive`, `@schema`, `@type`.
+- Schema/type validation via pipeline.
+- Search helpers for key lookup, reverse lookup, and predicate filtering.
+- Formatter utilities (`format`, `format_range`) and LSP assist (`lsp_assist`).
+- Optional AOT loading (`.aam.bin`) for fast startup (`aot` feature; enabled by default).
+- Fluent config generation with `AAMBuilder`.
 
 ## Format
-You can find documentation and examples for the format in the [docs](https://aam.ininids.in.rs/)
+
+You can find syntax documentation and examples at:
+https://aam.ininids.in.rs/
 
 ## Installation
 
-Add the library to your `Cargo.toml`:
-
+Add the crate to your `Cargo.toml`:
 
 <!-- x-release-please-start-version -->
 ```toml
 [dependencies]
 aam-rs = "2.0.1"
 ```
-
 <!-- x-release-please-start-version -->
 
-### Node.js / N-API
-
-Install the Node.js bindings from npm:
-
-```bash
-npm install aam-nodejs
-```
-
-The package ships prebuilt native addons for:
-
-- Linux x64 (GNU libc)
-- macOS x64
-- macOS arm64
-- Windows x64
-
-```js
-const {parse, AAMBuilder} = require('aam-nodejs')
-
-const cfg = parse('host = localhost\nport = 8080')
-console.log(cfg.get('host'))
-
-const b = new AAMBuilder()
-b.addLine('theme', 'dark')
-console.log(b.asString())
-```
-
-### C# / .NET
-
-Install the C# bindings from NuGet:
-
-```bash
-dotnet add package aam-csharp
-```
-
-The binding uses the native `aam_rs` library via FFI.
-
-```сsharp
-using AamCsharp;
-
-using var cfg = AamDocument.Parse("host = localhost\nport = 8080");
-Console.WriteLine(cfg.FindObj("host"));
-
-cfg.Merge("theme = dark");
-Console.WriteLine(cfg.FindObj("theme"));
-```
-
-## Configuration syntax (.aam)
-
-The format is line-based. Whitespace around keys and values is trimmed. Strings can be quoted.
+## Configuration syntax (`.aam`)
 
 ```aam
-# This is a comment
+# Comments are supported
 host = "localhost"
 port = 8080
 
-# Import other configuration files
 @import database.aam
 @import theme.aam
 
-# You can define aliases for deep lookup
-base_path = /var/www
-current_path = base_path
-
-# Circular references are handled safely
-loop_a = loop_b
-loop_b = loop_a
-```
-
-## Usage guide
-
-### 1) Parsing and loading
-
-You can parse configuration from a string, load it from a file, or merge multiple sources. Errors are handled via `AamlError`.
-
-```rust
-use aaml::aaml::AAML;
-use aaml::error::AamlError;
-
-fn main() -> Result<(), AamlError> {
-    // 1. Parse from string
-    let content = "
-        username = admin
-        timeout = 30
-    ";
-    let config = AAML::parse(content)?;
-
-    // 2. Load from file (supports @import directives)
-    let file_config = AAML::load("config.aam")?;
-
-    Ok(())
+@type port_t = i32
+@schema Service {
+    host: string
+    port: port_t
 }
 ```
 
-### 2) Merging configurations
+## Usage (new `AAM` API)
 
-Combine different `AAML` objects using the addition operator.
-
-```rust
-let mut config1 = AAML::parse("a = 1")?;
-let config2 = AAML::parse("b = 2")?;
-
-// Merge (config2 overwrites matching keys in config1)
-config1 += config2;
-// or: let config3 = config1 + config2;
-```
-
-### 3) Smart lookup (find_obj)
-
-`find_obj` is a hybrid lookup method. It first tries to find a value by the given key. If the key does not exist, it searches for a key whose value matches the provided string.
+### 1) Parse and load
 
 ```rust
-let content = "
-    # Key = Value
-    app_mode = production
-    debug    = false
-";
-let config = AAML::parse(content)?;
+use aam_rs::aam::AAM;
+use aam_rs::error::AamlError;
 
-// Scenario A: Direct key lookup
-let mode = config.find_obj("app_mode").unwrap();
-assert_eq!(mode, "production");
+fn print_errors(errors: &[AamlError]) {
+    for err in errors {
+        eprintln!("{err}");
+    }
+}
 
-// Scenario B: Reverse lookup
-// "production" is not a key, so it looks for a key with value "production"
-let key = config.find_obj("production").unwrap();
-assert_eq!(key, "app_mode");
+fn main() {
+    let inline = "host = localhost\nport = 8080";
+
+    match AAM::parse(inline) {
+        Ok(cfg) => {
+            if let Some(host) = cfg.get("host") {
+                println!("host = {host}");
+            }
+        }
+        Err(errors) => {
+            print_errors(&errors);
+        }
+    }
+}
 ```
 
-### 4) Deep recursive lookup (find_deep)
-
-This is useful for aliasing. It follows values as keys until it reaches a value that is not present as a key, or until a loop is detected.
+### 2) Lookups and queries
 
 ```rust
-let content = "
-    root = /usr/bin
-    executable = root
-    service = executable
-";
-let config = AAML::parse(content)?;
+use aam_rs::aam::AAM;
 
-// Traces: "service" -> "executable" -> "root" -> "/usr/bin"
-let final_val = config.find_deep("service").unwrap();
-assert_eq!(final_val, "/usr/bin");
+let cfg = AAM::parse(
+    "
+app_mode = production
+backup_mode = production
+api_port = 8080
+"
+).unwrap();
+
+// O(1) key lookup
+assert_eq!(cfg.get("api_port"), Some("8080"));
+
+// key-first lookup, then reverse lookup by value
+let found = cfg.find("production");
+assert_eq!(found.len(), 2);
+
+// reverse lookup only
+let keys = cfg.reverse_search("production");
+assert_eq!(keys.len(), 2);
+
+// key pattern search
+let deep = cfg.deep_search("mode");
+assert_eq!(deep.len(), 2);
+
+// custom predicate
+let filtered = cfg.find_by(|k, v| k.ends_with("_port") && v == "8080");
+assert_eq!(filtered, vec![("api_port", "8080")]);
 ```
 
-**Handling loops**: If the configuration contains a loop (e.g., `a=b`, `b=a`), `find_deep` returns the last unique value visited before the loop closes, preventing infinite recursion.
+### 3) Iteration and extraction
 
-### 5) Building configurations (AAMBuilder)
+```rust
+use aam_rs::aam::AAM;
 
-Use `AAMBuilder` to generate configuration files programmatically.
+let cfg = AAM::parse("a = 1\nb = 2").unwrap();
+
+for (k, v) in cfg.iter() {
+    println!("{k} = {v}");
+}
+
+let keys = cfg.keys();
+let map = cfg.to_map();
+assert!(keys.contains(&"a"));
+assert_eq!(map.get("b"), Some(&"2".to_string()));
+```
+
+### 4) Formatting and LSP helper
+
+```rust
+use aam_rs::aam::AAM;
+use aam_rs::pipeline::{FormatRange, FormattingOptions};
+
+let cfg = AAM::new();
+let src = "host=localhost\nport=8080";
+
+let formatted = cfg.format(src, &FormattingOptions::default()).unwrap();
+let _range = cfg
+    .format_range(
+        src,
+        FormatRange { start_line: 1, end_line: 1 },
+        &FormattingOptions::default(),
+    )
+    .unwrap();
+
+let assist = AAM::lsp_assist(&formatted, &FormattingOptions::default());
+assert!(assist.diagnostics.is_empty());
+```
+
+### 5) Builder (`AAMBuilder`)
 
 ```rust
 use aam_rs::builder::{AAMBuilder, SchemaField};
 
 let mut builder = AAMBuilder::new();
-builder.comment("Server configuration")
-       .type_alias("port_t", "i32")
-       .schema("Server", [
-           SchemaField::required("host",  "string"),
-           SchemaField::required("port",  "port_t"),
-           SchemaField::optional("debug", "bool"),
-       ])
-       .add_line("host", "2.0.1.1")
-       .add_line("port", "8000");
+builder
+    .comment("Server configuration")
+    .type_alias("port_t", "i32")
+    .schema("Server", [
+        SchemaField::required("host", "string"),
+        SchemaField::required("port", "port_t"),
+        SchemaField::optional("debug", "bool"),
+    ])
+    .add_line("host", "127.0.0.1")
+    .add_line("port", "8080");
 
-// Save to file
-builder.to_file("generated_config.aam");
-
-// Or convert to string
-println!("{}", builder);
+println!("{}", builder.as_string());
+builder.to_file("generated_config.aam").unwrap();
 ```
 
-### 6) Working with FoundValue
+## Legacy API (`AAML`, deprecated)
 
-Lookup results are wrapped in a `FoundValue` struct. It implements `Deref<Target=String>` and `Display`, so you can use it like a regular `&str` or `String`. It also provides helper methods for in-place modification.
+`AAML` is still available for compatibility and supports methods such as:
 
-```rust
-let config = AAML::parse("greeting = Hello World")?;
-let mut value = config.find_obj("greeting").unwrap();
+- `parse`, `load`
+- `merge_content`, `merge_file`
+- `find_obj`, `find_key`, `find_deep`
+- `validate_value`, `apply_schema`, `validate_schemas_completeness`
 
-// Use as a string
-println!("Original: {}", value); // Prints: Hello World
+For migration guidance, see `docs/AAML_TO_AAM_MIGRATION.md`.
 
-// Modify in-place using the helper method
-value.remove(" World");
-assert_eq!(value.as_str(), "Hello");
+## Bindings
+
+### Node.js / N-API
+
+```bash
+npm install aam-nodejs
 ```
 
-### 7) Directives example (`@type`, `@schema`, `@import`)
+### C# / .NET
 
-```aam
-@type port_t = i32
-
-@schema Service {
-    host: string
-    port: port_t
-}
-
-@import service_defaults.aam
-
-host = localhost
-port = 8080
+```bash
+dotnet add package aam-csharp
 ```
-
-This gives schema-checked assignments while still allowing modular config composition.
 
 ## Quick verification commands
 
 ```bash
 cargo test
-node --test js/test/*.test.js
-go test ./go/...
-dotnet test csharp/AamCsharp.sln
-ruby ruby/tests/test_aam_rs.rb
-php php/tests/smoke.php
+cargo run --example standard
+cargo run --example advanced
 ```
 
-## API reference
+## API reference (high-level)
 
-### AAML
+### `AAM`
 
-- `parse(content: &str) -> Result<Self, AamlError>`: Parses a string into an AAML map.
-- `load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError>`: Loads and parses a file, handling imports.
-- `merge_content(&mut self, content: &str) -> Result<(), AamlError>`: Merges content into the current instance.
-- `merge_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), AamlError>`: Reads a file and merges it.
-- `find_obj(&self, key: &str) -> Option<FoundValue>`: Smart bidirectional lookup.
-- `find_deep(&self, key: &str) -> Option<FoundValue>`: Recursive lookup with loop detection.
-- `find_key(&self, value: &str) -> Option<FoundValue>`: Strict reverse lookup (find key by value).
+- Constructors/loaders: `new`, `parse`, `load`, `from_pipeline`
+- Query: `get`, `find`, `find_by`, `deep_search`, `reverse_search`
+- Iteration/export: `iter`, `keys`, `to_map`
+- Introspection: `schemas`, `get_schema`, `types`, `get_type`
+- Formatting/LSP: `format`, `format_range`, `lsp_assist`
+- AOT (feature-gated): `cook`, `load_fast`
 
-### AAMBuilder
+### `AAMBuilder`
 
-- `new() -> Self`: Creates a new builder.
-- `add_line(key: &str, value: &str)`: Adds a `key = value` pair.
-- `comment(text: &str)`: Adds a `# text` comment line.
-- `schema(name: &str, fields: impl IntoIterator<Item = SchemaField>)`: Adds a `@schema Name { ... }` directive (inline).
-- `schema_multiline(name: &str, fields: impl IntoIterator<Item = SchemaField>)`: Adds a `@schema Name { ... }` directive (one field per line).
-- `derive(path: &str, schemas: impl IntoIterator<Item = impl AsRef<str>>)`: Adds a `@derive path[::Schema...]` directive.
-- `import(path: &str)`: Adds a `@import path` directive.
-- `type_alias(alias: &str, type_name: &str)`: Adds a `@type alias = type_name` directive.
-- `add_raw(raw_line: &str)` *(deprecated)*: Adds a raw line as-is. Prefer the typed methods above.
-- `to_file<P: AsRef<Path>>(&self, path: P)`: Writes the buffer to a file.
+- `new`, `with_capacity`
+- `add_line`, `comment`
+- `schema`, `schema_multiline`, `derive`, `import`, `type_alias`
+- `to_file`, `build`, `as_string`
 
-### AamlError
+### `AamlError`
 
-- `IoError`: Wraps standard I/O errors.
-- `ParseError`: Syntax errors (includes line number and details).
-- `NotFound`: Key not found (internal use).
+Typed errors used across parser, validator, and runtime paths.
 
 ## License
 
-See the `LICENSE` file.
+See `LICENSE-MIT` and `LICENSE-APACHE`.
 
-## Full Documentation
-Full API documentation is available at [docs.rs/aaml](https://docs.rs/aaml/) or in [main documentation of AAM](https://aam.ininids.in.rs).
+## Full documentation
 
-# Coming Soon
+- Docs.rs: https://docs.rs/aam-rs/
+- Project docs: https://aam.ininids.in.rs/
 
-- AAM CLI for terminal
-- More languages
-- AAM v2
-- Performance optimizations
-- More examples
-- New documentation site update
