@@ -430,6 +430,13 @@ impl Pipeline {
             .schemas
             .iter()
             .filter(|(schema_name, _)| !referenced_schemas.contains(schema_name.as_str()))
+            // Only implicitly apply root schemas if at least one of their fields is present in the context map
+            .filter(|(_, schema)| {
+                schema
+                    .fields
+                    .keys()
+                    .any(|f| context.map.contains_key(f.as_str()))
+            })
             .flat_map(|(schema_name, schema)| {
                 schema
                     .fields
