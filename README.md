@@ -4,6 +4,8 @@ A robust and lightweight configuration library for Rust built around the new pip
 It parses `.aam` files (`key = value`), supports directives (`@import`, `@derive`, `@schema`, `@type`), and provides
 fast query and formatting utilities.
 
+> **The Origin Story:** AAM was born out of necessity during the development of [rustgames](https://github.com/ininids/rustgames). I needed a configuration format that lived entirely outside the codebase, supported high-speed bidirectional search, and was optimized for extreme performance. What started as a specialized tool for game engine internals eventually evolved into a robust configuration ecosystem with schemas, imports, and AOT compilation.
+> 
 ## Why AAM?
 
 AAM was designed to solve the "configuration fatigue" in large-scale Rust projects. While formats like TOML are great for simple key-value pairs, they often fall short when your config grows. AAM introduces:
