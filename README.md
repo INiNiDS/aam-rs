@@ -4,6 +4,25 @@ A robust and lightweight configuration library for Rust built around the new pip
 It parses `.aam` files (`key = value`), supports directives (`@import`, `@derive`, `@schema`, `@type`), and provides
 fast query and formatting utilities.
 
+## Why AAM?
+
+AAM was designed to solve the "configuration fatigue" in large-scale Rust projects. While formats like TOML are great for simple key-value pairs, they often fall short when your config grows. AAM introduces:
+
+* **Type Safety & Schemas:** Define `@type` aliases and `@schema` structures directly in the config. No more "guessing" what a value should be.
+* **Modular Architecture:** Use `@import` to split massive configs into clean, manageable modules.
+* **AOT Performance:** Optional Ahead-of-Time compilation "cooks" your `.aam` files into a binary format for near-instant loading.
+* **Developer-Centric:** Built-in LSP support and formatting help you catch errors *before* you run the code.
+
+### AAM vs TOML
+
+| Feature | AAM | TOML |
+| :--- | :--- | :--- |
+| **Schema Validation** | Native (`@schema`) | External tools only |
+| **Modular Imports** | Native (`@import`) | Not supported |
+| **Type Aliasing** | Native (`@type`) | No |
+| **Performance** | High (AOT/Binary) | Standard (Text parsing) |
+| **Extensibility** | Pipeline-backed | Static |
+
 ## What changed in 2.x
 
 - `AAM` is now the primary API.
@@ -232,6 +251,23 @@ cargo run --example advanced
 ### `AamlError`
 
 Typed errors used across parser, validator, and runtime paths.
+
+## Ecosystem Tooling
+
+### AAM CLI
+For managing, formatting, and "cooking" your configuration files, check out the [aam-cli](https://github.com/ininids/aam-cli).
+
+**Installation:**
+```bash
+cargo install aam-cli
+```
+Key features:
+ * Cook: Convert .aam to binary .aam.bin for AOT loading.
+ * Format: Keep your config files clean and consistent.
+ * Check: Validate syntax and schema integrity from the terminal.
+
+### AAM Examples
+If you need more examples, check [aam-examples repository](https://github.com/ininids/aam-examples)
 
 ## License
 
