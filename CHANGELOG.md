@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.1...aam-rs-v2.0.2) (2026-04-08)
+
+
+### Bug Fixes
+
+* Fixed schema validation ([47d8fad](https://github.com/INiNiDS/aam-rs/commit/47d8fadd1d6abbed1c541396540ea9916977b7d5))
+* update migration guide, build.yml, and README for clarity and accuracy ([727ad5c](https://github.com/INiNiDS/aam-rs/commit/727ad5c3fc8c5e9ef4887d1878884c75ae74cb90))
+
 ## [2.0.1](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.0...aam-rs-v2.0.1) (2026-04-03)
 
 
