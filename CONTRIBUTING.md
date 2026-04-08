@@ -1,4 +1,4 @@
-# Contributing to AAML
+# Contributing to AAM
 
 First off, thank you for considering contributing to AAML! It's people like you that make open source software such an amazing place to learn, inspire, and create.
 
