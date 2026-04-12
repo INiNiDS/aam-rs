@@ -573,8 +573,6 @@ jobs:
           cp node-artifacts/aam_rs_node.win32-x64-msvc.node js/npm/win32-x64-msvc/
       - name: Publish platform packages
         working-directory: ./js
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
         run: |
           npm publish ./npm/linux-x64-gnu --access public --provenance
           npm publish ./npm/darwin-x64 --access public --provenance
@@ -583,8 +581,6 @@ jobs:
       - name: Publish main package
         working-directory: ./js
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
 
   publish-npm-github:
     name: Publish Node package to GitHub Packages
@@ -637,8 +633,6 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Publish WASM package to npm
         working-directory: ./wasm-pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN || secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
 
   build-c-libs:
