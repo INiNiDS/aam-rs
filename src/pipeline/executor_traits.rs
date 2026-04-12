@@ -725,6 +725,10 @@ impl DefaultParserExecutor {
 
             let sub_tasks = parser.generate_parse_tasks(&parse_output.ast);
             for sub_task in sub_tasks {
+                if let ParseTask::ProcessVariable { .. } = sub_task {
+                    // Do not import variables during derive - only schemas and types
+                    continue;
+                }
                 self.execute_parse(&sub_task, arena, context)?;
             }
 

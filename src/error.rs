@@ -11,7 +11,7 @@ pub(crate) struct ErrorRenderContext {
     source: String,
 }
 
-std::thread_local! {
+thread_local! {
     static ERROR_RENDER_CONTEXT: RefCell<ErrorRenderContext> = RefCell::new(ErrorRenderContext {
         path: "<raw_string>".to_string(),
         source: String::new(),

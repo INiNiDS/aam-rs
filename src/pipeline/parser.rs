@@ -446,6 +446,46 @@ impl DefaultParser {
         (args, arg_pos)
     }
 
+    fn validate_schema_directive_args(line: usize, trimmed_args: &str) -> Result<(), AamlError> {
+        let (name_part, body_opt) = trimmed_args.split_once('{').unwrap_or((trimmed_args, ""));
+        if name_part.trim().is_empty() {
+            return Err(AamlError::ParseError {
+                line,
+                content: "@schema".to_string(),
+                details: "Schema name is missing".to_string(),
+                diagnostics: None,
+            });
+        }
+
+        if !trimmed_args.contains('{') || !trimmed_args.ends_with('}') {
+            return Err(AamlError::ParseError {
+                line,
+                content: "@schema".to_string(),
+                details: "Schema block must end with '}'".to_string(),
+                diagnostics: None,
+            });
+        }
+
+        let body = body_opt.trim_end_matches('}').trim();
+        for field in body.split(|c| c == ',' || c == '\n') {
+            let field = field.trim();
+            if field.is_empty() {
+                continue;
+            }
+
+            if !field.contains(':') {
+                return Err(AamlError::ParseError {
+                    line,
+                    content: "invalid schema field".to_string(),
+                    details: format!("Field '{}' must be of the form 'name: type'", field),
+                    diagnostics: None,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
     fn parse_directive<'a>(
         tokens_filtered: &[&Token<'a>],
         pos: &mut usize,
@@ -460,9 +500,14 @@ impl DefaultParser {
 
         *pos = arg_pos;
 
+        let trimmed_args = args.trim();
+        if &*dir_name == "schema" {
+            Self::validate_schema_directive_args(line, trimmed_args)?;
+        }
+
         Ok(AstNode::Directive {
             name: dir_name,
-            args: args.trim().to_string().into(),
+            args: trimmed_args.to_string().into(),
             body: None,
             line,
         })
@@ -504,6 +549,69 @@ impl DefaultParser {
                 let child_key = format!("{}.{}", key, field);
                 Self::emit_assignment_parse_tasks(tasks, child_key.into(), child_value, line);
             }
+        }
+    }
+
+    fn build_type_task<'a>(args: &str, line: usize) -> ParseTask<'a> {
+        let (type_name, type_spec) = args
+            .split_once('=')
+            .map(|(lhs, rhs)| (lhs.trim(), rhs.trim()))
+            .unwrap_or(("", ""));
+
+        ParseTask::RegisterType {
+            type_name: type_name.to_string().into(),
+            type_spec: type_spec.to_string().into(),
+            line,
+        }
+    }
+
+    fn build_schema_task<'a>(args: &str, line: usize) -> ParseTask<'a> {
+        let schema_name = args.split_whitespace().next().unwrap_or("").to_string();
+        let body = args
+            .split_once('{')
+            .and_then(|(_, b)| b.rsplit_once('}'))
+            .map(|(b, _)| b)
+            .unwrap_or("");
+        let fields = body
+            .split(|c: char| c == ',' || c == '\n')
+            .filter_map(|field_def| {
+                let (field_name, type_name) = field_def.split_once(':')?;
+                let field_name = field_name.trim();
+                let type_name = type_name.trim();
+
+                if field_name.is_empty() {
+                    return None;
+                }
+
+                Some(format!("{}:{}", field_name, type_name))
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+
+        ParseTask::RegisterSchema {
+            schema_name: schema_name.into(),
+            fields: fields.into(),
+            line,
+        }
+    }
+
+    fn build_directive_task<'a>(
+        name: &std::borrow::Cow<'a, str>,
+        args: &std::borrow::Cow<'a, str>,
+        line: usize,
+    ) -> ParseTask<'a> {
+        match &**name {
+            "type" => Self::build_type_task(args, line),
+            "schema" => Self::build_schema_task(args, line),
+            "derive" => ParseTask::ResolveDeriveImport {
+                derive_path: args.clone(),
+                line,
+            },
+            _ => ParseTask::ExecuteDirective {
+                directive_name: name.clone(),
+                arguments: args.clone(),
+                line,
+            },
         }
     }
 }
@@ -574,7 +682,6 @@ impl Parser for DefaultParser {
 
         ParseOutput { ast, errors }
     }
-
     fn generate_parse_tasks<'a>(&self, ast: &[AstNode<'a>]) -> Vec<ParseTask<'a>> {
         let mut tasks = Vec::new();
 
@@ -585,61 +692,10 @@ impl Parser for DefaultParser {
                 }
                 AstNode::Directive {
                     name, args, line, ..
-                } => {
-                    if &**name == "type" {
-                        let (type_name, type_spec) = args
-                            .split_once('=')
-                            .map(|(lhs, rhs)| (lhs.trim(), rhs.trim()))
-                            .unwrap_or(("", ""));
-
-                        tasks.push(ParseTask::RegisterType {
-                            type_name: type_name.to_string().into(),
-                            type_spec: type_spec.to_string().into(),
-                            line: *line,
-                        });
-                    } else if &**name == "schema" {
-                        let name_part = args.split_whitespace().next().unwrap_or("").to_string();
-                        let body = args
-                            .split_once('{')
-                            .and_then(|(_, b)| b.rsplit_once('}'))
-                            .map(|(b, _)| b)
-                            .unwrap_or("");
-                        let parsed_fields = body
-                            .split(|c: char| c == ',' || c == '\n')
-                            .filter_map(|field_def| {
-                                let (field_name, type_name) = field_def.split_once(':')?;
-                                let field_name = field_name.trim();
-                                let type_name = type_name.trim();
-
-                                if field_name.is_empty() {
-                                    return None;
-                                }
-
-                                Some(format!("{}:{}", field_name, type_name))
-                            })
-                            .collect::<Vec<_>>()
-                            .join(",");
-
-                        tasks.push(ParseTask::RegisterSchema {
-                            schema_name: name_part.into(),
-                            fields: parsed_fields.into(),
-                            line: *line,
-                        });
-                    } else if &**name == "derive" {
-                        tasks.push(ParseTask::ResolveDeriveImport {
-                            derive_path: args.clone(),
-                            line: *line,
-                        });
-                    } else {
-                        tasks.push(ParseTask::ExecuteDirective {
-                            directive_name: name.clone(),
-                            arguments: args.clone(),
-                            line: *line,
-                        });
-                    }
-                }
+                } => tasks.push(Self::build_directive_task(name, args, *line)),
             }
         }
+
         tasks
     }
 

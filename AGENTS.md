@@ -132,3 +132,11 @@ When making a change that can affect users:
 
 If you are not sure whether a change is public-facing, treat it as public and update docs.
 
+## Context management for AI agents
+
+### Types duplication (types/ vs types_aam/)
+
+`src/types/` and `src/types_aam/` contain ~95% identical code with different trait implementations
+(`Type` for AAML vs `TypeAAM` for pipeline). This is architectural debt — future refactoring should
+use generics or macros to generate both from a single source. Until then, always update both in parallel.
+
