@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.2...aam-rs-v2.0.3) (2026-04-12)
+
+
+### Bug Fixes
+
+* enhance schema validation = ([1b1cba9](https://github.com/INiNiDS/aam-rs/commit/1b1cba9575859a1e69ce12be7eabd719edfe548d))
+
 ## [2.0.2](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.1...aam-rs-v2.0.2) (2026-04-08)
 
 
