@@ -4,51 +4,51 @@
       "release-type": "rust",
       "extra-files": [
         "Cargo.toml",
-        "java/build.gradle.kts",
-        "csharp/aam-csharp.csproj",
-        "ruby/aam-ruby.gemspec",
-        "js/package.json",
+        "bindings/java/build.gradle.kts",
+        "bindings/csharp/aam-csharp.csproj",
+        "bindings/ruby/aam-ruby.gemspec",
+        "bindings/js/package.json",
         {
           "type": "json",
-          "path": "js/package.json",
+          "path": "bindings/js/package.json",
           "jsonpath": "$.optionalDependencies['aam-nodejs-darwin-arm64']"
         },
         {
           "type": "json",
-          "path": "js/package.json",
+          "path": "bindings/js/package.json",
           "jsonpath": "$.optionalDependencies['aam-nodejs-linux-x64-gnu']"
         },
         {
           "type": "json",
-          "path": "js/package.json",
+          "path": "bindings/js/package.json",
           "jsonpath": "$.optionalDependencies['aam-nodejs-win32-x64-msvc']"
         },
         {
           "type": "json",
-          "path": "js/package.json",
+          "path": "bindings/js/package.json",
           "jsonpath": "$.optionalDependencies['aam-nodejs-darwin-x64']"
         },
         {
           "type": "toml",
-          "path": "js/Cargo.toml",
+          "path": "bindings/js/Cargo.toml",
           "jsonpath": "$.package.version"
         },
         {
           "type": "toml",
-          "path": "ruby/ext/aam_rs/Cargo.toml",
+          "path": "bindings/ruby/ext/aam_rs/Cargo.toml",
           "jsonpath": "$.package.version"
         },
         {
           "type": "toml",
-          "path": "wasm/Cargo.toml",
+          "path": "bindings/wasm/Cargo.toml",
           "jsonpath": "$.package.version"
         },
         {
           "type": "json",
-          "path": "php/composer.json",
+          "path": "bindings/php/composer.json",
           "jsonpath": "$.version"
         },
-        "csharp/CONTRIBUTING.md",
+        "bindings/csharp/CONTRIBUTING.md",
         "README.md"
       ]
     }

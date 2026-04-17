@@ -8,7 +8,7 @@ fn generate_csharp_bindings() {
         .csharp_class_name("AamNative")
         .csharp_namespace("AamCsharp")
         .csharp_use_function_pointer(false)
-        .generate_csharp_file("csharp/src/AamNative.cs")
+        .generate_csharp_file("bindings/csharp/src/AamNative.cs")
         .expect("Failed to generate C# bindings");
 }
 

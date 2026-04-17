@@ -4,7 +4,6 @@ use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use napi::{Error, Result, Status};
 use napi_derive::napi;
-use std::collections::HashMap;
 
 fn to_napi_error(err: AamlError) -> Error {
     Error::new(Status::GenericFailure, err.to_string())

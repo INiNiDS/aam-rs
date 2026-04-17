@@ -125,3 +125,7 @@ full_project_code.txt
 tmp/*
 
 Cargo.lock
+
+node_modules/
+bindings/csharp/**/bin/
+bindings/csharp/**/obj/

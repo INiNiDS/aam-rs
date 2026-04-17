@@ -34,16 +34,16 @@ Console.WriteLine(doc.FindObj("host"));
 
 ### Documentation
 
-- [C# README](csharp/README.md) - User guide
-- [C# CONTRIBUTING](csharp/CONTRIBUTING.md) - Development guide
+- [C# README](bindings/csharp/README.md) - User guide
+- [C# CONTRIBUTING](bindings/csharp/CONTRIBUTING.md) - Development guide
 - [Binding Generation Guide](docs/CSHARP_BINDING_GENERATION.md) - Technical details
 
 ### Local Development
 
 ```bash
-./csharp/setup-native.sh    # Linux/macOS
-csharp\setup-native.bat     # Windows
-cd csharp && dotnet test
+./bindings/csharp/setup-native.sh    # Linux/macOS
+bindings\csharp\setup-native.bat     # Windows
+cd bindings/csharp && dotnet test
 ```
 
 ---
@@ -65,7 +65,7 @@ print(doc.find_obj("host"))
 
 ### Documentation
 
-- See [Python README](python/)
+- See [Python README](bindings/python/)
 
 ---
 
@@ -86,7 +86,7 @@ console.log(doc.findObj("host"));
 
 ### Documentation
 
-- See [Node.js README](js/README.md)
+- See [Node.js README](bindings/js/README.md)
 
 ---
 
@@ -109,7 +109,7 @@ System.out.println(doc.findObj("host"));
 
 ### Documentation
 
-- See [Java README](java/)
+- See [Java README](bindings/java/)
 
 ---
 
@@ -135,7 +135,7 @@ func main() {
 
 ### Documentation
 
-- See [Go README](go/README.md)
+- See [Go README](bindings/go/README.md)
 
 ---
 
@@ -162,7 +162,7 @@ int main() {
 
 ### Documentation
 
-- See [C README](examples/c/)
+- See [C README](bindings/c/examples/)
 
 ---
 
@@ -216,28 +216,28 @@ fn main() {
 
 ```bash
 # Rust
-cargo build --release
+cargo build ./bindings/go --release
 
 # Python wheels
 pip install maturin
 maturin build --release
 
 # Node.js
-cd js && npm install && npm run build
+cd bindings/js && npm install && npm run build
 
 # Java
-cd java && ./gradlew build
+cd bindings/java && ./gradlew build
 
 # Go
-go build ./go
+go build ./bindings/go ./go
 
 # C/C++
-cargo build --release --features ffi
-cbindgen --config cbindgen.toml --output include/aam.h
+cargo build ./bindings/go --release --features ffi
+cbindgen --config cbindgen.toml --output bindings/c/include/aam.h
 
 # C# (NEW!)
-cargo build --release --features ffi,csharp
-cd csharp && dotnet build
+cargo build ./bindings/go --release --features ffi,csharp
+cd bindings/csharp && dotnet build
 ```
 
 ### Local Testing
@@ -247,19 +247,19 @@ cd csharp && dotnet build
 cargo test --all-features
 
 # Python tests
-cd python && python -m pytest
+cd bindings/python && python -m pytest
 
 # Node.js tests
-cd js && npm test
+cd bindings/js && npm test
 
 # Java tests
-cd java && ./gradlew test
+cd bindings/java && ./gradlew test
 
 # Go tests
-cd go && go test ./...
+cd bindings/go && go test ./...
 
 # C# tests
-cd csharp && dotnet test
+cd bindings/csharp && dotnet test
 ```
 
 ---
@@ -268,11 +268,11 @@ cd csharp && dotnet test
 
 Each language binding has its own contribution guidelines:
 
-- [C# CONTRIBUTING](csharp/CONTRIBUTING.md) - NEW!
-- [Python CONTRIBUTING](python/)
-- [Node.js CONTRIBUTING](js/README.md)
-- [Java CONTRIBUTING](java/)
-- [Go CONTRIBUTING](go/README.md)
+- [C# CONTRIBUTING](bindings/csharp/CONTRIBUTING.md) - NEW!
+- [Python CONTRIBUTING](bindings/python/)
+- [Node.js CONTRIBUTING](bindings/js/README.md)
+- [Java CONTRIBUTING](bindings/java/)
+- [Go CONTRIBUTING](bindings/go/README.md)
 
 ---
 

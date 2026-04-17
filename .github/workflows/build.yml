@@ -141,11 +141,11 @@ jobs:
           mkdir -p package/include package/lib/cmake/aam-c package/bin package/examples
           cbindgen --config cbindgen.toml --output package/include/aam-c.h
           cp LICENSE package/ 2>/dev/null || true
-          cp examples/c/*.c package/examples/ 2>/dev/null || true
-          cp examples/c/*.aam package/examples/ 2>/dev/null || true
-          cp examples/c/Makefile package/examples/ 2>/dev/null || true
-          cp examples/c/CMakeLists.txt package/examples/ 2>/dev/null || true
-          cp aam-cConfig.cmake package/lib/cmake/aam-c/ 2>/dev/null || true
+          cp bindings/c/examples/*.c package/examples/ 2>/dev/null || true
+          cp bindings/c/examples/*.aam package/examples/ 2>/dev/null || true
+          cp bindings/c/examples/Makefile package/examples/ 2>/dev/null || true
+          cp bindings/c/examples/CMakeLists.txt package/examples/ 2>/dev/null || true
+          cp bindings/c/aam-cConfig.cmake package/lib/cmake/aam-c/ 2>/dev/null || true
 
           if [ "${{ runner.os }}" == "Windows" ]; then
             cp target/release/aam_rs.dll package/bin/aam-c.dll
@@ -212,7 +212,7 @@ jobs:
         with:
           node-version: 24
       - name: Install Node.js dependencies
-        working-directory: ./js
+        working-directory: ./bindings/js
         run: npm install
       - name: Download CREDITS.html
         uses: actions/download-artifact@v4
@@ -220,15 +220,15 @@ jobs:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/js/
       - name: Build release addon
-        working-directory: ./js
+        working-directory: ./bindings/js
         run: npm run build
       - name: Upload addon artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: js/${{ matrix.binary }}
+          path: bindings/js/${{ matrix.binary }}
           retention-days: 1
 
   upload-node-to-release:
@@ -271,7 +271,7 @@ jobs:
           merge-multiple: true
           path: node-artifacts
       - name: Install Node.js dependencies
-        working-directory: ./js
+        working-directory: ./bindings/js
         run: npm install
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -281,15 +281,15 @@ jobs:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/js/
       - name: Populate platform packages
         run: |
-          cp node-artifacts/aam_rs_node.linux-x64-gnu.node js/npm/linux-x64-gnu/
-          cp node-artifacts/aam_rs_node.darwin-x64.node js/npm/darwin-x64/
-          cp node-artifacts/aam_rs_node.darwin-arm64.node js/npm/darwin-arm64/
-          cp node-artifacts/aam_rs_node.win32-x64-msvc.node js/npm/win32-x64-msvc/
+          cp node-artifacts/aam_rs_node.linux-x64-gnu.node bindings/js/npm/linux-x64-gnu/
+          cp node-artifacts/aam_rs_node.darwin-x64.node bindings/js/npm/darwin-x64/
+          cp node-artifacts/aam_rs_node.darwin-arm64.node bindings/js/npm/darwin-arm64/
+          cp node-artifacts/aam_rs_node.win32-x64-msvc.node bindings/js/npm/win32-x64-msvc/
       - name: Publish platform packages
-        working-directory: ./js
+        working-directory: ./bindings/js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -298,7 +298,7 @@ jobs:
           npm publish ./npm/darwin-arm64 --access public --provenance
           npm publish ./npm/win32-x64-msvc --access public --provenance
       - name: Publish main package
-        working-directory: ./js
+        working-directory: ./bindings/js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
@@ -316,7 +316,7 @@ jobs:
           node-version: 24
           registry-url: https://npm.pkg.github.com
       - name: Install Node.js dependencies
-        working-directory: ./js
+        working-directory: ./bindings/js
         run: npm install
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -326,9 +326,9 @@ jobs:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html js/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/js/
       - name: Publish scoped package to GitHub Packages
-        working-directory: ./js
+        working-directory: ./bindings/js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -349,10 +349,10 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
       - name: Build WASM package
-        working-directory: ./wasm
+        working-directory: ./bindings/wasm
         run: wasm-pack build --release --target nodejs --out-dir pkg
       - name: Run WASM tests
-        working-directory: ./wasm
+        working-directory: ./bindings/wasm
         run: |
           cargo test
           wasm-pack test --node
@@ -362,12 +362,12 @@ jobs:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html wasm/pkg/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/wasm/pkg/
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v7
         with:
           name: wasm-pkg
-          path: wasm/pkg
+          path: bindings/wasm/pkg
           retention-days: 1
 
   upload-wasm-to-release:
@@ -426,21 +426,21 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build Ruby extension
-        run: cargo build --manifest-path ruby/ext/aam_rs/Cargo.toml --release
+        run: cargo build --manifest-path bindings/ruby/ext/aam_rs/Cargo.toml --release
       - name: Download CREDITS.html
         uses: actions/download-artifact@v4
         with:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html ruby/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/ruby/
       - name: Fix Ruby Naming and Prepare Payload
         run: |
           # Фикс имени для сборки гема + патч файла
-          cp ruby/ext/aam_rs/target/release/libaam_ruby.so ruby/lib/aam_ruby.so 2>/dev/null || true
-          cp ruby/ext/aam_rs/target/release/libaam_rs_ruby.so ruby/lib/aam_rs_ruby.so 2>/dev/null || true
-          sed -i 's/libaam_ruby/aam_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
-          sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' ruby/lib/aam_rb.rb 2>/dev/null || true
+          cp bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/lib/aam_ruby.so 2>/dev/null || true
+          cp bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/lib/aam_rs_ruby.so 2>/dev/null || true
+          sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
+          sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
           cd ruby
           gem build aam-ruby.gemspec --output ../aam-ruby.gem
       - name: Upload Ruby artifact
@@ -517,10 +517,10 @@ jobs:
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
-          cp php/src/AamPhp.php php-pkg/src/
-          cp php/tests/smoke.php php-pkg/tests/
-          cp php/README.md php-pkg/ 2>/dev/null || true
-          cp php/composer.json php-pkg/ 2>/dev/null || true 
+          cp bindings/php/src/AamPhp.php php-pkg/src/
+          cp bindings/php/tests/smoke.php php-pkg/tests/
+          cp bindings/php/README.md php-pkg/ 2>/dev/null || true
+          cp bindings/php/composer.json php-pkg/ 2>/dev/null || true 
           cp target/release/libaam_rs.so php-pkg/native/
           cd php-pkg
           zip -r ../aam-php-package.zip ./*
@@ -567,7 +567,7 @@ jobs:
         run: |
           mkdir php-repo
           cd php-repo
-          unzip ../php-artifact/aam-php-package.zip
+          unzip ../bindings/php-artifact/aam-php-package.zip
           git init
           git branch -M main
           git config user.name "github-actions[bot]"
@@ -892,19 +892,19 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: jni-linux-x86_64
-          path: java/src/main/resources/natives/linux-x86_64
+          path: bindings/java/src/main/resources/natives/linux-x86_64
       - uses: actions/download-artifact@v8
         with:
           name: jni-macos-x86_64
-          path: java/src/main/resources/natives/macos-x86_64
+          path: bindings/java/src/main/resources/natives/macos-x86_64
       - uses: actions/download-artifact@v8
         with:
           name: jni-macos-aarch64
-          path: java/src/main/resources/natives/macos-aarch64
+          path: bindings/java/src/main/resources/natives/macos-aarch64
       - uses: actions/download-artifact@v8
         with:
           name: jni-windows-x86_64
-          path: java/src/main/resources/natives/windows-x86_64
+          path: bindings/java/src/main/resources/natives/windows-x86_64
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Download CREDITS.html
@@ -914,10 +914,10 @@ jobs:
           path: ./
       - name: Copy licenses
         run: |
-          mkdir -p java/src/main/resources/META-INF
-          cp LICENSE-MIT LICENSE-APACHE CREDITS.html java/src/main/resources/META-INF/
+          mkdir -p bindings/java/src/main/resources/META-INF
+          cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/java/src/main/resources/META-INF/
       - name: Build and Publish locally
-        working-directory: ./java
+        working-directory: ./bindings/java
         run: ./gradlew build publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -925,13 +925,13 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
       - name: Create Zip Bundle for Central Portal
         if: ${{ github.event.inputs.publish_maven_central == 'true' }}
-        working-directory: ./java
+        working-directory: ./bindings/java
         run: |
           cd build/staging-repo 
           zip -r ../bundle.zip .
       - name: Upload Bundle to Maven Central
         if: ${{ github.event.inputs.publish_maven_central == 'true' }}
-        working-directory: ./java
+        working-directory: ./bindings/java
         env:
           CENTRAL_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
@@ -948,7 +948,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
-          files: java/build/libs/*.jar
+          files: bindings/java/build/libs/*.jar
 
   build-csharp-libs:
     name: Build C# Native Libraries
@@ -1003,19 +1003,19 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: csharp-linux-x64
-          path: csharp/runtimes/linux-x64/native
+          path: bindings/csharp/runtimes/linux-x64/native
       - uses: actions/download-artifact@v8
         with:
           name: csharp-osx-x64
-          path: csharp/runtimes/osx-x64/native
+          path: bindings/csharp/runtimes/osx-x64/native
       - uses: actions/download-artifact@v8
         with:
           name: csharp-osx-arm64
-          path: csharp/runtimes/osx-arm64/native
+          path: bindings/csharp/runtimes/osx-arm64/native
       - uses: actions/download-artifact@v8
         with:
           name: csharp-win-x64
-          path: csharp/runtimes/win-x64/native
+          path: bindings/csharp/runtimes/win-x64/native
       - name: Resolve package version
         id: csharp_version
         shell: bash
@@ -1035,15 +1035,15 @@ jobs:
           name: credits-html
           path: ./
       - name: Copy licenses
-        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html csharp/
+        run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/csharp/
       - name: Pack NuGet
-        working-directory: ./csharp
+        working-directory: ./bindings/csharp
         run: dotnet pack AamCsharp.sln -c Release -p:Version=${{ steps.csharp_version.outputs.version }} -o artifacts
       - name: Publish NuGet package
-        working-directory: ./csharp
+        working-directory: ./bindings/csharp
         run: dotnet nuget push "artifacts/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
       - name: Publish NuGet package to GitHub Packages
-        working-directory: ./csharp
+        working-directory: ./bindings/csharp
         run: |
           dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
             --name github \
@@ -1056,7 +1056,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.get-latest-tag.outputs.tag_name }}
-          files: csharp/artifacts/*.nupkg
+          files: bindings/csharp/artifacts/*.nupkg
 
   build-go-libs:
     name: Build Go Native Libs
@@ -1101,8 +1101,8 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p go-pkg/lib go-pkg/include go-pkg/src
-          cp include/aam.h go-pkg/include/
-          cp -r go/ go-pkg/src/
+          cp bindings/c/include/aam.h go-pkg/include/
+          cp -r bindings/go/ go-pkg/src/
           if [ "${{ runner.os }}" == "Windows" ]; then
             cp target/${{ matrix.target }}/release/aam_rs.dll     go-pkg/lib/ 2>/dev/null || true
             cp target/${{ matrix.target }}/release/aam_rs.dll.lib go-pkg/lib/aam_rs.lib 2>/dev/null || true
@@ -1119,8 +1119,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path go-pkg/lib,go-pkg/include,go-pkg/src -Force | Out-Null
-          Copy-Item include/aam.h go-pkg/include/
-          Copy-Item go go-pkg/src -Recurse
+          Copy-Item bindings/c/include/aam.h go-pkg/include/
+          Copy-Item bindings/go go-pkg/src -Recurse
           Copy-Item "target/${{ matrix.target }}/release/aam_rs.dll" go-pkg/lib/ -ErrorAction SilentlyContinue
           Copy-Item "target/${{ matrix.target }}/release/aam_rs.dll.lib" go-pkg/lib/aam_rs.lib -ErrorAction SilentlyContinue
           Compress-Archive -Path go-pkg\* -DestinationPath "${{ matrix.artifact }}.zip" -Force
