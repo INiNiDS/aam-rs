@@ -9,5 +9,5 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-aam-rs = { path = "../../.." }
+aam-rs = { path = "../../../.." }
 magnus = { git = "https://github.com/matsadler/magnus", features = ["embed"] }

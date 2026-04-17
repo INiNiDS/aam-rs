@@ -6,7 +6,7 @@ package aam
 #cgo linux LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -ldl -lpthread -lm
 #cgo darwin LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -ldl -lpthread -lm
 #cgo windows LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -lws2_32 -lbcrypt -luserenv
-#include "aam.h"
+#include "../aam.h"
 #include <stdlib.h>
 */
 import "C"
