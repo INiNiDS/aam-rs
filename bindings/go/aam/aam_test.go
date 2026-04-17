@@ -3,7 +3,7 @@ package aam_test
 import (
 	"testing"
 
-	"github.com/INiNiDS/aam-rs/go/aam"
+	"github.com/INiNiDS/aam-rs/bindings/go/aam"
 )
 
 // ── Construction ─────────────────────────────────────────────────────────────
