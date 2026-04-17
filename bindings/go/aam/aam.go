@@ -2,10 +2,10 @@
 package aam
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -ldl -lpthread -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -ldl -lpthread -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../target/release -laam_rs -lws2_32 -lbcrypt -luserenv
+#cgo CFLAGS: -I${SRCDIR}/../../c/include
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -laam_rs -ldl -lpthread -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -laam_rs -ldl -lpthread -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -laam_rs -lws2_32 -lbcrypt -luserenv
 #include "../../c/include/aam.h"
 #include <stdlib.h>
 */
