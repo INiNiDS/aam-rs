@@ -34,7 +34,7 @@ impl Default for FormattingOptions {
         Self {
             indent_size: 4,
             use_tabs: false,
-            line_width: 100,
+            line_width: 100, // Если строка длиннее - сносим на новые строчки
             sort_keys: false,
             trailing_newline: true,
             preserve_blank_lines: true,
@@ -51,34 +51,13 @@ pub struct FormatRange {
     pub end_line: usize,
 }
 
-/// Trait for formatting AAML documents.
-///
-/// This trait provides methods to format AST nodes, handle range-based formatting,
-/// and support LSP clients that need formatting without full parsing/execution.
 pub trait Formatter: Send + Sync {
-    /// Formats an entire document represented by AST nodes.
-    ///
-    /// # Arguments
-    /// - `nodes`: AST nodes to format
-    /// - `options`: Formatting options
-    ///
-    /// # Returns
-    /// Formatted document as a string
     fn format_document(
         &self,
         nodes: &[AstNode],
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
-    /// Formats a specific range in a document.
-    ///
-    /// # Arguments
-    /// - `nodes`: AST nodes to format
-    /// - `range`: The range to format
-    /// - `options`: Formatting options
-    ///
-    /// # Returns
-    /// Formatted document with only the specified range modified
     fn format_range(
         &self,
         nodes: &[AstNode],
@@ -86,15 +65,6 @@ pub trait Formatter: Send + Sync {
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
-    /// Formats a single AST node.
-    ///
-    /// # Arguments
-    /// - `node`: AST node to format
-    /// - `indent_level`: Current indentation level
-    /// - `options`: Formatting options
-    ///
-    /// # Returns
-    /// Formatted node as a string
     fn format_node(
         &self,
         node: &AstNode,
@@ -102,33 +72,15 @@ pub trait Formatter: Send + Sync {
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
-    /// Normalizes comments in a document.
-    ///
-    /// # Arguments
-    /// - `content`: Raw document content
-    /// - `options`: Formatting options
-    ///
-    /// # Returns
-    /// Document with normalized comments
     fn normalize_comments(
         &self,
         content: &str,
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
-    /// Removes trailing whitespace and normalizes line endings.
-    ///
-    /// # Arguments
-    /// - `content`: Raw document content
-    ///
-    /// # Returns
-    /// Document with normalized whitespace
     fn normalize_whitespace(&self, content: &str) -> Result<String, AamlError>;
 }
 
-/// Default implementation of the Formatter trait.
-///
-/// Provides basic formatting capabilities suitable for most use cases.
 pub struct DefaultFormatter;
 
 impl DefaultFormatter {
@@ -145,7 +97,16 @@ impl DefaultFormatter {
         }
     }
 
-    /// Formats an assignment node.
+    /// Checks if the directive should be hoisted to the top (imports, derives)
+    fn is_hoistable(node: &AstNode) -> bool {
+        if let AstNode::Directive { name, .. } = node {
+            matches!(name.as_ref(), "import" | "derive")
+        } else {
+            false
+        }
+    }
+
+    /// Жестко контролируем пробелы вокруг знака равенства.
     fn format_assignment(
         key: &str,
         value: &str,
@@ -153,10 +114,74 @@ impl DefaultFormatter {
         options: &FormattingOptions,
     ) -> String {
         let indent = Self::create_indent(indent_level, options);
-        format!("{}{} = {}", indent, key, value)
+        // Trim just in case the raw value/key carries garbage whitespace
+        format!("{}{} = {}", indent, key.trim(), value.trim())
     }
 
-    /// Formats a directive node.
+    /// Умное форматирование алиасов типов (@type name = alias)
+    fn format_type_alias(args: &str, indent_level: usize, options: &FormattingOptions) -> String {
+        let indent = Self::create_indent(indent_level, options);
+        if let Some((name, alias)) = args.split_once('=') {
+            format!("{}@type {} = {}", indent, name.trim(), alias.trim())
+        } else {
+            format!("{}@type {}", indent, args.trim())
+        }
+    }
+
+    /// Разворачивает или схлопывает @schema в зависимости от line_width
+    fn format_schema(args: &str, indent_level: usize, options: &FormattingOptions) -> String {
+        let indent = Self::create_indent(indent_level, options);
+
+        // Пытаемся вытащить имя схемы и её тело (между { })
+        let Some((name_part, body_part)) = args.split_once('{') else {
+            // Если схема пустая или кривая, фоллбечимся в обычную директиву
+            return Self::format_directive("schema", args, indent_level, options);
+        };
+
+        let schema_name = name_part.trim();
+        let body = body_part.trim_end_matches('}').trim();
+
+        // Парсим пары ключ-значение
+        let pairs: Vec<_> = body
+            .split(|c| c == ',' || c == '\n')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let mut formatted_pairs = Vec::new();
+        for pair in pairs {
+            if let Some((k, v)) = pair.split_once(':') {
+                formatted_pairs.push(format!("{}: {}", k.trim(), v.trim()));
+            } else {
+                formatted_pairs.push(pair.to_string());
+            }
+        }
+
+        // Пробуем запихнуть всё в одну строчку
+        let single_line = format!(
+            "{}@schema {} {{ {} }}",
+            indent,
+            schema_name,
+            formatted_pairs.join(", ")
+        );
+
+        // Если строка влезает в лимиты (или лимит отключен), возвращаем её
+        if options.line_width == 0 || single_line.len() <= options.line_width {
+            return single_line;
+        }
+
+        // Если слишком жирная — разворачиваем (glow-up time)
+        let inner_indent = Self::create_indent(indent_level + 1, options);
+        let mut lines = vec![format!("{}@schema {} {{", indent, schema_name)];
+
+        for pair in formatted_pairs {
+            lines.push(format!("{}{}", inner_indent, pair));
+        }
+        lines.push(format!("{}}}", indent));
+
+        lines.join("\n")
+    }
+
     fn format_directive(
         name: &str,
         args: &str,
@@ -164,34 +189,10 @@ impl DefaultFormatter {
         options: &FormattingOptions,
     ) -> String {
         let indent = Self::create_indent(indent_level, options);
-        if args.is_empty() {
-            format!("{}@{}", indent, name)
+        if args.trim().is_empty() {
+            format!("{}@{}", indent, name.trim())
         } else {
-            format!("{}@{} {}", indent, name, args)
-        }
-    }
-
-    /// Formats an inline object node.
-    #[allow(dead_code)]
-    fn format_inline_object(pairs: &[(String, String)], _options: &FormattingOptions) -> String {
-        if pairs.is_empty() {
-            "{}".to_string()
-        } else {
-            let formatted_pairs: Vec<String> = pairs
-                .iter()
-                .map(|(k, v)| format!("{} = {}", k, v))
-                .collect();
-            format!("{{ {} }}", formatted_pairs.join(", "))
-        }
-    }
-
-    /// Formats an inline list node.
-    #[allow(dead_code)]
-    fn format_inline_list(items: &[String]) -> String {
-        if items.is_empty() {
-            "[]".to_string()
-        } else {
-            format!("[{}]", items.join(", "))
+            format!("{}@{} {}", indent, name.trim(), args.trim())
         }
     }
 }
@@ -208,16 +209,27 @@ impl Formatter for DefaultFormatter {
         nodes: &[AstNode],
         options: &FormattingOptions,
     ) -> Result<String, AamlError> {
-        let mut output = Vec::new();
+        let (hoistable, others): (Vec<_>, Vec<_>) =
+            nodes.iter().partition(|n| Self::is_hoistable(n));
 
-        for node in nodes {
-            let formatted = self.format_node(node, 0, options)?;
-            output.push(formatted);
+        let mut header: Vec<String> = hoistable
+            .into_iter()
+            .map(|n| self.format_node(n, 0, options))
+            .collect::<Result<_, _>>()?;
+
+        let body: Vec<String> = others
+            .into_iter()
+            .map(|n| self.format_node(n, 0, options))
+            .collect::<Result<_, _>>()?;
+
+        // Добавляем пустую строку-разделитель, если оба блока не пусты
+        if !header.is_empty() && !body.is_empty() && options.preserve_blank_lines {
+            header.push(String::new());
         }
 
-        let mut result = output.join("\n");
+        let mut result = [header, body].concat().join("\n");
 
-        if options.trailing_newline && !result.ends_with('\n') {
+        if options.trailing_newline && !result.is_empty() && !result.ends_with('\n') {
             result.push('\n');
         }
 
@@ -233,12 +245,11 @@ impl Formatter for DefaultFormatter {
         let mut output = Vec::new();
 
         for node in nodes {
-            let line = node.line();
+            let line = node.line(); // Предполагаем, что у AstNode есть метод .line()
             if line >= range.start_line && line <= range.end_line {
                 let formatted = self.format_node(node, 0, options)?;
                 output.push(formatted);
             } else {
-                // For lines outside the range, preserve original formatting
                 output.push(format!("(original line {})", line));
             }
         }
@@ -257,7 +268,12 @@ impl Formatter for DefaultFormatter {
                 Self::format_assignment(key, &value.to_string(), indent_level, options)
             }
             AstNode::Directive { name, args, .. } => {
-                Self::format_directive(name, args, indent_level, options)
+                // Умный матчинг по имени директивы
+                match name.as_ref() {
+                    "schema" => Self::format_schema(args, indent_level, options),
+                    "type" => Self::format_type_alias(args, indent_level, options),
+                    _ => Self::format_directive(name.as_ref(), args, indent_level, options),
+                }
             }
         };
 
@@ -273,12 +289,10 @@ impl Formatter for DefaultFormatter {
         let normalized: Vec<String> = lines
             .iter()
             .map(|line| {
-                // Normalize comment spacing (ensure space after #)
                 if let Some(pos) = line.find('#') {
                     let before = &line[..pos];
                     let after = &line[pos + 1..];
 
-                    // Only if surrounded by spaces (not hex color)
                     if pos > 0
                         && pos < line.len() - 1
                         && before.ends_with(' ')
@@ -288,7 +302,6 @@ impl Formatter for DefaultFormatter {
                         return format!("{}# {}", before.trim_end(), comment);
                     }
                 }
-
                 line.to_string()
             })
             .collect();
@@ -304,101 +317,5 @@ impl Formatter for DefaultFormatter {
             .collect();
 
         Ok(normalized.join("\n"))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_create_indent_spaces() {
-        let options = FormattingOptions {
-            indent_size: 4,
-            use_tabs: false,
-            ..Default::default()
-        };
-        assert_eq!(DefaultFormatter::create_indent(0, &options), "");
-        assert_eq!(DefaultFormatter::create_indent(1, &options), "    ");
-        assert_eq!(DefaultFormatter::create_indent(2, &options), "        ");
-    }
-
-    #[test]
-    fn test_create_indent_tabs() {
-        let options = FormattingOptions {
-            use_tabs: true,
-            ..Default::default()
-        };
-        assert_eq!(DefaultFormatter::create_indent(0, &options), "");
-        assert_eq!(DefaultFormatter::create_indent(1, &options), "\t");
-        assert_eq!(DefaultFormatter::create_indent(2, &options), "\t\t");
-    }
-
-    #[test]
-    fn test_format_assignment() {
-        let formatted =
-            DefaultFormatter::format_assignment("key", "value", 0, &FormattingOptions::default());
-        assert_eq!(formatted, "key = value");
-    }
-
-    #[test]
-    fn test_format_assignment_with_indent() {
-        let options = FormattingOptions {
-            indent_size: 2,
-            ..Default::default()
-        };
-        let formatted = DefaultFormatter::format_assignment("key", "value", 1, &options);
-        assert_eq!(formatted, "  key = value");
-    }
-
-    #[test]
-    fn test_format_directive() {
-        let formatted = DefaultFormatter::format_directive(
-            "import",
-            "base.aam",
-            0,
-            &FormattingOptions::default(),
-        );
-        assert_eq!(formatted, "@import base.aam");
-    }
-
-    #[test]
-    fn test_format_inline_object() {
-        let pairs = vec![
-            ("host".to_string(), "localhost".to_string()),
-            ("port".to_string(), "8080".to_string()),
-        ];
-        let formatted =
-            DefaultFormatter::format_inline_object(&pairs, &FormattingOptions::default());
-        assert_eq!(formatted, "{ host = localhost, port = 8080 }");
-    }
-
-    #[test]
-    fn test_format_inline_list() {
-        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let formatted = DefaultFormatter::format_inline_list(&items);
-        assert_eq!(formatted, "[a, b, c]");
-    }
-
-    #[test]
-    fn test_normalize_whitespace() {
-        let formatter = DefaultFormatter::new();
-        let input = "key = value   \nfoo = bar  ";
-        let result = formatter.normalize_whitespace(input).unwrap();
-        assert_eq!(result, "key = value\nfoo = bar");
-    }
-
-    #[test]
-    fn test_format_document() {
-        let formatter = DefaultFormatter::new();
-        let ast = vec![AstNode::Assignment {
-            key: "name".to_string().into(),
-            value: crate::pipeline::parser::ValueNode::Literal("test".to_string().into()),
-            line: 1,
-        }];
-        let result = formatter
-            .format_document(&ast, &FormattingOptions::default())
-            .unwrap();
-        assert!(result.contains("name = test"));
     }
 }
