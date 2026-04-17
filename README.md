@@ -55,7 +55,7 @@ Add the crate to your `Cargo.toml`:
 <!-- x-release-please-start-version -->
 ```toml
 [dependencies]
-aam-rs = "2.0.3"
+aam-rs = "2.0.4"
 ```
 <!-- x-release-please-start-version -->
 
@@ -192,7 +192,7 @@ builder
         SchemaField::required("port", "port_t"),
         SchemaField::optional("debug", "bool"),
     ])
-    .add_line("host", "2.0.3.1")
+    .add_line("host", "2.0.4.1")
     .add_line("port", "8080");
 
 println!("{}", builder.as_string());

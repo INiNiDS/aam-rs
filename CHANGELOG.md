@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.4](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.3...aam-rs-v2.0.4) (2026-04-17)
+
+
+### Bug Fixes
+
+* **aam:** update include path for aam.h in aam.go ([f74d172](https://github.com/INiNiDS/aam-rs/commit/f74d172b5aaf52abafb9182edeb84e2504df7ba0))
+* **aam:** update include path for aam.h in aam.go ([b59c550](https://github.com/INiNiDS/aam-rs/commit/b59c550b1324ef050904d7a141c14166d2c97293))
+* **aam:** update include path for aam.h in aam.go ([d5f05f6](https://github.com/INiNiDS/aam-rs/commit/d5f05f60948eb525fbd82d311d916ae9c6a71faf))
+* **aam:** update include paths and linker flags in aam.go ([706bc05](https://github.com/INiNiDS/aam-rs/commit/706bc056a232afb2f62a8d786af19410630963e6))
+* **bindings:** update aam-rs path references in Cargo.toml and aam.go ([611a29e](https://github.com/INiNiDS/aam-rs/commit/611a29e9f3688b0c41725e44ed5bc1618cc394aa))
+* Fixed bindings directory ([8bb9e0c](https://github.com/INiNiDS/aam-rs/commit/8bb9e0c36bbc1bfd3af61b02b577cfe9d571608b))
+* **formatter:** enhance formatting capabilities for AAM documents ([1f8f9c4](https://github.com/INiNiDS/aam-rs/commit/1f8f9c4892fdb028749f23922a77558cc6dcd741))
+
 ## [2.0.3](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.2...aam-rs-v2.0.3) (2026-04-12)
 
 
