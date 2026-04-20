@@ -18,8 +18,7 @@ classifiers = [
 
 [tool.maturin]
 # Name of the Python extension module produced (import aam_py)
-module-name = "aam_py._native"
+module-name = "aam_py"
 # Only build the cdylib for Python; strip the rlib from the Python wheel
-python-source = "python"
 features = ["python"]
 

@@ -175,10 +175,8 @@ jobs:
         run: cargo test --manifest-path bindings/ruby/ext/aam_rs/Cargo.toml
       - name: Fix Ruby Extension Naming (Patching)
         run: |
-          # Убираем системный префикс lib, чтобы Ruby нашел точку входа Init_aam_ruby
           mv bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/ext/aam_rs/target/release/aam_ruby.so 2>/dev/null || true
           mv bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/ext/aam_rs/target/release/aam_rs_ruby.so 2>/dev/null || true
-          # Патчим импорт в рубишном файле на лету
           sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
           sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
       - name: Run Ruby smoke test
@@ -205,7 +203,7 @@ jobs:
           AAM_RS_LIB: ${{ github.workspace }}/target/release/libaam_rs.so
         run: php bindings/php/tests/smoke.php
 
-  release-please:
+  release-plz:
     needs:
       [
         validate,
@@ -218,29 +216,27 @@ jobs:
       ]
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      release_created: ${{ steps.release.outputs.releases_created }}
+      # Достаем тег первого релизнутого крейта (безопасное извлечение через JSON)
+      tag_name: ${{ steps.release.outputs.releases_created == 'true' && fromJSON(steps.release.outputs.releases)[0].tag || '' }}
     steps:
-      - name: Run Release Please
-        id: release
-        uses: googleapis/release-please-action@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
-          config-file: release-please-config.json
-          manifest-file: release-please-manifest.json
-
-  publish-cargo:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo publish --token ${{ secrets.CRATES_TOKEN }} --no-verify
+          fetch-depth: 0 # Обязательно для release-plz, чтобы он мог читать историю и генерить CHANGELOG
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz
+        id: release
+        uses: MarcoIeni/release-plz-action@v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
 
   build-node-bindings:
     name: Build Node.js Native Addons
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -292,8 +288,8 @@ jobs:
 
   upload-node-to-release:
     name: Upload Node.js Addons to Release
-    needs: [ release-please, build-node-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-node-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Node.js addon artifacts
@@ -305,13 +301,13 @@ jobs:
       - name: Upload Node.js addons to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: node-artifacts/*.node
 
   build-wasm-bindings:
     name: Build & Test WASM Bindings
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -345,8 +341,8 @@ jobs:
 
   upload-wasm-to-release:
     name: Upload WASM Package to Release
-    needs: [ release-please, build-wasm-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-wasm-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download WASM package
@@ -361,13 +357,13 @@ jobs:
       - name: Upload WASM package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: aam-wasm-package.zip
 
   build-ruby-bindings:
     name: Build & Test Ruby Bindings
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -388,12 +384,11 @@ jobs:
         run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/ruby/
       - name: Fix Ruby Naming and Prepare Payload
         run: |
-          # Фикс имени для сборки гема + патч файла
           cp bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/lib/aam_ruby.so 2>/dev/null || true
           cp bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/lib/aam_rs_ruby.so 2>/dev/null || true
           sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
           sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
-          cd ruby
+          cd bindings/ruby
           gem build aam-ruby.gemspec --output ../aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
@@ -404,8 +399,8 @@ jobs:
 
   upload-ruby-to-release:
     name: Upload Ruby Gem to Release
-    needs: [ release-please, build-ruby-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-ruby-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Ruby artifact
@@ -416,13 +411,13 @@ jobs:
       - name: Upload Ruby package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: ruby-artifacts/aam-ruby.gem
 
   publish-ruby:
     name: Publish Ruby Gem (RubyGems + GitHub Packages)
-    needs: [ release-please, build-ruby-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-ruby-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Ruby artifact
@@ -443,8 +438,8 @@ jobs:
 
   build-php-bindings:
     name: Build & Test PHP Bindings
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -486,8 +481,8 @@ jobs:
 
   upload-php-to-release:
     name: Upload PHP Package to Release
-    needs: [ release-please, build-php-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-php-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download PHP package
@@ -498,13 +493,13 @@ jobs:
       - name: Upload PHP package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: aam-php-package.zip
 
   publish-php-mirror:
     name: Publish PHP Package to Mirror Repo (Packagist)
-    needs: [ release-please, build-php-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-php-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download PHP package artifact
@@ -514,13 +509,13 @@ jobs:
           path: php-artifact
       - name: Push to PHP Mirror Repository
         env:
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
           TARGET_REPO: "ininids/aam-php"
           MIRROR_TOKEN: ${{ secrets.PHP_MIRROR_TOKEN }}
         run: |
           mkdir php-repo
           cd php-repo
-          unzip ../bindings/php-artifact/aam-php-package.zip
+          unzip ../php-artifact/aam-php-package.zip
           git init 
           git branch -M main
           git config user.name "github-actions[bot]"
@@ -534,8 +529,8 @@ jobs:
 
   publish-npm:
     name: Publish to npm
-    needs: [ release-please, build-node-bindings, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-node-bindings, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -584,8 +579,8 @@ jobs:
 
   publish-npm-github:
     name: Publish Node package to GitHub Packages
-    needs: [ release-please, build-node-bindings, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-node-bindings, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -617,8 +612,8 @@ jobs:
 
   publish-wasm-npm:
     name: Publish WASM package to npm
-    needs: [ release-please, build-wasm-bindings ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-wasm-bindings ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download WASM package artifact
@@ -636,8 +631,8 @@ jobs:
         run: npm publish --access public --provenance
 
   build-c-libs:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -702,13 +697,13 @@ jobs:
       - name: Upload Release Artifact
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: ${{ matrix.artifact_name }}.zip
 
   build-csharp-libs:
     name: Build C# Native Libraries
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: release-plz
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -747,8 +742,8 @@ jobs:
           retention-days: 1
 
   linux:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -796,8 +791,8 @@ jobs:
           path: dist
 
   musllinux:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -841,8 +836,8 @@ jobs:
           path: dist
 
   windows:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -890,8 +885,8 @@ jobs:
           path: dist
 
   macos:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -929,8 +924,8 @@ jobs:
           path: dist
 
   sdist:
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -952,8 +947,8 @@ jobs:
 
   upload-wheels-to-release:
     name: Upload Python Wheels to Release
-    needs: [ release-please, linux, musllinux, windows, macos, sdist ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, linux, musllinux, windows, macos, sdist ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all wheels
@@ -965,13 +960,13 @@ jobs:
       - name: Upload Wheels and sdist to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: dist/*
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [ release-please, linux, musllinux, windows, macos, sdist ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, linux, musllinux, windows, macos, sdist ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -992,8 +987,8 @@ jobs:
 
   build-jni-libs:
     name: Build JNI Native Libraries
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: release-plz
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -1031,8 +1026,8 @@ jobs:
 
   upload-jni-to-release:
     name: Upload JNI to GitHub Release
-    needs: [ release-please, build-jni-libs ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-jni-libs ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -1046,14 +1041,14 @@ jobs:
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           gh release upload "$TAG_NAME" jni-artifacts/*
 
   build-go-libs:
     name: Build Go Native Libs
-    needs: [ release-please, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     strategy:
       matrix:
         include:
@@ -1120,13 +1115,13 @@ jobs:
       - name: Upload Go package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: ${{ matrix.artifact }}.zip
 
   publish-java:
     name: Publish Fat JAR & Upload to Release
-    needs: [ release-please, build-jni-libs, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-jni-libs, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1191,13 +1186,13 @@ jobs:
       - name: Upload JAR to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: bindings/java/build/libs/*.jar
 
   publish-csharp:
     name: Publish C# Package to NuGet
-    needs: [ release-please, build-csharp-libs, generate-credits ]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    needs: [ release-plz, build-csharp-libs, generate-credits ]
+    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1225,7 +1220,7 @@ jobs:
         id: csharp_version
         shell: bash
         run: |
-          TAG="${{ needs.release-please.outputs.tag_name }}"
+          TAG="${{ needs.release-plz.outputs.tag_name }}"
           VERSION="${TAG##*-v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Could not parse semantic version from tag: $TAG"
@@ -1259,5 +1254,5 @@ jobs:
       - name: Upload NuGet package to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-plz.outputs.tag_name }}
           files: bindings/csharp/artifacts/*.nupkg
