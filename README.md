@@ -17,13 +17,13 @@ AAM was designed to solve the "configuration fatigue" in large-scale Rust projec
 
 ### AAM vs TOML
 
-| Feature | AAM | TOML |
-| :--- | :--- | :--- |
-| **Schema Validation** | Native (`@schema`) | External tools only |
-| **Modular Imports** | Native (`@import`) | Not supported |
-| **Type Aliasing** | Native (`@type`) | No |
-| **Performance** | High (AOT/Binary) | Standard (Text parsing) |
-| **Extensibility** | Pipeline-backed | Static |
+| Feature               | AAM                | TOML                    |
+|:----------------------|:-------------------|:------------------------|
+| **Schema Validation** | Native (`@schema`) | External tools only     |
+| **Modular Imports**   | Native (`@import`) | Not supported           |
+| **Type Aliasing**     | Native (`@type`)   | No                      |
+| **Performance**       | High (AOT/Binary)  | Standard (Text parsing) |
+| **Extensibility**     | Pipeline-backed    | Static                  |
 
 ## What changed in 2.x
 
@@ -57,7 +57,8 @@ Add the crate to your `Cargo.toml`:
 [dependencies]
 aam-rs = "2.0.4"
 ```
-<!-- x-release-please-start-version -->
+
+<!-- x-release-please-end -->
 
 ## Configuration syntax (`.aam`)
 

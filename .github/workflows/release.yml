@@ -47,6 +47,8 @@ jobs:
           components: rustfmt
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-msrv
+        run: cargo install cargo-msrv --locked
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run tests
@@ -54,6 +56,8 @@ jobs:
           cargo test --all-targets
           cargo test --all-targets --features serde
           cargo test --all-targets --features aot
+      - name: Verify MSRV
+        run: cargo msrv verify -- cargo check --all-targets
       - name: Security audit (cargo-deny)
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -217,13 +221,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.releases_created }}
-      # Достаем тег первого релизнутого крейта (безопасное извлечение через JSON)
       tag_name: ${{ steps.release.outputs.releases_created == 'true' && fromJSON(steps.release.outputs.releases)[0].tag || '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # Обязательно для release-plz, чтобы он мог читать историю и генерить CHANGELOG
+          fetch-depth: 0
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Run release-plz

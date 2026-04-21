@@ -436,7 +436,6 @@ jobs:
         run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/ruby/
       - name: Fix Ruby Naming and Prepare Payload
         run: |
-          # Фикс имени для сборки гема + патч файла
           cp bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/lib/aam_ruby.so 2>/dev/null || true
           cp bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/lib/aam_rs_ruby.so 2>/dev/null || true
           sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true

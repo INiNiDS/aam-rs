@@ -286,8 +286,9 @@ All bindings are automatically:
 
 ### Release Process
 
-1. Commit to `main` → All tests run
-2. Create release with `release-please` → Artifacts built
+1. Commit to `main` -> All tests run
+2. Rust release is created by `release-plz`
+3. Non-Rust package versions are synchronized by `release-please`
 3. Publish to:
     - 🦀 crates.io (Rust)
     - 📦 npm (Node.js)

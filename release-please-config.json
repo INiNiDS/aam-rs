@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "bindings",
+      "include-component-in-tag": false,
+      "changelog-path": "bindings/CHANGELOG.md",
+      "extra-files": [
+        "README.md",
+        "bindings/csharp/aam-csharp.csproj",
+        "bindings/java/build.gradle.kts",
+        "bindings/js/package.json",
+        "bindings/js/npm/darwin-arm64/package.json",
+        "bindings/js/npm/darwin-x64/package.json",
+        "bindings/js/npm/linux-x64-gnu/package.json",
+        "bindings/js/npm/win32-x64-msvc/package.json",
+        "bindings/php/composer.json",
+        "bindings/ruby/aam-ruby.gemspec",
+        "bindings/wasm/pkg/package.json"
+      ]
+    }
+  }
+}
+
