@@ -5,7 +5,7 @@ description = "A Rust implementation of the Abstract Alias Mapping (AAM) framewo
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/INiNiDS/aam-rs/"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89.0"
 readme = "README.md"
 categories = [
     "data-structures",

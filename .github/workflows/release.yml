@@ -47,8 +47,10 @@ jobs:
           components: rustfmt
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Install cargo-msrv
-        run: cargo install cargo-msrv --locked
+      - name: Install cargo-binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+      - name: Install cargo-msrv via binstall
+        run: cargo binstall cargo-msrv -y
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run tests
