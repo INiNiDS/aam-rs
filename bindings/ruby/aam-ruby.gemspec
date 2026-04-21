@@ -25,9 +25,9 @@ Gem::Specification.new do |spec|
       'LICENSE-APACHE',
       'CREDITS.html',
       'lib/**/*.rb',
+      'lib/aam_ruby.*',
       'lib/aam_rs_ruby.*',
-      'tests/**/*.rb',
-      'ext/aam_rs/target/release/libaam_rs_ruby.*'
+      'tests/**/*.rb'
     ]
   end
 
