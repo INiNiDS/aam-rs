@@ -265,7 +265,7 @@ jobs:
           
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
             fh.write(f"tag_name={tag_name}\n")
-            PY
+          PY
 
   build-node-bindings:
     name: Build Node.js Native Addons
