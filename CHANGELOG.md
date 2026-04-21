@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.7](https://github.com/INiNiDS/aam-rs/compare/2.0.6...2.0.7) - 2026-04-21
+
+### Other
+
+- *(package)* downgrade version to 2.0.6
+
 ## [2.0.6](https://github.com/INiNiDS/aam-rs/compare/2.0.5...2.0.6) - 2026-04-21
 
 ### Other
