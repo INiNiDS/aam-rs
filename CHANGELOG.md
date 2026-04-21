@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.6](https://github.com/INiNiDS/aam-rs/compare/2.0.5...2.0.6) - 2026-04-21
+
+### Other
+
+- *(release)* improve release workflow script formatting
+- *(release)* update release configuration and versioning
+
 ## [2.0.5](https://github.com/INiNiDS/aam-rs/compare/v2.0.4...v2.0.5) - 2026-04-21
 
 ### Fixed
