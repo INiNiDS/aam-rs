@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.0](https://github.com/INiNiDS/aam-rs/compare/2.0.6...2.1.0) - 2026-04-21
+
+### Added
+
+- *(aam)* improve error handling in AamValue display implementation
+
+### Fixed
+
+- *(aam)* improve error handling in AamValue display implementation
+
 ## [2.0.6](https://github.com/INiNiDS/aam-rs/compare/2.0.5...2.0.6) - 2026-04-21
 
 ### Other
