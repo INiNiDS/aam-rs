@@ -1,0 +1,4 @@
+[workspace]
+# Use plain semver tags like 1.2.3 (without v prefix).
+git_tag_name = "{{ version }}"
+

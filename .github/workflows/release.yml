@@ -223,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.releases_created }}
-      tag_name: ${{ steps.release.outputs.releases_created == 'true' && fromJSON(steps.release.outputs.releases)[0].tag || '' }}
+      tag_name: ${{ steps.extract_tag.outputs.tag_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -237,6 +237,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
+      - name: Extract created release tag
+        id: extract_tag
+        shell: bash
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.releases_created }}
+          RELEASES_JSON: ${{ steps.release.outputs.releases }}
+        run: |
+          if [[ "$RELEASE_CREATED" != "true" ]]; then
+            echo "tag_name=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          python - <<'PY'
+  import json
+  import os
+  
+  raw = os.environ.get("RELEASES_JSON", "[]")
+  tag_name = ""
+
+try:
+  releases = json.loads(raw)
+  if releases and isinstance(releases, list):
+    tag_name = str(releases[0].get("tag", ""))
+except Exception:
+  tag_name = ""
+
+with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+  fh.write(f"tag_name={tag_name}\n")
+  PY
 
   build-node-bindings:
     name: Build Node.js Native Addons
@@ -322,6 +351,14 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
+      - name: Sync WASM package version
+        env:
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
+        run: |
+          VERSION="$TAG_NAME"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
+          sed -E -i "s/^version = \".*\"$/version = \"$VERSION\"/" bindings/wasm/Cargo.toml
       - name: Build WASM package
         working-directory: ./bindings/wasm
         run: wasm-pack build --release --target nodejs --out-dir pkg
@@ -387,6 +424,14 @@ jobs:
           path: ./
       - name: Copy licenses
         run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/ruby/
+      - name: Sync Ruby gem version
+        env:
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
+        run: |
+          VERSION="$TAG_NAME"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
+          sed -E -i "s/(spec.version = ')[^']+(' .*x-release-please-version)/\1$VERSION\2/" bindings/ruby/aam-ruby.gemspec
       - name: Fix Ruby Naming and Prepare Payload
         run: |
           cp bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/lib/aam_ruby.so 2>/dev/null || true
@@ -467,6 +512,24 @@ jobs:
         run: |
           mkdir -p php-pkg
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html php-pkg/
+      - name: Sync PHP package version
+        env:
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
+        run: |
+          VERSION="$TAG_NAME"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
+          export VERSION
+          python - <<'PY'
+  import os
+  import json
+  from pathlib import Path
+  
+  path = Path("bindings/php/composer.json")
+  data = json.loads(path.read_text(encoding="utf-8"))
+  data["version"] = os.environ["VERSION"]
+  path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+  PY
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
@@ -565,6 +628,36 @@ jobs:
           path: ./
       - name: Copy licenses
         run: cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/js/
+      - name: Sync npm package versions
+        env:
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
+        run: |
+          VERSION="$TAG_NAME"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
+          export VERSION
+          node - <<'NODE'
+  const fs = require('node:fs');
+  const paths = [
+  'bindings/js/package.json',
+  'bindings/js/npm/linux-x64-gnu/package.json',
+  'bindings/js/npm/darwin-x64/package.json',
+  'bindings/js/npm/darwin-arm64/package.json',
+  'bindings/js/npm/win32-x64-msvc/package.json',
+];
+  const version = process.env.VERSION;
+  
+  for (const p of paths) {
+  const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+  pkg.version = version;
+  if (pkg.optionalDependencies) {
+  for (const key of Object.keys(pkg.optionalDependencies)) {
+  pkg.optionalDependencies[key] = version;
+}
+}
+  fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+}
+  NODE
       - name: Populate platform packages
         run: |
           cp node-artifacts/aam_rs_node.linux-x64-gnu.node bindings/js/npm/linux-x64-gnu/
@@ -779,14 +872,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
           manylinux: auto
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
           manylinux: auto
       - name: Upload wheels
@@ -824,14 +917,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Upload wheels
@@ -871,7 +964,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
       - uses: actions/setup-python@v6
         with:
@@ -881,7 +974,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -914,13 +1007,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -943,7 +1036,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist
+          args: --out dist -m bindings/python/pyproject.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v7
         with:
@@ -1163,6 +1256,14 @@ jobs:
         run: |
           mkdir -p bindings/java/src/main/resources/META-INF
           cp LICENSE-MIT LICENSE-APACHE CREDITS.html bindings/java/src/main/resources/META-INF/
+      - name: Sync Java package version
+        env:
+          TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
+        run: |
+          VERSION="$TAG_NAME"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
+          sed -E -i "s/^version = \".*\" \/\/ x-release-please-version$/version = \"$VERSION\" \/\/ x-release-please-version/" bindings/java/build.gradle.kts
       - name: Build and Publish locally
         working-directory: ./bindings/java
         run: ./gradlew build publish
@@ -1226,7 +1327,9 @@ jobs:
         shell: bash
         run: |
           TAG="${{ needs.release-plz.outputs.tag_name }}"
-          VERSION="${TAG##*-v}"
+          VERSION="$TAG"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Could not parse semantic version from tag: $TAG"
             exit 1

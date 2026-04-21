@@ -610,14 +610,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
           manylinux: auto
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
           manylinux: auto
       - name: Upload wheels
@@ -654,14 +654,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Upload wheels
@@ -700,7 +700,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
       - uses: actions/setup-python@v6
         with:
@@ -710,7 +710,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -742,13 +742,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --out dist -m bindings/python/pyproject.toml
           sccache: false
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
+          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -770,7 +770,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist
+          args: --out dist -m bindings/python/pyproject.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v7
         with:
@@ -1020,7 +1020,9 @@ jobs:
         shell: bash
         run: |
           TAG="${{ needs.get-latest-tag.outputs.tag_name }}"
-          VERSION="${TAG##*-v}"
+          VERSION="$TAG"
+          VERSION="${VERSION#aam-rs-v}"
+          VERSION="${VERSION#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Could not parse semantic version from tag: $TAG"
             exit 1
