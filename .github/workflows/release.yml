@@ -356,8 +356,6 @@ jobs:
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           VERSION="$TAG_NAME"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           sed -E -i "s/^version = \".*\"$/version = \"$VERSION\"/" bindings/wasm/Cargo.toml
       - name: Build WASM package
         working-directory: ./bindings/wasm
@@ -429,8 +427,6 @@ jobs:
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           VERSION="$TAG_NAME"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           sed -E -i "s/(spec.version = ')[^']+(' .*x-release-please-version)/\1$VERSION\2/" bindings/ruby/aam-ruby.gemspec
       - name: Fix Ruby Naming and Prepare Payload
         run: |
@@ -517,14 +513,12 @@ jobs:
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           VERSION="$TAG_NAME"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           export VERSION
           python - <<'PY'
           import os
           import json
           from pathlib import Path
-          
+
           path = Path("bindings/php/composer.json")
           data = json.loads(path.read_text(encoding="utf-8"))
           data["version"] = os.environ["VERSION"]
@@ -633,8 +627,6 @@ jobs:
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           VERSION="$TAG_NAME"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           export VERSION
           node - <<'NODE'
           const fs = require('node:fs');
@@ -646,7 +638,7 @@ jobs:
           'bindings/js/npm/win32-x64-msvc/package.json',
           ];
           const version = process.env.VERSION;
-          
+
           for (const p of paths) {
           const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
           pkg.version = version;
@@ -1261,8 +1253,6 @@ jobs:
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
           VERSION="$TAG_NAME"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           sed -E -i "s/^version = \".*\" \/\/ x-release-please-version$/version = \"$VERSION\" \/\/ x-release-please-version/" bindings/java/build.gradle.kts
       - name: Build and Publish locally
         working-directory: ./bindings/java
@@ -1328,8 +1318,6 @@ jobs:
         run: |
           TAG="${{ needs.release-plz.outputs.tag_name }}"
           VERSION="$TAG"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Could not parse semantic version from tag: $TAG"
             exit 1

@@ -23,8 +23,6 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="$TAG"
-          VERSION="${VERSION#aam-rs-v}"
-          VERSION="${VERSION#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Could not parse semantic version from tag: $TAG"
             exit 1
