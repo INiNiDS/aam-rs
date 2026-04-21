@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.5](https://github.com/INiNiDS/aam-rs/compare/v2.0.4...v2.0.5) - 2026-04-21
+
+### Fixed
+
+- remove unused files from git
+- *(release)* update Rust version and installation method for dependencies
+
+### Other
+
+- *(release)* update cargo-binstall installation command
+- *(release)* update release workflow to include cargo bin in PATH
+- *(release)* now release please for non-Rust package versions and release-plz for Rust Packages.
+- *(release)* update versioning comments and module names
+
 ## [2.0.4](https://github.com/INiNiDS/aam-rs/compare/aam-rs-v2.0.3...aam-rs-v2.0.4) (2026-04-17)
 
 
