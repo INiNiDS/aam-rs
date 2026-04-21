@@ -50,9 +50,7 @@ jobs:
       - name: Install cargo-binstall
         run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
       - name: Install cargo-msrv via binstall
-        run: cargo binstall cargo-msrv -y
-      - name: Add cargo bin to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        run: cargo binstall cargo-msrv -y --force
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run tests
