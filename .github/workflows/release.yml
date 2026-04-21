@@ -250,22 +250,22 @@ jobs:
           fi
 
           python - <<'PY'
-  import json
-  import os
-  
-  raw = os.environ.get("RELEASES_JSON", "[]")
-  tag_name = ""
-
-try:
-  releases = json.loads(raw)
-  if releases and isinstance(releases, list):
-    tag_name = str(releases[0].get("tag", ""))
-except Exception:
-  tag_name = ""
-
-with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-  fh.write(f"tag_name={tag_name}\n")
-  PY
+          import json
+          import os
+          
+          raw = os.environ.get("RELEASES_JSON", "[]")
+          tag_name = ""
+          
+          try:
+            releases = json.loads(raw)
+            if releases and isinstance(releases, list):
+              tag_name = str(releases[0].get("tag", ""))
+          except Exception:
+            tag_name = ""
+          
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+            fh.write(f"tag_name={tag_name}\n")
+            PY
 
   build-node-bindings:
     name: Build Node.js Native Addons
@@ -521,15 +521,15 @@ with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
           VERSION="${VERSION#v}"
           export VERSION
           python - <<'PY'
-  import os
-  import json
-  from pathlib import Path
-  
-  path = Path("bindings/php/composer.json")
-  data = json.loads(path.read_text(encoding="utf-8"))
-  data["version"] = os.environ["VERSION"]
-  path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-  PY
+          import os
+          import json
+          from pathlib import Path
+          
+          path = Path("bindings/php/composer.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["version"] = os.environ["VERSION"]
+          path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          PY
       - name: Package PHP artifacts
         run: |
           mkdir -p php-pkg/src php-pkg/tests php-pkg/native
@@ -637,27 +637,27 @@ with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
           VERSION="${VERSION#v}"
           export VERSION
           node - <<'NODE'
-  const fs = require('node:fs');
-  const paths = [
-  'bindings/js/package.json',
-  'bindings/js/npm/linux-x64-gnu/package.json',
-  'bindings/js/npm/darwin-x64/package.json',
-  'bindings/js/npm/darwin-arm64/package.json',
-  'bindings/js/npm/win32-x64-msvc/package.json',
-];
-  const version = process.env.VERSION;
-  
-  for (const p of paths) {
-  const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
-  pkg.version = version;
-  if (pkg.optionalDependencies) {
-  for (const key of Object.keys(pkg.optionalDependencies)) {
-  pkg.optionalDependencies[key] = version;
-}
-}
-  fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-}
-  NODE
+          const fs = require('node:fs');
+          const paths = [
+          'bindings/js/package.json',
+          'bindings/js/npm/linux-x64-gnu/package.json',
+          'bindings/js/npm/darwin-x64/package.json',
+          'bindings/js/npm/darwin-arm64/package.json',
+          'bindings/js/npm/win32-x64-msvc/package.json',
+          ];
+          const version = process.env.VERSION;
+          
+          for (const p of paths) {
+          const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+          pkg.version = version;
+          if (pkg.optionalDependencies) {
+          for (const key of Object.keys(pkg.optionalDependencies)) {
+          pkg.optionalDependencies[key] = version;
+          }
+          }
+          fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+          }
+          NODE
       - name: Populate platform packages
         run: |
           cp node-artifacts/aam_rs_node.linux-x64-gnu.node bindings/js/npm/linux-x64-gnu/
