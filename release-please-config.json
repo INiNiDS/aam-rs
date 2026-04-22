@@ -8,10 +8,12 @@
       "changelog-path": "bindings/CHANGELOG.md",
       "extra-files": [
         "README.md",
+        "bindings/python/Cargo.toml",
         "bindings/js/Cargo.toml",
         "bindings/wasm/Cargo.toml",
         "bindings/ruby/ext/aam_rs/Cargo.toml",
         "bindings/csharp/aam-csharp.csproj",
+        "bindings/csharp/CONTRIBUTING.md",
         "bindings/java/build.gradle.kts",
         "bindings/js/package.json",
         "bindings/js/npm/darwin-arm64/package.json",

@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "aam-py"
 description = "Python bindings for the aam-rs AAML configuration parser"
 readme = "README_PY.md"
-license = { text = "MIT OR Apache-2.0" }
+license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-MIT", "LICENSE-APACHE", "CREDITS.html"]
 dynamic = ["version"]
 requires-python = ">=3.8"

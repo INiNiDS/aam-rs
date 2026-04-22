@@ -1,0 +1,16 @@
+[package]
+name = "aam-py"
+description = "Python bindings for the aam-rs AAML configuration parser"
+repository = "https://github.com/ininids/aam-rs/tree/main/bindings/python"
+version = "2.0.6"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "aam_rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aam-rs = { path = "../../..", features = ["python"] }
+pyo3 = { version = "0.28", features = ["extension-module", "abi3-py38"] }

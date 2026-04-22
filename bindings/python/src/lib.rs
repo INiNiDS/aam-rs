@@ -1,12 +1,11 @@
 //! PyO3 bindings — exposes `AAM` to Python as `aam_rs.AAM`.
 
-use crate::aam::AAM;
-use crate::builder::{AAMBuilder, SchemaField};
-use crate::error::AamlError;
-use crate::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+use aam_rs::aam::AAM;
+use aam_rs::builder::{AAMBuilder, SchemaField};
+use aam_rs::error::AamlError;
+use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use std::collections::HashMap;
 
 // ── Error conversion ─────────────────────────────────────────────────────────
 
@@ -133,12 +132,6 @@ impl PyAam {
     fn inner_ref(&self) -> PyResult<&AAM> {
         self.inner
             .as_ref()
-            .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
-    }
-
-    fn inner_mut(&mut self) -> PyResult<&mut AAM> {
-        self.inner
-            .as_mut()
             .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
     }
 }
@@ -308,7 +301,8 @@ impl PyAam {
 
 // ── Module registration ──────────────────────────────────────────────────────
 
-pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
+#[pymodule(name = "aam_rs")]
+fn aam_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAam>()?;
     m.add_class::<PyAamBuilder>()?;
     m.add_class::<PySchemaField>()?;
