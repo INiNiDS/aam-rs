@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.0](https://github.com/INiNiDS/aam-rs/compare/2.1.0...2.2.0) - 2026-04-22
+
+### Added
+
+- *(aam)* add Python bindings for aam-rs
+
 ## [2.1.0](https://github.com/INiNiDS/aam-rs/compare/2.0.6...2.1.0) - 2026-04-21
 
 ### Added
