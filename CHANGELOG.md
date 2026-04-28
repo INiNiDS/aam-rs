@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.0](https://github.com/INiNiDS/aam-rs/compare/2.2.0...2.3.0) - 2026-04-28
+
+### Added
+
+- *(translator)* add TOML to AAM translation functionality
+
 ## [2.2.0](https://github.com/INiNiDS/aam-rs/compare/2.1.0...2.2.0) - 2026-04-22
 
 ### Added
