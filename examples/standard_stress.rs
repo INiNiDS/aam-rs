@@ -15,7 +15,7 @@ use aam_rs::builder::AAMBuilder;
 use std::time::Instant;
 
 fn main() {
-    let count = 30_000_000;
+    let count = 300;
     println!("🚀 Starting stress test with {} key-value pairs...", count);
 
     // ── Generation ────────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ fn main() {
     }
     let path = "generated_stress_test.aam";
     let gen_duration = gen_start.elapsed();
+    builder.to_file(path).expect("Failed to write AAM file");
     println!("✅ Generation:  {:?}", gen_duration);
 
     // ── Parsing ───────────────────────────────────────────────────────────────

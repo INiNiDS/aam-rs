@@ -42,7 +42,8 @@ serde = { version = "1.0.228", features = ["derive"], optional = true }
 pyo3 = { version = "0.28", features = ["extension-module", "abi3-py38"], optional = true }
 jni = { version = "0.22.3", optional = true }
 memmap2 = { version = "0.9.9", optional = true }
-rkyv = { version = "0.8.15", features = ["std", "bytecheck"], optional = true }
+rkyv = { version = "0.8.16", features = ["std", "bytecheck"], optional = true }
+toml = { version = "1.1.2", optional = true }
 
 [build-dependencies]
 csbindgen = { version = "1.9.7", optional = true }
@@ -66,6 +67,7 @@ csharp = ["dep:csbindgen", "ffi"]
 legacy = []
 parallel = ["dep:rayon"]
 64bit = ["rkyv/pointer_width_64"]
+translator = ["dep:toml"]
 
 [[example]]
 name = "standard"
@@ -75,6 +77,7 @@ name = "standard_stress"
 
 [[example]]
 name = "derive"
+required-features = ["serde"]
 
 [[example]]
 name = "custom_types"
@@ -90,6 +93,10 @@ name = "config_inheritance"
 
 [[example]]
 name = "builder"
+
+[[example]]
+name = "translator"
+required-features = ["translator"]
 
 [dev-dependencies]
 serde_json = "1.0.149"
