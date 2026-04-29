@@ -2,6 +2,8 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder as CoreAamBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+#[cfg(feature = "translator")]
+use aam_rs::translator::TOMLTranslator;
 use napi::{Error, Result, Status};
 use napi_derive::napi;
 use std::collections::HashMap;
@@ -286,4 +288,21 @@ pub fn lsp_assist(content: String) -> JsLspResult {
 #[napi]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+// ── TOMLTranslator ──────────────────────────────────────────────────────────
+
+#[cfg(feature = "translator")]
+#[napi(js_name = "TOMLTranslator")]
+pub struct JsTOMLTranslator;
+
+#[cfg(feature = "translator")]
+#[napi]
+impl JsTOMLTranslator {
+    #[napi(js_name = "tomlToAAM")]
+    pub fn toml_to_aam(toml_source: String) -> Result<Vec<String>> {
+        TOMLTranslator::toml_to_aam(&toml_source)
+            .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))
+            .map(|builders| builders.into_iter().map(|b| b.build()).collect())
+    }
 }

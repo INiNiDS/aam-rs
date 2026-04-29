@@ -2,6 +2,8 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+#[cfg(feature = "translator")]
+use aam_rs::translator::TOMLTranslator;
 use wasm_bindgen::prelude::*;
 
 fn first_js_error(errors: Vec<AamlError>) -> JsValue {
@@ -213,5 +215,26 @@ impl AamDocument {
             .map_or(JsValue::NULL, |text| JsValue::from_str(&text));
         let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("formatted"), &formatted);
         JsValue::from(obj)
+    }
+}
+
+// ── TOMLTranslator ───────────────────────────────────────────────────────────
+
+#[cfg(feature = "translator")]
+#[wasm_bindgen(js_name = TOMLTranslator)]
+pub struct WasmTOMLTranslator;
+
+#[cfg(feature = "translator")]
+#[wasm_bindgen]
+impl WasmTOMLTranslator {
+    #[wasm_bindgen(js_name = tomlToAAM)]
+    pub fn toml_to_aam(toml_source: &str) -> Result<js_sys::Array, JsValue> {
+        let builders = TOMLTranslator::toml_to_aam(toml_source)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let arr = js_sys::Array::new();
+        for builder in builders {
+            arr.push(&JsValue::from_str(&builder.build()));
+        }
+        Ok(arr)
     }
 }

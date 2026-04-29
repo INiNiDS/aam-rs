@@ -1,11 +1,11 @@
 [package]
 name = "aam-rs-node"
-version = "2.0.4"
+version = "2.3.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-aam-rs = { path = "../.." }
+aam-rs = { path = "../..", features = ["translator"] }
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 

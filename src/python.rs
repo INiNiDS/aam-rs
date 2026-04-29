@@ -8,6 +8,9 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
+#[cfg(feature = "translator")]
+use crate::translator::TOMLTranslator;
+
 // ── Error conversion ─────────────────────────────────────────────────────────
 
 fn to_py(err: AamlError) -> PyErr {
@@ -306,12 +309,33 @@ impl PyAam {
     }
 }
 
+// ── PyTOMLTranslator class ───────────────────────────────────────────────
+
+#[cfg(feature = "translator")]
+#[pyclass(name = "TOMLTranslator")]
+pub struct PyTOMLTranslator;
+
+#[cfg(feature = "translator")]
+#[pymethods]
+impl PyTOMLTranslator {
+    #[staticmethod]
+    fn toml_to_aam(toml_source: &str) -> PyResult<Vec<String>> {
+        TOMLTranslator::toml_to_aam(toml_source)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            .map(|builders| builders.into_iter().map(|b| b.build()).collect())
+    }
+}
+
 // ── Module registration ──────────────────────────────────────────────────────
 
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
     m.add_class::<PyAam>()?;
     m.add_class::<PyAamBuilder>()?;
     m.add_class::<PySchemaField>()?;
+    #[cfg(feature = "translator")]
+    {
+        m.add_class::<PyTOMLTranslator>()?;
+    }
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
