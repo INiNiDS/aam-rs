@@ -1,11 +1,12 @@
 //! PyO3 bindings — exposes `AAM` to Python as `aam_rs.AAM`.
 
-use aam_rs::aam::AAM;
-use aam_rs::builder::{AAMBuilder, SchemaField};
-use aam_rs::error::AamlError;
-use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+use ::aam_rs::aam::AAM;
+use ::aam_rs::builder::{AAMBuilder, SchemaField};
+use ::aam_rs::error::AamlError;
+use ::aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use std::collections::HashMap;
 
 // ── Error conversion ─────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 
 // ── PySchemaField class ──────────────────────────────────────────────────────
 
-#[pyclass(name = "SchemaField")]
+#[pyclass(name = "SchemaField", from_py_object)]
 #[derive(Clone)]
 pub struct PySchemaField {
     inner: SchemaField,
@@ -53,7 +54,7 @@ impl PySchemaField {
 
 // ── PyAAMBuilder class ───────────────────────────────────────────────────────
 
-#[pyclass(unsendable, name = "AAMBuilder")]
+#[pyclass(unsendable, name = "AAMBuilder", skip_from_py_object)]
 pub struct PyAamBuilder {
     inner: AAMBuilder,
 }
@@ -123,7 +124,7 @@ impl PyAamBuilder {
 
 // ── PyAAM class ──────────────────────────────────────────────────────────────
 
-#[pyclass(unsendable, name = "AAM")]
+#[pyclass(unsendable, name = "AAM", skip_from_py_object)]
 pub struct PyAam {
     inner: Option<AAM>,
 }

@@ -28,7 +28,7 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 
 // ── PySchemaField class ──────────────────────────────────────────────────────
 
-#[pyclass(name = "SchemaField")]
+#[pyclass(name = "SchemaField", from_py_object)]
 #[derive(Clone)]
 pub struct PySchemaField {
     inner: SchemaField,
@@ -127,7 +127,7 @@ impl PyAamBuilder {
 
 // ── PyAAM class ──────────────────────────────────────────────────────────────
 
-#[pyclass(unsendable, name = "AAM")]
+#[pyclass(unsendable, name = "AAM", skip_from_py_object)]
 pub struct PyAam {
     inner: Option<AAM>,
 }
@@ -136,12 +136,6 @@ impl PyAam {
     fn inner_ref(&self) -> PyResult<&AAM> {
         self.inner
             .as_ref()
-            .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
-    }
-
-    fn inner_mut(&mut self) -> PyResult<&mut AAM> {
-        self.inner
-            .as_mut()
             .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
     }
 }

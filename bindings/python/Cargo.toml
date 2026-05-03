@@ -8,9 +8,12 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [lib]
-name = "aam_rs"
-crate-type = ["cdylib", "rlib"]
+name = "_aam_rs"
+crate-type = ["cdylib"]
 
 [dependencies]
-aam-rs = { path = "../../..", features = ["python"] }
+aam-rs = { path = "../..", features = ["python"] }
 pyo3 = { version = "0.28", features = ["extension-module", "abi3-py38"] }
+
+[features]
+python = []
