@@ -55,7 +55,7 @@ Add the crate to your `Cargo.toml`:
 <!-- x-release-please-start-version -->
 ```toml
 [dependencies]
-aam-rs = "2.0.4"
+aam-rs = "3.0.0"
 ```
 
 <!-- x-release-please-end -->
