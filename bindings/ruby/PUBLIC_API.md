@@ -13,6 +13,7 @@ Source of truth: `ruby/ext/aam_rs/src/lib.rs`.
 - `AamRb::AAM.new`
 - `AamRb::AAM.parse(content)`
 - `AamRb::AAM.load(path)`
+- `AamRb.split_aam(content)`
 - `AamRb::AAMBuilder.new`
 - `AamRb::AAMBuilder.with_capacity(capacity)`
 - `AamRb::SchemaField.required(name, type_name)`

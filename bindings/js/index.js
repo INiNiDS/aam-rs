@@ -77,8 +77,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-android-arm64')
                 const bindingPackageVersion = require('aam-nodejs-android-arm64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -93,8 +93,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-android-arm-eabi')
                 const bindingPackageVersion = require('aam-nodejs-android-arm-eabi/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -114,8 +114,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-win32-x64-gnu')
                     const bindingPackageVersion = require('aam-nodejs-win32-x64-gnu/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -130,8 +130,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-win32-x64-msvc')
                     const bindingPackageVersion = require('aam-nodejs-win32-x64-msvc/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -147,8 +147,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-win32-ia32-msvc')
                 const bindingPackageVersion = require('aam-nodejs-win32-ia32-msvc/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -163,8 +163,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-win32-arm64-msvc')
                 const bindingPackageVersion = require('aam-nodejs-win32-arm64-msvc/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -182,8 +182,8 @@ function requireNative() {
         try {
             const binding = require('aam-nodejs-darwin-universal')
             const bindingPackageVersion = require('aam-nodejs-darwin-universal/package.json').version
-            if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+            if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
             }
             return binding
         } catch (e) {
@@ -198,8 +198,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-darwin-x64')
                 const bindingPackageVersion = require('aam-nodejs-darwin-x64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -214,8 +214,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-darwin-arm64')
                 const bindingPackageVersion = require('aam-nodejs-darwin-arm64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -234,8 +234,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-freebsd-x64')
                 const bindingPackageVersion = require('aam-nodejs-freebsd-x64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -250,8 +250,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-freebsd-arm64')
                 const bindingPackageVersion = require('aam-nodejs-freebsd-arm64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -271,8 +271,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-x64-musl')
                     const bindingPackageVersion = require('aam-nodejs-linux-x64-musl/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -287,8 +287,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-x64-gnu')
                     const bindingPackageVersion = require('aam-nodejs-linux-x64-gnu/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -305,8 +305,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-arm64-musl')
                     const bindingPackageVersion = require('aam-nodejs-linux-arm64-musl/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -321,8 +321,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-arm64-gnu')
                     const bindingPackageVersion = require('aam-nodejs-linux-arm64-gnu/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -339,8 +339,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-arm-musleabihf')
                     const bindingPackageVersion = require('aam-nodejs-linux-arm-musleabihf/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -355,8 +355,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-arm-gnueabihf')
                     const bindingPackageVersion = require('aam-nodejs-linux-arm-gnueabihf/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -373,8 +373,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-loong64-musl')
                     const bindingPackageVersion = require('aam-nodejs-linux-loong64-musl/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -389,8 +389,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-loong64-gnu')
                     const bindingPackageVersion = require('aam-nodejs-linux-loong64-gnu/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -407,8 +407,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-riscv64-musl')
                     const bindingPackageVersion = require('aam-nodejs-linux-riscv64-musl/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -423,8 +423,8 @@ function requireNative() {
                 try {
                     const binding = require('aam-nodejs-linux-riscv64-gnu')
                     const bindingPackageVersion = require('aam-nodejs-linux-riscv64-gnu/package.json').version
-                    if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                        throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                     }
                     return binding
                 } catch (e) {
@@ -440,8 +440,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-linux-ppc64-gnu')
                 const bindingPackageVersion = require('aam-nodejs-linux-ppc64-gnu/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                    if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                        throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -456,8 +456,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-linux-s390x-gnu')
                 const bindingPackageVersion = require('aam-nodejs-linux-s390x-gnu/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -476,8 +476,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-openharmony-arm64')
                 const bindingPackageVersion = require('aam-nodejs-openharmony-arm64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -492,8 +492,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-openharmony-x64')
                 const bindingPackageVersion = require('aam-nodejs-openharmony-x64/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -508,8 +508,8 @@ function requireNative() {
             try {
                 const binding = require('aam-nodejs-openharmony-arm')
                 const bindingPackageVersion = require('aam-nodejs-openharmony-arm/package.json').version
-                if (bindingPackageVersion !== '1.4.0' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
-                    throw new Error(`Native binding package version mismatch, expected 1.4.0 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
+                if (bindingPackageVersion !== '2.4.1' && process.env.NAPI_RS_ENFORCE_VERSION_CHECK && process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== '0') {
+                    throw new Error(`Native binding package version mismatch, expected 2.4.1 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`)
                 }
                 return binding
             } catch (e) {
@@ -575,6 +575,62 @@ if (!nativeBinding) {
     throw new Error(`Failed to load native binding`)
 }
 
+function parseSectionHeader(line) {
+    if (!line.startsWith('#')) {
+        return null
+    }
+    const rest = line.slice(1).trim()
+    return rest.endsWith('.aam') ? rest : null
+}
+
+function parseAssignment(line) {
+    const idx = line.indexOf('=')
+    if (idx <= 0) {
+        return null
+    }
+    const key = line.slice(0, idx).trim()
+    if (!key) {
+        return null
+    }
+    return [key, line.slice(idx + 1).trim()]
+}
+
+function splitAam(content) {
+    const result = {}
+    let currentName = null
+    let currentBuilder = null
+
+    for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim()
+        if (!line) {
+            continue
+        }
+
+        const header = parseSectionHeader(line)
+        if (header) {
+            if (currentName && currentBuilder) {
+                result[currentName] = currentBuilder
+            }
+            currentName = header
+            currentBuilder = new nativeBinding.AAMBuilder()
+            continue
+        }
+
+        if (currentName && currentBuilder) {
+            const assignment = parseAssignment(line)
+            if (assignment) {
+                currentBuilder.addLine(assignment[0], assignment[1])
+            }
+        }
+    }
+
+    if (currentName && currentBuilder) {
+        result[currentName] = currentBuilder
+    }
+
+    return result
+}
+
 module.exports = nativeBinding
 module.exports.AAM = nativeBinding.AAM
 module.exports.JsAam = nativeBinding.JsAam
@@ -584,4 +640,5 @@ module.exports.format = nativeBinding.format
 module.exports.load = nativeBinding.load
 module.exports.lspAssist = nativeBinding.lspAssist
 module.exports.parse = nativeBinding.parse
-module.exports.version = nativeBinding.version
+module.exports.splitAam = splitAam
+module.exports.version = () => '2.4.1'

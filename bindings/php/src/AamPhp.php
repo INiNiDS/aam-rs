@@ -55,6 +55,54 @@ final class AamDocument
         }
     }
 
+    public static function parse(string $content, ?string $libPath = null): self
+    {
+        return new self($content, $libPath);
+    }
+
+    /**
+     * @return array<string, AamBuilder>
+     */
+    public static function splitAam(string $content): array
+    {
+        $result = [];
+        $currentName = null;
+        $currentBuilder = null;
+
+        foreach (preg_split('/\r?\n/', $content) ?: [] as $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '') {
+                continue;
+            }
+
+            $header = self::parseSectionHeader($line);
+            if ($header !== null) {
+                if ($currentName !== null && $currentBuilder !== null) {
+                    $result[$currentName] = $currentBuilder;
+                }
+                $currentName = $header;
+                $currentBuilder = new AamBuilder();
+                continue;
+            }
+
+            if ($currentName === null || $currentBuilder === null) {
+                continue;
+            }
+
+            $assignment = self::parseAssignment($line);
+            if ($assignment !== null) {
+                [$key, $value] = $assignment;
+                $currentBuilder->addLine($key, $value);
+            }
+        }
+
+        if ($currentName !== null && $currentBuilder !== null) {
+            $result[$currentName] = $currentBuilder;
+        }
+
+        return $result;
+    }
+
     public function __destruct()
     {
         if ($this->handle !== null && !FFI::isNull($this->handle)) {
@@ -167,6 +215,34 @@ final class AamDocument
         } finally {
             $this->ffi->aam_string_free($ptr);
         }
+    }
+
+    private static function parseSectionHeader(string $line): ?string
+    {
+        if (!str_starts_with($line, '#')) {
+            return null;
+        }
+
+        $rest = trim(substr($line, 1));
+        return str_ends_with($rest, '.aam') ? $rest : null;
+    }
+
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    private static function parseAssignment(string $line): ?array
+    {
+        $idx = strpos($line, '=');
+        if ($idx === false || $idx <= 0) {
+            return null;
+        }
+
+        $key = trim(substr($line, 0, $idx));
+        if ($key === '') {
+            return null;
+        }
+
+        return [$key, trim(substr($line, $idx + 1))];
     }
 }
 

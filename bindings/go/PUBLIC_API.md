@@ -13,6 +13,7 @@ Source of truth: `go/aam/aam.go`.
 - `New() (*AAM, error)`
 - `Parse(content string) (*AAM, error)`
 - `Load(path string) (*AAM, error)`
+- `SplitAam(content string) map[string]*AAMBuilder`
 - `NewBuilder() *AAMBuilder`
 - `RequiredField(name, typeName string) SchemaField`
 - `OptionalField(name, typeName string) SchemaField`

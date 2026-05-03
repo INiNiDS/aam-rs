@@ -42,6 +42,26 @@ fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
         .collect()
 }
 
+fn parse_section_header(line: &str) -> Option<&str> {
+    if !line.starts_with('#') {
+        return None;
+    }
+    let rest = line[1..].trim();
+    rest.ends_with(".aam").then_some(rest)
+}
+
+fn parse_assignment(line: &str) -> Option<(&str, &str)> {
+    let idx = line.find('=')?;
+    if idx == 0 {
+        return None;
+    }
+    let key = line[..idx].trim();
+    if key.is_empty() {
+        return None;
+    }
+    Some((key, line[idx + 1..].trim()))
+}
+
 #[wasm_bindgen]
 impl WasmAamBuilder {
     #[wasm_bindgen(constructor)]
@@ -216,6 +236,49 @@ impl AamDocument {
         let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("formatted"), &formatted);
         JsValue::from(obj)
     }
+}
+
+#[wasm_bindgen(js_name = splitAam)]
+pub fn split_aam(content: &str) -> js_sys::Object {
+    let result = js_sys::Object::new();
+    let mut current_name: Option<String> = None;
+    let mut current_builder = WasmAamBuilder::new();
+
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Some(filename) = parse_section_header(line) {
+            if let Some(prev_name) = current_name.take() {
+                let _ = js_sys::Reflect::set(
+                    &result,
+                    &JsValue::from_str(&prev_name),
+                    &JsValue::from_str(&current_builder.as_string()),
+                );
+            }
+            current_name = Some(filename.to_owned());
+            current_builder = WasmAamBuilder::new();
+            continue;
+        }
+
+        if current_name.is_some() {
+            if let Some((key, value)) = parse_assignment(line) {
+                current_builder.add_line(key, value);
+            }
+        }
+    }
+
+    if let Some(prev_name) = current_name {
+        let _ = js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str(&prev_name),
+            &JsValue::from_str(&current_builder.as_string()),
+        );
+    }
+
+    result
 }
 
 // ── TOMLTranslator ───────────────────────────────────────────────────────────

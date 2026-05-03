@@ -61,6 +61,54 @@ public sealed unsafe class AamDocument : IDisposable
     }
 
     /// <summary>
+    /// Splits a multi-section AAM text into a dictionary of builders keyed by section filename.
+    /// </summary>
+    public static Dictionary<string, AamBuilder> SplitAam(string content)
+    {
+        var result = new Dictionary<string, AamBuilder>(StringComparer.Ordinal);
+        string? currentName = null;
+        AamBuilder? currentBuilder = null;
+
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrEmpty(line))
+            {
+                continue;
+            }
+
+            if (ParseSectionHeader(line) is string header)
+            {
+                if (currentName is not null && currentBuilder is not null)
+                {
+                    result[currentName] = currentBuilder;
+                }
+
+                currentName = header;
+                currentBuilder = new AamBuilder();
+                continue;
+            }
+
+            if (currentName is null || currentBuilder is null)
+            {
+                continue;
+            }
+
+            if (ParseAssignment(line) is { } assignment)
+            {
+                currentBuilder.AddLine(assignment.key, assignment.value);
+            }
+        }
+
+        if (currentName is not null && currentBuilder is not null)
+        {
+            result[currentName] = currentBuilder;
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Gets a value indicating whether the document has been disposed.
     /// </summary>
     public bool IsClosed => _handle is null || _handle.IsClosed || _handle.IsInvalid;
@@ -181,6 +229,35 @@ public sealed unsafe class AamDocument : IDisposable
         var errPtr = AamNative.aam_last_error(Handle);
         var message = AamNative.BorrowUtf8String(errPtr) ?? "Native operation failed";
         throw new AamException(message);
+    }
+
+    private static string? ParseSectionHeader(string line)
+    {
+        if (!line.StartsWith('#'))
+        {
+            return null;
+        }
+
+        var rest = line[1..].Trim();
+        return rest.EndsWith(".aam", StringComparison.Ordinal) ? rest : null;
+    }
+
+    private static (string key, string value)? ParseAssignment(string line)
+    {
+        var idx = line.IndexOf('=');
+        if (idx <= 0)
+        {
+            return null;
+        }
+
+        var key = line[..idx].Trim();
+        if (string.IsNullOrEmpty(key))
+        {
+            return null;
+        }
+
+        var value = line[(idx + 1)..].Trim();
+        return (key, value);
     }
 
     private static Dictionary<string, string> ParseLineMap(string? raw)

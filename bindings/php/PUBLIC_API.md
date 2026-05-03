@@ -11,6 +11,8 @@ Source of truth: `php/src/AamPhp.php`.
 ## AamDocument Construction
 
 - `new AamDocument(string $content, ?string $libPath = null)`
+- `AamDocument::parse(string $content, ?string $libPath = null)`
+- `AamDocument::splitAam(string $content)`
 
 ## AamDocument Methods
 

@@ -1,3 +1,4 @@
+use crate::builder::AAMBuilder;
 use std::collections::HashMap;
 
 /// Parses a multi-section AAML text and returns a `HashMap` mapping each file name

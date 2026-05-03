@@ -11,6 +11,7 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 
 - `AamDocument.parse(String content)`
 - `AamDocument.load(String path)`
+- `AamDocument.splitAam(String content)`
 
 ## Instance Methods
 

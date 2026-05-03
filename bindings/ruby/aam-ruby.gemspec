@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = 'aam-ruby'
-  spec.version = '2.0.4' # x-release-please-version
+  spec.version = '2.4.1' # x-release-please-version
   spec.authors = ['INiNiDS']
   spec.email = ['ininids@ininids.in.rs']
 

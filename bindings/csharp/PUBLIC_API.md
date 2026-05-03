@@ -11,6 +11,7 @@ Source of truth: `csharp/src/AamDocument.cs`, `csharp/src/AamBuilder.cs`.
 - `new AamDocument()`
 - `AamDocument.Parse(string content)`
 - `AamDocument.Load(string path)`
+- `AamDocument.SplitAam(string content)`
 
 ## Core Methods
 

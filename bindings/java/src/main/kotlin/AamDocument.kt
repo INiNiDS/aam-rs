@@ -80,6 +80,54 @@ class AamDocument private constructor(private var nativePtr: Long) : AutoCloseab
             if (ptr == 0L) throw IllegalStateException("Failed to load AAM file: $path")
             return AamDocument(ptr)
         }
+
+        @JvmStatic
+        fun splitAam(content: String): Map<String, AamBuilder> {
+            val result = linkedMapOf<String, AamBuilder>()
+            var currentName: String? = null
+            var currentBuilder: AamBuilder? = null
+
+            for (rawLine in content.lineSequence()) {
+                val line = rawLine.trim()
+                if (line.isEmpty()) continue
+
+                val header = parseSectionHeader(line)
+                if (header != null) {
+                    if (currentName != null && currentBuilder != null) {
+                        result[currentName] = currentBuilder
+                    }
+                    currentName = header
+                    currentBuilder = AamBuilder()
+                    continue
+                }
+
+                if (currentName == null || currentBuilder == null) continue
+
+                parseAssignment(line)?.let { (key, value) ->
+                    currentBuilder.addLine(key, value)
+                }
+            }
+
+            if (currentName != null && currentBuilder != null) {
+                result[currentName] = currentBuilder
+            }
+
+            return result
+        }
+
+        private fun parseSectionHeader(line: String): String? {
+            if (!line.startsWith('#')) return null
+            val rest = line.substring(1).trim()
+            return if (rest.endsWith(".aam")) rest else null
+        }
+
+        private fun parseAssignment(line: String): Pair<String, String>? {
+            val idx = line.indexOf('=')
+            if (idx <= 0) return null
+            val key = line.substring(0, idx).trim()
+            if (key.isEmpty()) return null
+            return key to line.substring(idx + 1).trim()
+        }
     }
 
     /**

@@ -208,6 +208,66 @@ func parseCMap(cStr *C.char) map[string]string {
 	return res
 }
 
+// SplitAam parses a multi-section AAM text into per-file builders.
+func SplitAam(content string) map[string]*AAMBuilder {
+	result := make(map[string]*AAMBuilder)
+	var currentName string
+	var currentBuilder *AAMBuilder
+
+	for _, rawLine := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+
+		if filename, ok := parseSectionHeader(line); ok {
+			if currentName != "" && currentBuilder != nil {
+				result[currentName] = currentBuilder
+			}
+			currentName = filename
+			currentBuilder = NewBuilder()
+			continue
+		}
+
+		if currentName == "" || currentBuilder == nil {
+			continue
+		}
+
+		if key, value, ok := parseAssignment(line); ok {
+			currentBuilder.AddLine(key, value)
+		}
+	}
+
+	if currentName != "" && currentBuilder != nil {
+		result[currentName] = currentBuilder
+	}
+
+	return result
+}
+
+func parseSectionHeader(s string) (string, bool) {
+	if !strings.HasPrefix(s, "#") {
+		return "", false
+	}
+	rest := strings.TrimSpace(s[1:])
+	if strings.HasSuffix(rest, ".aam") {
+		return rest, true
+	}
+	return "", false
+}
+
+func parseAssignment(s string) (string, string, bool) {
+	parts := strings.SplitN(s, "=", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(parts[0])
+	if key == "" {
+		return "", "", false
+	}
+	return key, strings.TrimSpace(parts[1]), true
+}
+
 // SchemaField declares a field used in @schema directives.
 type SchemaField struct {
 	Name     string

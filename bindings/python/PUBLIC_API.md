@@ -17,6 +17,7 @@ Source of truth: `src/python.rs` (PyO3 class exported as `aam_py.AAM`).
 ## Utility Static Method
 
 - `AAM.lsp_assist(content: str) -> tuple[list[str], str | None]`
+- `split_aam(content: str) -> dict[str, AAMBuilder]`
 
 ## Instance Methods
 
