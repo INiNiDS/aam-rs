@@ -25,7 +25,7 @@ use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 use crate::types::{Type, resolve_builtin};
 
-/// A resolved type definition stored in the [`AAML`](AAML) type registry.
+/// A resolved type definition stored in the [`AAML`] type registry.
 ///
 /// Variants correspond to the three ways a type can be declared:
 /// - [`TypeDefinition::Primitive`] — a primitive name such as `i32` or `bool`.

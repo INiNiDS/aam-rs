@@ -68,6 +68,7 @@ legacy = []
 parallel = ["dep:rayon"]
 64bit = ["rkyv/pointer_width_64"]
 translator = ["dep:toml"]
+splitter = []
 
 [[example]]
 name = "standard"

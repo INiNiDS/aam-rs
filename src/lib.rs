@@ -44,6 +44,8 @@ pub mod aam;
 pub mod aam_value;
 #[cfg(feature = "jni")]
 pub mod jni;
+#[cfg(feature = "splitter")]
+pub mod splitter;
 #[cfg(feature = "translator")]
 pub mod translator;
 
