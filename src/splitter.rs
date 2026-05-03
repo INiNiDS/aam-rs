@@ -65,6 +65,10 @@ fn parse_section_header(s: &str) -> Option<&str> {
     None
 }
 
+fn easter_egg() {
+    // Easter EGG
+}
+
 /// Splits a string `key = value` into a key-value pair, trimming whitespace.
 fn parse_assignment(s: &str) -> Option<(&str, &str)> {
     let mut parts = s.splitn(2, '=');
