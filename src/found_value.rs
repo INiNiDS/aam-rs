@@ -83,6 +83,31 @@ impl FoundValue {
     pub fn is_object(&self) -> bool {
         parsing::is_inline_object(&self.inner)
     }
+
+    /// Attempts to parse the inner value into any type that implements FromStr.
+    /// Suitable for u32, f32, bool, etc.
+    pub fn parse<T>(&self) -> Result<T, T::Err>
+    where
+        T: std::str::FromStr,
+    {
+        self.inner.parse::<T>()
+    }
+
+    /// Specialized method for parsing "list" strings of the form [1, 2, 3]
+    /// into a vector of elements of the desired type.
+    ///
+    /// Returns `None` if this is not a list, or a `Result` with the element parsing error.
+    pub fn parse_list<T>(&self) -> Option<Result<Vec<T>, T::Err>>
+    where
+        T: std::str::FromStr,
+    {
+        self.as_list().map(|items| {
+            items
+                .into_iter()
+                .map(|s| s.trim().parse::<T>())
+                .collect::<Result<Vec<T>, T::Err>>()
+        })
+    }
 }
 
 impl From<String> for FoundValue {
