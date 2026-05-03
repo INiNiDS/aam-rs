@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.1](https://github.com/INiNiDS/aam-rs/compare/2.5.0...2.5.1) - 2026-05-03
+
+### Fixed
+
+- *(splitter)* add easter egg function to splitter module
+
 ## [2.5.0](https://github.com/INiNiDS/aam-rs/compare/2.4.0...2.5.0) - 2026-05-03
 
 ### Added
