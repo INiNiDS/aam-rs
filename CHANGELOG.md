@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.0](https://github.com/INiNiDS/aam-rs/compare/2.4.0...2.5.0) - 2026-05-03
+
+### Added
+
+- *(splitter)* implement split_aam function for multi-section AAML parsing
+
 ## [2.4.0](https://github.com/INiNiDS/aam-rs/compare/2.3.0...2.4.0) - 2026-05-03
 
 ### Added
