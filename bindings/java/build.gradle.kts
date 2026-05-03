@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "rs.in.ininids"
-version = "2.4.1" // x-release-please-version
+version = "2.5.1" // x-release-please-version
 
 repositories {
     mavenCentral()

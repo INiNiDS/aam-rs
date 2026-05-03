@@ -69,5 +69,5 @@ def split_aam(content: str) -> Dict[str, AAMBuilder]:
 
 __all__ = ["AAM", "AAMBuilder", "SchemaField", "__version__", "split_aam"]
 
-__version__ = "2.4.1"
+__version__ = "2.5.1"
 

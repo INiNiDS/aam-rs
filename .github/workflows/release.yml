@@ -267,37 +267,6 @@ jobs:
             fh.write(f"tag_name={tag_name}\n")
           PY
 
-      - name: Wait for release-please sync workflow
-        if: ${{ steps.release.outputs.releases_created == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ steps.extract_tag.outputs.tag_name }}
-        run: |
-          echo "Waiting for release-please workflow on tag '$TAG_NAME'..."
-
-          RUN_ID=""
-          for _ in {1..36}; do
-            RUN_ID=$(gh run list \
-              --workflow "Sync Non-Rust Versions" \
-              --event push \
-              --json databaseId,headBranch \
-              --jq ".[] | select(.headBranch == \"$TAG_NAME\") | .databaseId" | head -n 1)
-
-            if [[ -n "$RUN_ID" ]]; then
-              break
-            fi
-
-            sleep 10
-          done
-
-          if [[ -z "$RUN_ID" ]]; then
-            echo "Could not find release-please run for tag '$TAG_NAME'"
-            exit 1
-          fi
-
-          gh run watch "$RUN_ID" --exit-status
-
   build-node-bindings:
     name: Build Node.js Native Addons
     needs: [ release-plz, generate-credits ]
