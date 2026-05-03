@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.0](https://github.com/INiNiDS/aam-rs/compare/2.3.0...2.4.0) - 2026-05-03
+
+### Added
+
+- *(splitter)* add AAML splitting functionality with parsing methods
+- *(found_value)* add parsing methods for single values and lists
+
+### Other
+
+- *(aam)* update version to 2.3.0 and add TOML translation support
+
 ## [2.3.0](https://github.com/INiNiDS/aam-rs/compare/2.2.0...2.3.0) - 2026-04-28
 
 ### Added
