@@ -8,7 +8,6 @@ use crate::pipeline::tasks::{ExecutionStats, ExecutionTask, ParseTask, Validatio
 use crate::pipeline::{PipelineBuildHasher, PipelineHashMap};
 use smol_str::SmolStr;
 use std::collections::HashSet;
-use std::path::PathBuf;
 
 #[inline]
 fn new_pipeline_map<K, V>() -> PipelineHashMap<K, V> {

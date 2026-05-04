@@ -10,8 +10,10 @@ use crate::error::ErrorDiagnostics;
 use crate::pipeline::PipelineHashMap;
 use crate::pipeline::execution_descriptor::ExecutionDescriptor;
 use crate::pipeline::tasks::ExecutionTask;
+use crate::pipeline::utils::resolve_relative_path;
 use bumpalo::Bump;
 use smol_str::SmolStr;
+use std::path::Path;
 
 /// Trait for executing the final materialization of configuration state.
 ///
@@ -227,20 +229,29 @@ impl DefaultExecuter {
         file_path: &std::borrow::Cow<'_, str>,
         merge_strategy: &std::borrow::Cow<'_, str>,
         output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
+        source_dir: Option<&Path>,
     ) -> Result<(), AamlError> {
-        let content =
-            std::fs::read_to_string(file_path.as_ref()).map_err(|e| AamlError::IoError {
-                details: e.to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
-                    "I/O operation failed",
-                    format!("Could not read imported file '{}': {}", file_path, e),
-                    "Check file permissions and ensure the path exists",
-                )),
-            })?;
+        let resolved = resolve_relative_path(file_path.as_ref(), source_dir);
+        let content = std::fs::read_to_string(&resolved).map_err(|e| AamlError::IoError {
+            details: e.to_string(),
+            diagnostics: Some(ErrorDiagnostics::new(
+                "I/O operation failed",
+                format!(
+                    "Could not read imported file '{}': {}",
+                    resolved.display(),
+                    e
+                ),
+                "Check file permissions and ensure the path exists",
+            )),
+        })?;
 
         let sub_pipeline = crate::pipeline::Pipeline::new();
         let arena = Bump::new();
-        let sub_output = match sub_pipeline.process_with_arena(&content, &arena) {
+        let sub_output = match sub_pipeline.process_with_arena_and_source_dir(
+            &content,
+            &arena,
+            resolved.parent(),
+        ) {
             Ok(out) => out,
             Err(errors) => {
                 return Err(errors
@@ -314,7 +325,12 @@ impl DefaultExecuter {
                 file_path,
                 merge_strategy,
                 line: _,
-            } => Self::import_file(file_path, merge_strategy, output_map),
+            } => Self::import_file(
+                file_path,
+                merge_strategy,
+                output_map,
+                crate::pipeline::source_dir::get().as_deref(),
+            ),
             ExecutionTask::ResolveReference {
                 source_key,
                 target_key,

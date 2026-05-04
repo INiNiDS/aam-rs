@@ -14,6 +14,7 @@
 use crate::aaml::AAML;
 use crate::commands::Command;
 use crate::error::AamlError;
+use crate::pipeline::utils::resolve_relative_path;
 
 /// Command handler for the `@import` directive.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -46,6 +47,7 @@ impl Command for ImportCommand {
         }
 
         let path = AAML::unwrap_quotes(raw_path);
-        aaml.merge_file(path)
+        let resolved = resolve_relative_path(path, aaml.source_dir.as_deref());
+        aaml.merge_file(resolved)
     }
 }

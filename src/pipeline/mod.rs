@@ -14,6 +14,8 @@ pub mod parser;
 pub mod scope_manager;
 pub mod utils;
 
+pub(crate) mod source_dir;
+
 pub mod executer;
 pub mod executor_traits;
 pub mod tasks;
@@ -175,6 +177,16 @@ impl Pipeline {
     pub fn process(&self, content: &str) -> Result<PipelineOutput, Vec<AamlError>> {
         let arena = Bump::new();
         self.process_with_arena(content, &arena)
+    }
+
+    /// Processes AAML content with a source directory for relative path resolution.
+    pub fn process_with_source_dir(
+        &self,
+        content: &str,
+        source_dir: Option<&std::path::Path>,
+    ) -> Result<PipelineOutput, Vec<AamlError>> {
+        let arena = Bump::new();
+        self.process_with_arena_and_source_dir(content, &arena, source_dir)
     }
 
     /// Creates a pipeline instance.
@@ -521,6 +533,7 @@ impl Pipeline {
         &self,
         content: &'a str,
         arena: &'a Bump,
+        source_dir: Option<&std::path::Path>,
     ) -> Result<PipelineOutput, Vec<AamlError>> {
         let mut all_errors: ErrorAccumulator = TinyVec::new();
 
@@ -531,6 +544,10 @@ impl Pipeline {
 
         let ast = self.parse_ast(&tokens, &mut all_errors);
         let mut descriptor = ExecutionDescriptor::new(ast.clone(), "inline".to_string());
+
+        // RAII guard: resets thread-local source_dir on drop (including panic)
+        let _guard =
+            crate::pipeline::source_dir::SourceDirGuard::new(source_dir.map(|p| p.to_path_buf()));
 
         self.run_parse_tasks(&ast, arena, &mut descriptor, &mut all_errors);
         self.run_validation_tasks(&ast, &mut descriptor, &mut all_errors);
@@ -557,7 +574,16 @@ impl Pipeline {
         content: &'a str,
         arena: &'a Bump,
     ) -> Result<PipelineOutput, Vec<AamlError>> {
-        self.process_with_tasks(content, arena)
+        self.process_with_tasks(content, arena, None)
+    }
+
+    pub fn process_with_arena_and_source_dir<'a>(
+        &self,
+        content: &'a str,
+        arena: &'a Bump,
+        source_dir: Option<&std::path::Path>,
+    ) -> Result<PipelineOutput, Vec<AamlError>> {
+        self.process_with_tasks(content, arena, source_dir)
     }
 
     pub fn format(

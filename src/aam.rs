@@ -85,14 +85,23 @@ impl AAM {
 
         #[cfg(not(feature = "aot"))]
         {
-            let content = std::fs::read_to_string(path.as_ref()).map_err(|e| {
+            let path = path.as_ref();
+            let content = std::fs::read_to_string(path).map_err(|e| {
                 vec![AamlError::IoError {
-                    details: format!("failed to read '{}': {e}", path.as_ref().display()),
+                    details: format!("failed to read '{}': {e}", path.display()),
                     diagnostics: None,
                 }]
             })?;
 
-            Self::parse_with_source_name(&path.as_ref().display().to_string(), &content)
+            let source_name = path.display().to_string();
+            set_error_render_context(source_name.clone(), &content);
+            let pipeline = Pipeline::new();
+            let source_dir = path.parent();
+            let output = pipeline.process_with_source_dir(&content, source_dir)?;
+
+            Ok(Self {
+                backend: AamBackend::Dynamic(output),
+            })
         }
     }
 

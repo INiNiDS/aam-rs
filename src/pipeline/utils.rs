@@ -1,5 +1,22 @@
 use crate::error::AamlError;
 use crate::pipeline::execution_descriptor::ExecutionContext;
+use std::path::{Path, PathBuf};
+
+/// Resolves a file path relative to a source directory.
+///
+/// If `file_path` is absolute, returns it as-is.
+/// If `source_dir` is `Some`, joins it with the relative `file_path`.
+/// Otherwise, returns `file_path` unchanged (relative to CWD).
+pub fn resolve_relative_path(file_path: &str, source_dir: Option<&Path>) -> PathBuf {
+    let path = Path::new(file_path);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else if let Some(dir) = source_dir {
+        dir.join(path)
+    } else {
+        path.to_path_buf()
+    }
+}
 
 /// Validates a value against a type, handling built-ins, registered custom types, and nested schemas.
 pub fn validate_type_value(

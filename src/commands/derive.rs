@@ -22,6 +22,7 @@
 use crate::aaml::AAML;
 use crate::commands::Command;
 use crate::error::AamlError;
+use crate::pipeline::utils::resolve_relative_path;
 
 /// Command handler for the `@derive` directive.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -67,7 +68,8 @@ impl Command for DeriveCommand {
 
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError> {
         let (path, selectors) = parse_derive_arg(args.trim());
-        let mut base = AAML::load(path)?;
+        let resolved = resolve_relative_path(path, aaml.source_dir.as_deref());
+        let mut base = AAML::load(resolved)?;
 
         let original_schemas: Vec<String> = aaml.get_schemas().keys().cloned().collect();
 

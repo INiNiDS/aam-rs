@@ -390,9 +390,9 @@ fn parse_assignment_line(
     }
 }
 
-fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
+fn compile_text(text: &str, source_dir: Option<&Path>) -> Result<CookedAotBlob, Vec<AamlError>> {
     if should_use_pipeline_compile(text) {
-        return compile_via_pipeline(text);
+        return compile_via_pipeline(text, source_dir);
     }
 
     let estimated = text.lines().count();
@@ -450,9 +450,12 @@ fn compile_text(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
     Ok(builder.finish())
 }
 
-fn compile_via_pipeline(text: &str) -> Result<CookedAotBlob, Vec<AamlError>> {
+fn compile_via_pipeline(
+    text: &str,
+    source_dir: Option<&std::path::Path>,
+) -> Result<CookedAotBlob, Vec<AamlError>> {
     let pipeline = Pipeline::new();
-    let output = pipeline.process(text)?;
+    let output = pipeline.process_with_source_dir(text, source_dir)?;
 
     let estimated = output.map.len();
     let mut builder = SoaBuilder::with_capacity(estimated);
@@ -531,7 +534,7 @@ impl AamCompiler {
             ))]
         })?;
 
-        let cooked = compile_text(&content)?;
+        let cooked = compile_text(&content, source_path.parent())?;
         let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&cooked).map_err(|e| {
             vec![AamlError::DirectiveError {
                 directive: "cook".to_string(),

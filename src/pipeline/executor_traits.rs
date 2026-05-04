@@ -10,6 +10,7 @@ use crate::pipeline::lexer::Lexer;
 use crate::pipeline::new_pipeline_hash_map;
 use crate::pipeline::parser::Parser;
 use crate::pipeline::tasks::{ParseTask, TaskError, TaskExecutionResult, ValidationTask};
+use crate::pipeline::utils::resolve_relative_path;
 use bumpalo::Bump;
 use smol_str::SmolStr;
 
@@ -532,7 +533,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
 /// This processes parsing tasks like variable registration, scope management,
 /// and directive execution.
 pub struct DefaultParserExecutor {
-    // Can hold shared registries and command handlers
+    // Can hold shared registries or command handlers
 }
 
 impl DefaultParserExecutor {
@@ -699,10 +700,13 @@ impl DefaultParserExecutor {
             });
         }
 
-        let file_path = parts[0].to_string();
+        let raw_path = parts[0];
+        let resolved =
+            resolve_relative_path(raw_path, crate::pipeline::source_dir::get().as_deref());
+        let file_path = resolved.to_string_lossy().to_string();
         if !context.is_imported(&file_path) {
             let content_string =
-                std::fs::read_to_string(&file_path).map_err(|e| AamlError::IoError {
+                std::fs::read_to_string(&resolved).map_err(|e| AamlError::IoError {
                     details: format!("Failed to read imported file '{}': {}", file_path, e),
                     diagnostics: Some(ErrorDiagnostics::new(
                         "Import failed",
@@ -723,6 +727,12 @@ impl DefaultParserExecutor {
                 return Err(first_error);
             }
 
+            // Update source_dir to the imported file's directory for nested derives
+            // RAII guard restores the previous value on drop (including panic)
+            let _nested_guard = crate::pipeline::source_dir::SourceDirGuard::new(
+                resolved.parent().map(|p| p.to_path_buf()),
+            );
+
             let sub_tasks = parser.generate_parse_tasks(&parse_output.ast);
             for sub_task in sub_tasks {
                 if let ParseTask::ProcessVariable { .. } = sub_task {
@@ -731,7 +741,6 @@ impl DefaultParserExecutor {
                 }
                 self.execute_parse(&sub_task, arena, context)?;
             }
-
             context.record_import(file_path);
         }
 

@@ -15,7 +15,7 @@ use crate::types::{Type, resolve_builtin};
 use std::collections::HashMap;
 use std::fs;
 use std::ops::{Add, AddAssign};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 mod lookup;
@@ -52,6 +52,8 @@ pub struct AAML {
     commands: HashMap<String, Arc<dyn Command>>,
     types: HashMap<String, Box<dyn Type>>,
     schemas: HashMap<String, SchemaDef>,
+    /// Base directory for resolving relative paths in @import/@derive directives.
+    pub(crate) source_dir: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for AAML {
@@ -71,6 +73,7 @@ impl AAML {
             commands: HashMap::new(),
             types: HashMap::new(),
             schemas: HashMap::new(),
+            source_dir: None,
         };
         instance.register_default_commands();
         instance
@@ -87,6 +90,7 @@ impl AAML {
             commands: HashMap::new(),
             types: HashMap::new(),
             schemas: HashMap::new(),
+            source_dir: None,
         };
         instance.register_default_commands();
         instance
@@ -266,8 +270,11 @@ impl AAML {
 
     /// Loads an AAML file from disk and returns a new [`AAML`] instance.
     pub fn load<P: AsRef<Path>>(file_path: P) -> Result<Self, AamlError> {
+        let file_path = file_path.as_ref();
         let content = fs::read_to_string(file_path)?;
-        Self::parse(&content)
+        let mut aaml = Self::parse(&content)?;
+        aaml.source_dir = file_path.parent().map(|p| p.to_path_buf());
+        Ok(aaml)
     }
 
     /// Strips surrounding `"…"` or `'…'` quotes. Returns the trimmed string unchanged
