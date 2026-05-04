@@ -16,12 +16,27 @@ pub fn validate_type_value(
         }
     }
 
-    // 2. Nested schema — type_name matches a registered schema name
+    // 2. "schema" type — a generic inline object type (no field-level validation)
+    if type_name == "schema" {
+        if !crate::aaml::parsing::is_inline_object(value) {
+            return Err(AamlError::InvalidValue {
+                details: format!(
+                    "Value for type 'schema' must be an inline object '{{ k = v, ... }}', got: '{}'",
+                    value
+                ),
+                expected: "inline object format: { key = value, ... }".to_string(),
+                diagnostics: None,
+            });
+        }
+        return Ok(());
+    }
+
+    // 3. Nested schema — type_name matches a registered schema name
     if let Some(schema_info) = context.schemas.get(type_name) {
         return validate_inline_object_against_schema(value, schema_info, context);
     }
 
-    // 3. Built-in types
+    // 4. Built-in types
     match crate::types_aam::resolve_builtin(type_name) {
         Ok(validator) => validator.validate(value, context),
         Err(_) => Err(AamlError::InvalidType {

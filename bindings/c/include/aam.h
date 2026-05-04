@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 typedef struct AamHandle AamHandle;
+typedef struct AamInlineObjectHandle AamInlineObjectHandle;
 
 
 AamHandle *aam_new(void);
@@ -35,6 +36,18 @@ char *aam_type_names(const AamHandle *handle);
 
 void aam_string_free(char *s);
 const char *aam_last_error(const AamHandle *handle);
+
+/* ── InlineObject API ────────────────────────────────────────────────────── */
+
+AamInlineObjectHandle *aam_inline_new(void);
+void aam_inline_free(AamInlineObjectHandle *handle);
+int aam_inline_add(AamInlineObjectHandle *handle, const char *key, const char *value);
+char *aam_inline_to_string(const AamInlineObjectHandle *handle);
+
+/* Parse an inline object string `{ k = v, ... }` into a key=value map.
+ * Returns a newline-separated string, or NULL on failure.
+ * Must be freed with aam_string_free(). */
+char *aam_parse_inline_to_map(const char *content);
 
 #ifdef __cplusplus
 }

@@ -102,6 +102,242 @@ impl SchemaField {
     }
 }
 
+/// Enumeration of all built-in AAML types for use with the Builder API.
+///
+/// Can be passed directly to [`AAMBuilder::type_alias`] and similar methods.
+///
+/// Only available with the `builder-extras` feature (enabled by default).
+///
+/// # Example
+/// ```
+/// use aam_rs::builder::BuiltInType;
+///
+/// let t = BuiltInType::I32;
+/// assert_eq!(t.to_string(), "i32");
+///
+/// let v = BuiltInType::List(Box::new(BuiltInType::String));
+/// assert_eq!(v.to_string(), "list<string>");
+/// ```
+#[cfg(feature = "builder-extras")]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BuiltInType {
+    // ── Primitives ──────────────────────────────────────────────────────────────
+    I32,
+    F64,
+    String,
+    Bool,
+    Color,
+
+    // ── Math types ──────────────────────────────────────────────────────────────
+    Vector2,
+    Vector3,
+    Vector4,
+    Quaternion,
+    Matrix3x3,
+    Matrix4x4,
+
+    // ── Time types ──────────────────────────────────────────────────────────────
+    DateTime,
+    Duration,
+    Year,
+    Day,
+    Hour,
+    Minute,
+
+    // ── Physics types (common) ──────────────────────────────────────────────────
+    Kilogram,
+    Meter,
+
+    // ── Special ─────────────────────────────────────────────────────────────────
+    /// Generic inline object type (`schema`).
+    Schema,
+
+    /// Any other type specified as a raw string (e.g. `"physics::newton"`).
+    Custom(String),
+
+    /// List of another type (e.g. `list<f64>`).
+    List(Box<BuiltInType>),
+}
+
+#[cfg(feature = "builder-extras")]
+impl std::fmt::Display for BuiltInType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuiltInType::I32 => write!(f, "i32"),
+            BuiltInType::F64 => write!(f, "f64"),
+            BuiltInType::String => write!(f, "string"),
+            BuiltInType::Bool => write!(f, "bool"),
+            BuiltInType::Color => write!(f, "color"),
+            BuiltInType::Vector2 => write!(f, "math::vector2"),
+            BuiltInType::Vector3 => write!(f, "math::vector3"),
+            BuiltInType::Vector4 => write!(f, "math::vector4"),
+            BuiltInType::Quaternion => write!(f, "math::quaternion"),
+            BuiltInType::Matrix3x3 => write!(f, "math::matrix3x3"),
+            BuiltInType::Matrix4x4 => write!(f, "math::matrix4x4"),
+            BuiltInType::DateTime => write!(f, "time::datetime"),
+            BuiltInType::Duration => write!(f, "time::duration"),
+            BuiltInType::Year => write!(f, "time::year"),
+            BuiltInType::Day => write!(f, "time::day"),
+            BuiltInType::Hour => write!(f, "time::hour"),
+            BuiltInType::Minute => write!(f, "time::minute"),
+            BuiltInType::Kilogram => write!(f, "physics::kilogram"),
+            BuiltInType::Meter => write!(f, "physics::meter"),
+            BuiltInType::Schema => write!(f, "schema"),
+            BuiltInType::Custom(s) => write!(f, "{}", s),
+            BuiltInType::List(inner) => write!(f, "list<{}>", inner),
+        }
+    }
+}
+
+#[cfg(feature = "builder-extras")]
+impl From<&str> for BuiltInType {
+    fn from(s: &str) -> Self {
+        match s {
+            "i32" => BuiltInType::I32,
+            "f64" => BuiltInType::F64,
+            "string" => BuiltInType::String,
+            "bool" => BuiltInType::Bool,
+            "color" => BuiltInType::Color,
+            "math::vector2" => BuiltInType::Vector2,
+            "math::vector3" => BuiltInType::Vector3,
+            "math::vector4" => BuiltInType::Vector4,
+            "math::quaternion" => BuiltInType::Quaternion,
+            "math::matrix3x3" => BuiltInType::Matrix3x3,
+            "math::matrix4x4" => BuiltInType::Matrix4x4,
+            "time::datetime" => BuiltInType::DateTime,
+            "time::duration" => BuiltInType::Duration,
+            "time::year" => BuiltInType::Year,
+            "time::day" => BuiltInType::Day,
+            "time::hour" => BuiltInType::Hour,
+            "time::minute" => BuiltInType::Minute,
+            "physics::kilogram" => BuiltInType::Kilogram,
+            "physics::meter" => BuiltInType::Meter,
+            "schema" => BuiltInType::Schema,
+            _ => {
+                if let Some(inner) = s.strip_prefix("list<").and_then(|s| s.strip_suffix('>')) {
+                    BuiltInType::List(Box::new(BuiltInType::from(inner)))
+                } else {
+                    BuiltInType::Custom(s.to_string())
+                }
+            }
+        }
+    }
+}
+
+/// A builder for inline object literals `{ key = value, ... }`.
+///
+/// Only available with the `builder-extras` feature (enabled by default).
+///
+/// # Example
+/// ```
+/// use aam_rs::builder::InlineObject;
+///
+/// let obj = InlineObject::new()
+///     .with_field("system", "cmake")
+///     .with_field("command", "cmake")
+///     .with_field("args", "[\"-G\", \"Ninja\"]");
+///
+/// assert_eq!(
+///     obj.to_string(),
+///     r#"{ system = cmake, command = cmake, args = ["-G", "Ninja"] }"#
+/// );
+/// ```
+#[cfg(feature = "builder-extras")]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InlineObject {
+    fields: Vec<(String, String)>,
+}
+
+#[cfg(feature = "builder-extras")]
+impl InlineObject {
+    /// Creates a new empty inline object.
+    pub fn new() -> Self {
+        Self { fields: Vec::new() }
+    }
+
+    /// Adds a field to the inline object (builder-pattern, consumes self).
+    pub fn with_field(mut self, key: &str, value: &str) -> Self {
+        self.fields.push((key.to_string(), value.to_string()));
+        self
+    }
+
+    /// Adds a field by mutable reference.
+    pub fn add_field(&mut self, key: &str, value: &str) -> &mut Self {
+        self.fields.push((key.to_string(), value.to_string()));
+        self
+    }
+
+    /// Returns the fields as a slice.
+    pub fn fields(&self) -> &[(String, String)] {
+        &self.fields
+    }
+
+    /// Renders the object as an AAML inline object string.
+    pub fn to_aaml(&self) -> String {
+        self.to_string()
+    }
+}
+
+#[cfg(feature = "builder-extras")]
+impl Default for InlineObject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "builder-extras")]
+impl std::fmt::Display for InlineObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ ")?;
+        for (i, (k, v)) in self.fields.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{} = {}", k, v)?;
+        }
+        write!(f, " }}")
+    }
+}
+
+#[cfg(feature = "builder-extras")]
+impl From<Vec<(String, String)>> for InlineObject {
+    fn from(fields: Vec<(String, String)>) -> Self {
+        Self { fields }
+    }
+}
+
+#[cfg(feature = "builder-extras")]
+impl From<InlineObject> for String {
+    fn from(obj: InlineObject) -> String {
+        obj.to_string()
+    }
+}
+
+/// Parses an inline object string `{ key = value, ... }` into a `HashMap<String, String>`.
+///
+/// Nested structures (e.g. `[a, b]` inside values) are preserved as raw strings.
+///
+/// # Feature
+/// Enabled by default under the `builder-extras` feature.
+///
+/// # Example
+/// ```
+/// use aam_rs::builder::parse_inline_to_map;
+///
+/// let map = parse_inline_to_map(r#"{ system = cmake, args = ["-G", "Ninja"] }"#).unwrap();
+/// assert_eq!(map.get("system").unwrap(), "cmake");
+/// assert_eq!(map.get("args").unwrap(), r#"["-G", "Ninja"]"#);
+/// ```
+#[cfg(feature = "builder-extras")]
+pub fn parse_inline_to_map(
+    s: &str,
+) -> Result<std::collections::HashMap<String, String>, crate::error::AamlError> {
+    let pairs = crate::aaml::parsing::parse_inline_object(s)?;
+    Ok(pairs.into_iter().collect())
+}
+
 /// Accumulates AAML source lines and can flush them to a file or a `String`.
 ///
 /// # Example
@@ -202,7 +438,6 @@ impl AAMBuilder {
             if !first {
                 self.buffer.push_str(", ");
             }
-            // Пишем напрямую в буфер, без создания временной String
             field.to_aaml_writer(&mut self.buffer).unwrap();
             first = false;
         }
@@ -308,6 +543,60 @@ impl AAMBuilder {
         self.buffer.push_str(" = ");
         self.buffer.push_str(type_name);
         self
+    }
+
+    /// Appends a `@type alias = builtin_type` directive using a [`BuiltInType`] enum.
+    ///
+    /// Only available with the `builder-extras` feature (enabled by default).
+    ///
+    /// # Example
+    /// ```
+    /// use aam_rs::builder::{AAMBuilder, BuiltInType};
+    ///
+    /// let mut b = AAMBuilder::new();
+    /// b.type_alias_builtin("pos", BuiltInType::Vector3);
+    /// assert!(b.build().contains("@type pos = math::vector3"));
+    /// ```
+    #[cfg(feature = "builder-extras")]
+    pub fn type_alias_builtin(&mut self, alias: &str, builtin: BuiltInType) -> &mut Self {
+        self.type_alias(alias, &builtin.to_string())
+    }
+
+    /// Appends a `key = value` line where the value is an inline object.
+    ///
+    /// Only available with the `builder-extras` feature (enabled by default).
+    ///
+    /// # Example
+    /// ```
+    /// use aam_rs::builder::{AAMBuilder, InlineObject};
+    ///
+    /// let mut b = AAMBuilder::new();
+    /// let obj = InlineObject::new()
+    ///     .with_field("system", "cmake")
+    ///     .with_field("command", "cmake");
+    /// b.add_inline("build", &obj);
+    /// assert!(b.build().contains("build = { system = cmake, command = cmake }"));
+    /// ```
+    #[cfg(feature = "builder-extras")]
+    pub fn add_inline(&mut self, key: &str, obj: &InlineObject) -> &mut Self {
+        self.add_line(key, &obj.to_string())
+    }
+
+    /// Appends a `key = value` line where the value is parsed from an inline object string.
+    ///
+    /// Only available with the `builder-extras` feature (enabled by default).
+    ///
+    /// # Example
+    /// ```
+    /// use aam_rs::builder::AAMBuilder;
+    ///
+    /// let mut b = AAMBuilder::new();
+    /// b.add_inline_str("build", r#"{ system = cmake, command = cmake }"#);
+    /// assert!(b.build().contains("build = { system = cmake, command = cmake }"));
+    /// ```
+    #[cfg(feature = "builder-extras")]
+    pub fn add_inline_str(&mut self, key: &str, inline_str: &str) -> &mut Self {
+        self.add_line(key, inline_str)
     }
 
     /// Appends a raw line as-is (e.g. a directive not covered by the typed API).

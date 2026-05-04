@@ -1,5 +1,5 @@
 use aam_rs::aam::{AAM, AamLspAssist};
-use aam_rs::builder::{AAMBuilder, SchemaField};
+use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 #[cfg(feature = "translator")]
@@ -115,6 +115,45 @@ impl WasmAamBuilder {
     pub fn as_string(&self) -> String {
         self.inner.as_string()
     }
+}
+
+// ── Wasm InlineObject ────────────────────────────────────────────────────────
+
+#[wasm_bindgen(js_name = InlineObject)]
+pub struct WasmInlineObject {
+    inner: InlineObject,
+}
+
+#[wasm_bindgen]
+impl WasmInlineObject {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WasmInlineObject {
+        WasmInlineObject {
+            inner: InlineObject::new(),
+        }
+    }
+
+    #[wasm_bindgen(js_name = add)]
+    pub fn add_field(&mut self, key: &str, value: &str) {
+        self.inner.add_field(key, value);
+    }
+
+    #[wasm_bindgen(js_name = toString)]
+    pub fn to_js_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
+/// Parse an inline object string into a JS object.
+#[wasm_bindgen(js_name = parseInlineToMap)]
+pub fn wasm_parse_inline_to_map(content: &str) -> Result<js_sys::Object, JsValue> {
+    let map = aam_rs::builder::parse_inline_to_map(content)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let obj = js_sys::Object::new();
+    for (k, v) in map {
+        let _ = js_sys::Reflect::set(&obj, &JsValue::from_str(&k), &JsValue::from_str(&v));
+    }
+    Ok(obj)
 }
 
 #[wasm_bindgen]

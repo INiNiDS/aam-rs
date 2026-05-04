@@ -53,6 +53,14 @@ export declare class AAMBuilder {
 
 export type JsAamBuilder = AAMBuilder
 
+export declare class InlineObject {
+    constructor()
+
+    add(key: string, value: string): void
+
+    toString(): string
+}
+
 export declare function format(content: string): string
 
 export interface JsLspResult {
@@ -69,3 +77,5 @@ export declare function parse(content: string): AAM
 export declare function splitAam(content: string): Record<string, AAMBuilder>
 
 export declare function version(): string
+
+export declare function parseInlineToMap(content: string): Record<string, string>

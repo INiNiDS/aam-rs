@@ -378,3 +378,56 @@ func (b *AAMBuilder) Build() string {
 func (b *AAMBuilder) ToFile(path string) error {
 	return os.WriteFile(path, []byte(b.buffer.String()), 0o644)
 }
+
+// AddInline appends "key = { ... }" using the given InlineObject.
+func (b *AAMBuilder) AddInline(key string, obj *InlineObject) *AAMBuilder {
+	b.AddLine(key, obj.String())
+	return b
+}
+
+// ── InlineObject ─────────────────────────────────────────────────────────────
+
+// InlineObject builds `{ key = value, ... }` inline object literals.
+type InlineObject struct {
+	pairs []string
+}
+
+// NewInlineObject creates an empty inline object.
+func NewInlineObject() *InlineObject {
+	return &InlineObject{}
+}
+
+// Add appends a key=value pair.
+func (o *InlineObject) Add(key, value string) *InlineObject {
+	o.pairs = append(o.pairs, key+" = "+value)
+	return o
+}
+
+// String renders the object as an AAML inline object string.
+func (o *InlineObject) String() string {
+	return "{ " + strings.Join(o.pairs, ", ") + " }"
+}
+
+// ── ParseInlineToMap ─────────────────────────────────────────────────────────
+
+// ParseInlineToMap parses an inline object string into a Go map.
+func ParseInlineToMap(content string) (map[string]string, error) {
+	cContent := C.CString(content)
+	defer C.free(unsafe.Pointer(cContent))
+
+	result := C.aam_parse_inline_to_map(cContent)
+	if result == nil {
+		return nil, errors.New("aam: parseInlineToMap failed")
+	}
+	goStr := C.GoString(result)
+	C.aam_string_free(result)
+
+	m := make(map[string]string)
+	for _, line := range strings.Split(goStr, "\n") {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			m[parts[0]] = parts[1]
+		}
+	}
+	return m, nil
+}

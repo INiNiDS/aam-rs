@@ -1,5 +1,7 @@
 use aam_rs::aam::AAM;
-use aam_rs::builder::{AAMBuilder, SchemaField};
+use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
+use aam_rs::found_value::FoundValue;
+use std::collections::HashMap;
 
 #[test]
 fn parse_accepts_valid_builtin_types() {
@@ -212,4 +214,147 @@ fn derive_not_imports() {
     } else {
         assert!(doc.is_err());
     }
+}
+
+#[test]
+fn test_inline_schema_validation() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let base_path = dir.path();
+
+    let file_path = base_path.join("config.aam");
+    let child_path = base_path.join("re2.aam");
+
+    let source = InlineObject::new()
+        .with_field("dir", r#""/hyprland/build/re2""#)
+        .with_field("branch", "main")
+        .with_field("url", r#""https://github.com/google/re2.git""#);
+    let build = InlineObject::new()
+        .with_field("system", "cmake")
+        .with_field("command", "cmake")
+        .with_field(
+            "args",
+            r#"["-G", "Ninja", "-DCMAKE_INSTALL_PREFIX=/hyprland", "-DCMAKE_INSTALL_LIBDIR=lib64", "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_LINKER=mold", "-DBUILD_SHARED_LIBS=ON", "-B", "build"]"#,
+        );
+    let install = InlineObject::new()
+        .with_field("commands", r#"["make install"]"#)
+        .with_field("prefix", r#""/usr/local""#);
+    let hooks = InlineObject::new()
+        .with_field("pre_build", r#""""#)
+        .with_field("post_build", r#""""#);
+
+    let mut b = AAMBuilder::new();
+    b.schema_multiline(
+        "SourceInfo",
+        vec![
+            SchemaField::required("dir", "string"),
+            SchemaField::required("branch", "string"),
+            SchemaField::required("url", "string"),
+        ],
+    )
+    .schema_multiline(
+        "BuildInfo",
+        vec![
+            SchemaField::required("system", "string"),
+            SchemaField::required("command", "string"),
+            SchemaField::required("args", "list<string>"),
+        ],
+    )
+    .schema_multiline(
+        "InstallInfo",
+        vec![
+            SchemaField::required("commands", "list<string>"),
+            SchemaField::required("prefix", "string"),
+        ],
+    )
+    .schema_multiline(
+        "Hooks",
+        vec![
+            SchemaField::required("pre_build", "string"),
+            SchemaField::required("post_build", "string"),
+        ],
+    )
+    .schema_multiline(
+        "Project",
+        vec![
+            SchemaField::required("id", "string"),
+            SchemaField::required("name", "string"),
+            SchemaField::required("type", "string"),
+            SchemaField::required("version", "string"),
+            SchemaField::required("source", "SourceInfo"),
+            SchemaField::required("build", "BuildInfo"),
+            SchemaField::required("install", "InstallInfo"),
+            SchemaField::required("hooks", "Hooks"),
+            SchemaField::required("build_deps", "list<string>"),
+            SchemaField::required("run_deps", "list<string>"),
+        ],
+    )
+    .to_file(file_path.clone())
+    .expect("Failed to write AAM file");
+    let mut b = AAMBuilder::new();
+    b.derive(file_path.to_str().unwrap(), vec!["Project"])
+        .import(file_path.to_str().unwrap())
+        .add_line("id", "re2")
+        .add_line("name", "RE2")
+        .add_line("type", "core")
+        .add_line("version", "2025-11-05")
+        .add_inline("source", &source)
+        .add_inline("build", &build)
+        .add_inline("install", &install)
+        .add_inline("hooks", &hooks)
+        .add_line("build_deps", "[ninja, cmake, mold, abseil-cpp]")
+        .add_line("run_deps", "[abseil-cpp]")
+        .to_file(child_path.clone())
+        .expect("Failed to write AAM file");
+
+    println!("{}", b.build());
+
+    let doc = AAM::parse(child_path.to_str().unwrap());
+    if let Err(ref errors) = doc {
+        for err in errors {
+            eprintln!("Parse error: {}", err);
+        }
+    }
+    assert!(doc.is_ok(), "Expected successful parse with inline schemas");
+
+    let aam = doc.unwrap();
+
+    // Simple value assertions
+    assert_eq!(aam.get("id"), Some("re2"));
+    assert_eq!(aam.get("name"), Some("RE2"));
+    assert_eq!(aam.get("type"), Some("core"));
+    assert_eq!(aam.get("version"), Some("2025-11-05"));
+
+    // Parse inline object values back into HashMap via FoundValue
+    let source_map: HashMap<String, String> = FoundValue::new(aam.get("source").unwrap())
+        .as_object()
+        .expect("source should be a parseable inline object");
+    assert_eq!(source_map.get("dir").unwrap(), "/hyprland/build/re2");
+    assert_eq!(source_map.get("branch").unwrap(), "main");
+    assert_eq!(
+        source_map.get("url").unwrap(),
+        "https://github.com/google/re2.git"
+    );
+
+    let build_map = FoundValue::new(aam.get("build").unwrap())
+        .as_object()
+        .expect("build should be a parseable inline object");
+    assert_eq!(build_map.get("system").unwrap(), "cmake");
+    assert_eq!(build_map.get("command").unwrap(), "cmake");
+
+    let install_map = FoundValue::new(aam.get("install").unwrap())
+        .as_object()
+        .expect("install should be a parseable inline object");
+    assert_eq!(install_map.get("prefix").unwrap(), "/usr/local");
+
+    let hooks_map = FoundValue::new(aam.get("hooks").unwrap())
+        .as_object()
+        .expect("hooks should be a parseable inline object");
+    assert_eq!(hooks_map.get("pre_build").unwrap(), "");
+
+    // Verify schemas are registered
+    assert!(aam.get_schema("Project").is_some());
+    assert!(aam.get_schema("SourceInfo").is_some());
+    assert!(aam.get_schema("BuildInfo").is_some());
+    assert!(aam.get_schema("InstallInfo").is_some());
+    assert!(aam.get_schema("Hooks").is_some());
 }

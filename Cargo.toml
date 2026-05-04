@@ -49,7 +49,7 @@ toml = { version = "1.1.2", optional = true }
 csbindgen = { version = "1.9.7", optional = true }
 
 [features]
-default = ["legacy", "aot", "release", "hash-std"]
+default = ["legacy", "aot", "release", "hash-std", "builder-extras"]
 hash-std = []
 hash-fx = []
 hash-ahash = ["dep:ahash"]
@@ -69,6 +69,7 @@ parallel = ["dep:rayon"]
 64bit = ["rkyv/pointer_width_64"]
 translator = ["dep:toml"]
 splitter = []
+builder-extras = []
 
 [[example]]
 name = "standard"

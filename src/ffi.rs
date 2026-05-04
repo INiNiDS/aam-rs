@@ -8,6 +8,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use crate::aam::AAM;
+use crate::builder::InlineObject;
 use crate::error::AamlError;
 use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 
@@ -292,4 +293,78 @@ fn to_c_string_map(map: Vec<(&str, &str)>) -> *mut c_char {
         .collect::<Vec<_>>()
         .join("\n");
     to_c_string(&joined)
+}
+
+// ── InlineObject FFI ─────────────────────────────────────────────────────────
+
+/// Opaque handle for an inline object.
+pub struct AamInlineObjectHandle {
+    inner: InlineObject,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn aam_inline_new() -> *mut AamInlineObjectHandle {
+    Box::into_raw(Box::new(AamInlineObjectHandle {
+        inner: InlineObject::new(),
+    }))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_inline_free(handle: *mut AamInlineObjectHandle) {
+    if !handle.is_null() {
+        unsafe { drop(Box::from_raw(handle)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_inline_add(
+    handle: *mut AamInlineObjectHandle,
+    key: *const c_char,
+    value: *const c_char,
+) -> i32 {
+    if handle.is_null() || key.is_null() || value.is_null() {
+        return -1;
+    }
+    let handle = unsafe { &mut *handle };
+    let key = match unsafe { CStr::from_ptr(key) }.to_str() {
+        Ok(k) => k,
+        Err(_) => return -1,
+    };
+    let value = match unsafe { CStr::from_ptr(value) }.to_str() {
+        Ok(v) => v,
+        Err(_) => return -1,
+    };
+    handle.inner.add_field(key, value);
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_inline_to_string(handle: *const AamInlineObjectHandle) -> *mut c_char {
+    if handle.is_null() {
+        return std::ptr::null_mut();
+    }
+    let handle = unsafe { &*handle };
+    to_c_string(&handle.inner.to_string())
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_parse_inline_to_map(content: *const c_char) -> *mut c_char {
+    if content.is_null() {
+        return std::ptr::null_mut();
+    }
+    let s = match unsafe { CStr::from_ptr(content) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    match crate::builder::parse_inline_to_map(s) {
+        Ok(map) => {
+            let joined = map
+                .into_iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("\n");
+            to_c_string(&joined)
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
 }

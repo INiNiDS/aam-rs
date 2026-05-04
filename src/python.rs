@@ -1,7 +1,7 @@
 //! PyO3 bindings — exposes `AAM` to Python as `aam_rs.AAM`.
 
 use crate::aam::AAM;
-use crate::builder::{AAMBuilder, SchemaField};
+use crate::builder::{AAMBuilder, InlineObject, SchemaField};
 use crate::error::AamlError;
 use crate::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 use pyo3::exceptions::PyRuntimeError;
@@ -320,12 +320,49 @@ impl PyTOMLTranslator {
     }
 }
 
+// ── PyInlineObject class ────────────────────────────────────────────────────
+
+#[pyclass(unsendable, name = "InlineObject")]
+pub struct PyInlineObject {
+    inner: InlineObject,
+}
+
+#[pymethods]
+impl PyInlineObject {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: InlineObject::new(),
+        }
+    }
+
+    fn add(&mut self, key: &str, value: &str) {
+        self.inner.add_field(key, value);
+    }
+
+    fn __str__(&self) -> String {
+        self.inner.to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("InlineObject({})", self.inner.to_string())
+    }
+}
+
+/// Parse an inline object string `{ key = value, ... }` into a Python dict.
+#[pyfunction(name = "parse_inline_to_map")]
+fn py_parse_inline_to_map(content: &str) -> PyResult<HashMap<String, String>> {
+    crate::builder::parse_inline_to_map(content).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
 // ── Module registration ──────────────────────────────────────────────────────
 
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
     m.add_class::<PyAam>()?;
     m.add_class::<PyAamBuilder>()?;
     m.add_class::<PySchemaField>()?;
+    m.add_class::<PyInlineObject>()?;
+    m.add_function(wrap_pyfunction!(py_parse_inline_to_map, m)?)?;
     #[cfg(feature = "translator")]
     {
         m.add_class::<PyTOMLTranslator>()?;

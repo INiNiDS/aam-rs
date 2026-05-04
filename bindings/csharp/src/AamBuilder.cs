@@ -113,6 +113,12 @@ public sealed class AamBuilder
         return this;
     }
 
+    public AamBuilder AddInline(string key, InlineObject obj)
+    {
+        AddLine(key, obj.ToString());
+        return this;
+    }
+
     public string Build() => _buffer.ToString();
 
     public void ToFile(string path)
@@ -127,6 +133,51 @@ public sealed class AamBuilder
         if (_buffer.Length > 0)
         {
             _buffer.AppendLine();
+        }
+    }
+}
+
+/// Builds `{ key = value, ... }` inline object literals.
+public sealed class InlineObject
+{
+    private readonly List<string> _pairs = new();
+
+    public InlineObject Add(string key, string value)
+    {
+        _pairs.Add($"{key} = {value}");
+        return this;
+    }
+
+    public override string ToString() => "{ " + string.Join(", ", _pairs) + " }";
+}
+
+/// Parse an inline object string into a string dictionary.
+public static class AamInline
+{
+    public static Dictionary<string, string> ParseInlineToMap(string content)
+    {
+        unsafe
+        {
+            fixed (byte* contentPtr = System.Text.Encoding.UTF8.GetBytes(content + "\0"))
+            {
+                var result = AamNative.aam_parse_inline_to_map(contentPtr);
+                if (result == null)
+                    return new Dictionary<string, string>();
+
+                var str = System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)result);
+                AamNative.aam_string_free(result);
+
+                var dict = new Dictionary<string, string>();
+                if (str == null) return dict;
+
+                foreach (var line in str.Split('\n'))
+                {
+                    var parts = line.Split('=', 2);
+                    if (parts.Length == 2)
+                        dict[parts[0]] = parts[1];
+                }
+                return dict;
+            }
         }
     }
 }

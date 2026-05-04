@@ -1,5 +1,5 @@
 use aam_rs::aam::AAM;
-use aam_rs::builder::{AAMBuilder, SchemaField};
+use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
 use magnus::{Error, Module, Object, RArray, Ruby, TryConvert, function, method};
@@ -194,9 +194,44 @@ impl RubyAamBuilder {
         self.inner.borrow_mut().type_alias(&alias, &type_name);
     }
 
+    pub fn add_inline(&self, key: String, obj: &RubyInlineObject) {
+        self.inner
+            .borrow_mut()
+            .add_line(&key, &obj.inner.to_string());
+    }
+
     pub fn as_string(&self) -> String {
         self.inner.borrow().as_string()
     }
+}
+
+// --- RubyInlineObject ---
+#[magnus::wrap(class = "AamRb::InlineObject", free_immediately, size)]
+pub struct RubyInlineObject {
+    inner: InlineObject,
+}
+
+impl RubyInlineObject {
+    pub fn new() -> Self {
+        Self {
+            inner: InlineObject::new(),
+        }
+    }
+
+    pub fn add(&mut self, key: String, value: String) {
+        self.inner.add_field(&key, &value);
+    }
+
+    pub fn to_s(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
+/// Parse an inline object string into a Ruby Hash.
+fn ruby_parse_inline_to_map(content: String) -> Result<BTreeMap<String, String>, Error> {
+    aam_rs::builder::parse_inline_to_map(&content)
+        .map(|m| m.into_iter().collect())
+        .map_err(|e| ruby_runtime_error(e.to_string()))
 }
 
 // --- Init ---
@@ -238,7 +273,18 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     builder_class.define_method("derive", method!(RubyAamBuilder::derive, 2))?;
     builder_class.define_method("import", method!(RubyAamBuilder::import, 1))?;
     builder_class.define_method("type_alias", method!(RubyAamBuilder::type_alias, 2))?;
+    builder_class.define_method("add_inline", method!(RubyAamBuilder::add_inline, 2))?;
     builder_class.define_method("as_string", method!(RubyAamBuilder::as_string, 0))?;
+
+    let inline_class = module.define_class("InlineObject", ruby.class_object())?;
+    inline_class.define_singleton_method("new", function!(RubyInlineObject::new, 0))?;
+    inline_class.define_method("add", method!(RubyInlineObject::add, 2))?;
+    inline_class.define_method("to_s", method!(RubyInlineObject::to_s, 0))?;
+
+    module.define_module_function(
+        "parse_inline_to_map",
+        function!(ruby_parse_inline_to_map, 1),
+    )?;
 
     Ok(())
 }

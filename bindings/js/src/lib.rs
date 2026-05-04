@@ -1,5 +1,5 @@
 use aam_rs::aam::{AAM, AamLspAssist};
-use aam_rs::builder::{AAMBuilder as CoreAamBuilder, SchemaField};
+use aam_rs::builder::{AAMBuilder as CoreAamBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
 #[cfg(feature = "translator")]
@@ -288,6 +288,39 @@ pub fn lsp_assist(content: String) -> JsLspResult {
 #[napi]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+// ── InlineObject ─────────────────────────────────────────────────────────────
+
+#[napi(js_name = "InlineObject")]
+pub struct JsInlineObject {
+    inner: InlineObject,
+}
+
+#[napi]
+impl JsInlineObject {
+    #[napi(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: InlineObject::new(),
+        }
+    }
+
+    #[napi]
+    pub fn add(&mut self, key: String, value: String) {
+        self.inner.add_field(&key, &value);
+    }
+
+    #[napi(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        self.inner.to_string()
+    }
+}
+
+/// Parse an inline object string into a JavaScript object.
+#[napi(js_name = "parseInlineToMap")]
+pub fn js_parse_inline_to_map(content: String) -> Result<HashMap<String, String>> {
+    aam_rs::builder::parse_inline_to_map(&content).map_err(to_napi_error)
 }
 
 // ── TOMLTranslator ──────────────────────────────────────────────────────────

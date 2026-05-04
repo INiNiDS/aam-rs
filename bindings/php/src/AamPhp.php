@@ -26,6 +26,7 @@ final class AamDocument
 
         $this->ffi = FFI::cdef(<<<'CDEF'
             typedef struct AamHandle AamHandle;
+            typedef struct AamInlineObjectHandle AamInlineObjectHandle;
             AamHandle* aam_new(void);
             void aam_free(AamHandle* handle);
             int aam_parse(AamHandle* handle, const char* content);
@@ -42,6 +43,12 @@ final class AamDocument
 
             void aam_string_free(char* s);
             const char* aam_last_error(AamHandle* handle);
+
+            AamInlineObjectHandle* aam_inline_new(void);
+            void aam_inline_free(AamInlineObjectHandle* handle);
+            int aam_inline_add(AamInlineObjectHandle* handle, const char* key, const char* value);
+            char* aam_inline_to_string(const AamInlineObjectHandle* handle);
+            char* aam_parse_inline_to_map(const char* content);
         CDEF, $lib);
 
         $this->handle = $this->ffi->aam_new();
@@ -324,5 +331,68 @@ final class AamBuilder
     public function toFile(string $path): void
     {
         file_put_contents($path, $this->build());
+    }
+
+    /** @param InlineObject $obj */
+    public function addInline(string $key, InlineObject $obj): self
+    {
+        $this->addLine($key, (string)$obj);
+        return $this;
+    }
+}
+
+final class InlineObject
+{
+    /** @var list<string> */
+    private array $pairs = [];
+
+    public function add(string $key, string $value): self
+    {
+        $this->pairs[] = "$key = $value";
+        return $this;
+    }
+
+    public function __toString(): string
+    {
+        return '{ ' . implode(', ', $this->pairs) . ' }';
+    }
+}
+
+/**
+ * Parse an inline object string into a PHP associative array.
+ *
+ * @return array<string, string>
+ */
+function parse_inline_to_map(string $content): array
+{
+    $ffi = FFI::cdef(<<<'CDEF'
+        char* aam_parse_inline_to_map(const char* content);
+        void aam_string_free(char* s);
+    CDEF, getenv('AAM_RS_LIB') ?: __DIR__ . '/../../target/release/libaam_rs.so');
+
+    $cContent = FFI::new('char[' . (strlen($content) + 1) . ']', false);
+    FFI::memcpy($cContent, $content, strlen($content));
+    $cContent[strlen($content)] = "\0";
+
+    $ptr = $ffi->aam_parse_inline_to_map(FFI::cast('char*', $cContent));
+    if ($ptr === null) {
+        throw new RuntimeException('Failed to parse inline object');
+    }
+
+    try {
+        $str = FFI::string($ptr);
+        if ($str === '') {
+            return [];
+        }
+        $result = [];
+        foreach (explode("\n", $str) as $line) {
+            $parts = explode('=', $line, 2);
+            if (count($parts) === 2) {
+                $result[$parts[0]] = $parts[1];
+            }
+        }
+        return $result;
+    } finally {
+        $ffi->aam_string_free($ptr);
     }
 }

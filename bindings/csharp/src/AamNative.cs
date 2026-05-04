@@ -65,6 +65,25 @@ namespace AamCsharp
     {
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe partial struct AamInlineObjectHandle
+    {
+    }
 
+    // ── InlineObject FFI ──────────────────────────────────────────────────────
 
+    [DllImport(__DllName, EntryPoint = "aam_inline_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    internal static extern AamInlineObjectHandle* aam_inline_new();
+
+    [DllImport(__DllName, EntryPoint = "aam_inline_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    internal static extern void aam_inline_free(AamInlineObjectHandle* handle);
+
+    [DllImport(__DllName, EntryPoint = "aam_inline_add", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    internal static extern int aam_inline_add(AamInlineObjectHandle* handle, byte* key, byte* value);
+
+    [DllImport(__DllName, EntryPoint = "aam_inline_to_string", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    internal static extern byte* aam_inline_to_string(AamInlineObjectHandle* handle);
+
+    [DllImport(__DllName, EntryPoint = "aam_parse_inline_to_map", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    internal static extern byte* aam_parse_inline_to_map(byte* content);
 }
