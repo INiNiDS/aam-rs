@@ -55,13 +55,49 @@ impl AAM {
     }
 
     /// Parses an AAM string using the default Pipeline and returns a new [`AAM`] instance.
+    ///
+    /// If `text` is a path to an existing file on disk, it is loaded and parsed dynamically
+    /// (with full schema support), bypassing the AOT cache. Otherwise `text` is treated as
+    /// raw AAM content.
     pub fn parse(text: &str) -> Result<Self, Vec<AamlError>> {
+        let path = Path::new(text);
+        if path.is_file() {
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                vec![AamlError::IoError {
+                    details: format!("failed to read '{}': {e}", path.display()),
+                    diagnostics: None,
+                }]
+            })?;
+            set_error_render_context(text.to_string(), &content);
+            let pipeline = Pipeline::new();
+            let output = pipeline.process_with_source_dir(&content, path.parent())?;
+            return Ok(Self {
+                backend: AamBackend::Dynamic(output),
+            });
+        }
         Self::parse_with_source_name("raw_string", text)
     }
 
     /// Creates an [`AAM`] instance from a custom configured Pipeline.
     /// Use this if you need to register custom commands, parsers, or validators.
+    ///
+    /// If `text` is a path to an existing file on disk, it is loaded and parsed as a file.
+    /// Otherwise `text` is treated as raw AAM content.
     pub fn from_pipeline(pipeline: Pipeline, text: &str) -> Result<Self, Vec<AamlError>> {
+        let path = Path::new(text);
+        if path.is_file() {
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                vec![AamlError::IoError {
+                    details: format!("failed to read '{}': {e}", path.display()),
+                    diagnostics: None,
+                }]
+            })?;
+            set_error_render_context(text.to_string(), &content);
+            let output = pipeline.process_with_source_dir(&content, path.parent())?;
+            return Ok(Self {
+                backend: AamBackend::Dynamic(output),
+            });
+        }
         set_error_render_context("raw_string", text);
         let output = pipeline.process(text)?;
         Ok(Self {
