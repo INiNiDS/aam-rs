@@ -1,3 +1,4 @@
+
 stages:
   - validate
   - test-bindings
@@ -80,18 +81,20 @@ test-go-bindings:
   image: rust:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
   script:
     - apt-get update && apt-get install -y golang-go
     - cargo build --release --features ffi
     - cd bindings/go && go test -v ./...
-  variables:
-    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
 
 test-csharp-bindings:
   stage: test-bindings
   image: rust:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
   script:
     - apt-get update && apt-get install -y dotnet-sdk-10.0
     - cargo build --release --features ffi,csharp
@@ -99,18 +102,17 @@ test-csharp-bindings:
     - dotnet restore AamCsharp.sln
     - dotnet build AamCsharp.sln --configuration Release --no-restore
     - dotnet test AamCsharp.sln --configuration Release --no-build -v normal
-  variables:
-    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
 
 test-php-bindings:
   stage: test-bindings
   image: rust:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    AAM_RS_LIB: ${CI_PROJECT_DIR}/target/release/libaam_rs.so
   script:
     - apt-get update && apt-get install -y php php-ffi
     - cargo build --release --features ffi
-    - export AAM_RS_LIB=${CI_PROJECT_DIR}/target/release/libaam_rs.so
     - php bindings/php/tests/smoke.php
 
 test-ruby-bindings:
@@ -150,6 +152,9 @@ test-wasm-bindings:
     - cargo install wasm-pack --locked
     - cd bindings/wasm && cargo test && wasm-pack test --node
 
+# ============================================================================
+# STAGE: release (только main) — GitLab-нативный release-plz
+# ============================================================================
 release-plz:
   stage: release
   image: rust:latest
@@ -193,6 +198,7 @@ credits:
       - LICENSE-MIT
       - LICENSE-APACHE
     expire_in: 1 day
+
 
 # ─── C Library ───────────────────────────────────────────────────────
 .c_build_setup: &c_build_setup
