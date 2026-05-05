@@ -1,30 +1,11 @@
-# .gitlab-ci.yml — эквивалент GitHub Actions "Release & Publish"
-# Предполагается, что в проекте настроены следующие CI/CD переменные (секреты):
-#   GITHUB_TOKEN         — токен для создания GitHub Release и пушей
-#   CARGO_REGISTRY_TOKEN — токен для crates.io
-#   CRATES_IO_TOKEN      — (синоним, укажите один)
-#   NPM_TOKEN            — токен для npmjs.com
-#   PYPI_API_TOKEN       — токен для PyPI
-#   RUBY_GEMS_TOKEN      — токен для RubyGems
-#   MAVEN_USERNAME, MAVEN_PASSWORD — для Maven Central
-#   GPG_PRIVATE_KEY, GPG_PASSPHRASE — для подписи Java
-#   NUGET_API_KEY        — токен NuGet.org
-#   PHP_MIRROR_TOKEN     — токен для mirror-репозитория PHP
-#   и другие, если нужны.
-
-workflow:
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/    # только теги вида vX.Y.Z
-    - if: $CI_COMMIT_BRANCH == "main"            # пуш в основную ветку
-    - when: never
-
 stages:
-  - validate          # линтинг, тесты, MSRV, аудит (main only)
-  - release           # автоматический release-plz (main only)
-  - prepare           # генерация CREDITS.html и лицензий (tag only)
-  - build             # сборка всех артефактов (tag only)
-  - upload-release    # загрузка артефактов в GitHub Release (tag only)
-  - publish           # публикация пакетов в реестрах (tag only)
+  - validate
+  - test-bindings
+  - release
+  - prepare
+  - build
+  - upload-release
+  - publish
 
 variables:
   RUST_VERSION: "stable"
@@ -38,20 +19,13 @@ cache:
     - .cargo/git/
     - target/
 
-# ============================================================================
-# Шаблоны, чтобы не дублировать настройку Rust и зависимостей
-# ============================================================================
 .common_rust_install: &common_rust_install
   before_script:
     - rustup default ${RUST_VERSION}
     - rustup component add rustfmt clippy 2>/dev/null || true
 
 .install_binstall: &install_binstall
-  - cargo install cargo-binstall --locked
-
-# ============================================================================
-# STAGE: validate (только для main)
-# ============================================================================
+  - cargo install cargo-binstall --locked 2>/dev/null || true
 
 fmt-check:
   stage: validate
@@ -101,9 +75,81 @@ security-audit:
     - cargo deny check bans licenses
   allow_failure: true
 
-# ============================================================================
-# STAGE: release (только main) – аналог release-plz с GitHub API
-# ============================================================================
+test-go-bindings:
+  stage: test-bindings
+  image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y golang-go
+    - cargo build --release --features ffi
+    - cd bindings/go && go test -v ./...
+  environment:
+    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
+
+test-csharp-bindings:
+  stage: test-bindings
+  image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y dotnet-sdk-10.0
+    - cargo build --release --features ffi,csharp
+    - cd bindings/csharp
+    - dotnet restore AamCsharp.sln
+    - dotnet build AamCsharp.sln --configuration Release --no-restore
+    - dotnet test AamCsharp.sln --configuration Release --no-build -v normal
+  environment:
+    LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
+
+test-php-bindings:
+  stage: test-bindings
+  image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y php php-ffi
+    - cargo build --release --features ffi
+    - export AAM_RS_LIB=${CI_PROJECT_DIR}/target/release/libaam_rs.so
+    - php bindings/php/tests/smoke.php
+
+test-ruby-bindings:
+  stage: test-bindings
+  image: ruby:3.3
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y curl build-essential
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - cargo build --manifest-path bindings/ruby/ext/aam_rs/Cargo.toml --release
+    - cp bindings/ruby/ext/aam_rs/target/release/libaam_ruby.so bindings/ruby/ext/aam_rs/target/release/aam_ruby.so 2>/dev/null || true
+    - ruby bindings/ruby/tests/test_aam_rs.rb
+
+test-js-bindings:
+  stage: test-bindings
+  image: node:24
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y curl build-essential
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - cd bindings/js && npm install && npm test
+
+test-wasm-bindings:
+  stage: test-bindings
+  image: rust:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - apt-get update && apt-get install -y npm
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    - apt-get install -y nodejs
+    - rustup target add wasm32-unknown-unknown
+    - cargo install wasm-pack --locked
+    - cd bindings/wasm && cargo test && wasm-pack test --node
+
 release-plz:
   stage: release
   image: rust:latest
@@ -115,24 +161,22 @@ release-plz:
     - test-core
     - test-msrv
     - security-audit
+    - test-go-bindings
+    - test-csharp-bindings
+    - test-php-bindings
+    - test-ruby-bindings
+    - test-js-bindings
+    - test-wasm-bindings
   script:
     - apt-get update && apt-get install -y git
     - git config user.email "gitlab-ci@example.com"
     - git config user.name "GitLab CI"
     - *install_binstall
     - cargo binstall release-plz -y
-    # Запускаем release-plz; он создаст коммит, тег и GitHub Release
-    - release-plz release --git-token "${GITHUB_TOKEN}" --cargo-token "${CARGO_REGISTRY_TOKEN}" --verbose
-    # Пушим тег в репозиторий, чтобы запустился следующий пайплайн для тега
-    - git push origin --tags
+    - release-plz release --forge gitlab --git-token "${GITLAB_TOKEN}" --cargo-token "${CARGO_REGISTRY_TOKEN}" --verbose
   environment:
     name: release-plz
-  only:
-    - main
 
-# ============================================================================
-# STAGE: prepare – создание CREDITS.html (только для тегов)
-# ============================================================================
 credits:
   stage: prepare
   image: rust:latest
@@ -150,33 +194,27 @@ credits:
       - LICENSE-APACHE
     expire_in: 1 day
 
-# ============================================================================
-# STAGE: build – все платформы и языковые биндинги
-# Все джобы ниже выполняются только для тегов и требуют credits.
-# ============================================================================
-
-# ---------- C Library ----------
-.build-c-common: &build_c_common
+# ─── C Library ───────────────────────────────────────────────────────
+.c_build_setup: &c_build_setup
   stage: build
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   needs: ["credits"]
-  script:
-    - rustup default stable
-    - cargo install cargo-binstall
-    - cargo binstall cbindgen -y
-    - cargo build --release
-    - mkdir -p dist-c
 
 build-c-libs:linux:
-  <<: *build_c_common
+  <<: *c_build_setup
   image: rust:latest
   before_script:
     - apt-get update && apt-get install -y zip
+    - rustup default stable
+    - cargo install cargo-binstall --locked
+    - cargo binstall cbindgen -y
+    - cargo build --release
+    - mkdir -p dist-c
   script:
-    - *build_c_common_script
     - cp target/release/libaam_rs.so libaam-c.so
     - cbindgen --config cbindgen.toml --output aam-c.h
+    - cp LICENSE-MIT LICENSE-APACHE CREDITS.html .
     - zip aam-c-linux-x86_64.zip libaam-c.so aam-c.h LICENSE-MIT LICENSE-APACHE CREDITS.html
     - mv aam-c-linux-x86_64.zip dist-c/
   artifacts:
@@ -184,16 +222,20 @@ build-c-libs:linux:
       - dist-c/aam-c-linux-x86_64.zip
 
 build-c-libs:macos:
-  <<: *build_c_common
+  <<: *c_build_setup
   tags:
     - saas-macos-medium
   before_script:
     - brew install zip
-  script:
     - rustup default stable
+    - cargo install cargo-binstall --locked
+    - cargo binstall cbindgen -y
     - cargo build --release
+    - mkdir -p dist-c
+  script:
     - cp target/release/libaam_rs.dylib libaam-c.dylib
     - cbindgen --config cbindgen.toml --output aam-c.h
+    - cp LICENSE-MIT LICENSE-APACHE CREDITS.html .
     - zip aam-c-macos-x86_64.zip libaam-c.dylib aam-c.h LICENSE-MIT LICENSE-APACHE CREDITS.html
     - mv aam-c-macos-x86_64.zip dist-c/
   artifacts:
@@ -201,22 +243,27 @@ build-c-libs:macos:
       - dist-c/aam-c-macos-x86_64.zip
 
 build-c-libs:windows:
-  <<: *build_c_common
+  <<: *c_build_setup
   tags:
     - saas-windows-medium
-  script:
+  before_script:
     - rustup default stable
+    - cargo install cargo-binstall --locked
+    - cargo binstall cbindgen -y
     - cargo build --release
+    - if not exist dist-c mkdir dist-c
+  script:
     - copy target\release\aam_rs.dll aam-c.dll
-    - copy target\release\aam_rs.dll.lib aam-c.lib 2>NUL
+    - copy target\release\aam_rs.dll.lib aam-c.lib 2>NUL || (echo. > aam-c.lib)
     - cbindgen --config cbindgen.toml --output aam-c.h
+    - copy LICENSE-MIT+LICENSE-APACHE+CREDITS.html . >NUL
     - Compress-Archive -Path aam-c.dll,aam-c.lib,aam-c.h,LICENSE-MIT,LICENSE-APACHE,CREDITS.html -DestinationPath aam-c-windows-x86_64.zip
     - move aam-c-windows-x86_64.zip dist-c\
   artifacts:
     paths:
       - dist-c/aam-c-windows-x86_64.zip
 
-# ---------- Node.js Addon ----------
+# ─── Node.js Addon ───────────────────────────────────────────────────
 .build-node: &build_node
   stage: build
   rules:
@@ -274,7 +321,7 @@ build-node-win32-x64:
     paths:
       - dist-node/aam_rs_node.win32-x64-msvc.node
 
-# ---------- WASM ----------
+# ─── WASM ────────────────────────────────────────────────────────────
 build-wasm:
   stage: build
   image: rust:latest
@@ -294,7 +341,7 @@ build-wasm:
     paths:
       - dist-wasm/
 
-# ---------- Ruby Gem ----------
+# ─── Ruby Gem ────────────────────────────────────────────────────────
 build-ruby:
   stage: build
   image: ruby:3.3
@@ -317,7 +364,7 @@ build-ruby:
     paths:
       - dist-ruby/aam-ruby.gem
 
-# ---------- PHP ----------
+# ─── PHP ─────────────────────────────────────────────────────────────
 build-php:
   stage: build
   image: rust:latest
@@ -333,15 +380,14 @@ build-php:
     - cp bindings/php/README.md php-pkg/ 2>/dev/null || true
     - cp bindings/php/composer.json php-pkg/ 2>/dev/null || true
     - cp target/release/libaam_rs.so php-pkg/native/
-    - cp LICENSE-MIT LICENSE-APACHE php-pkg/
-    - cp CREDITS.html php-pkg/
+    - cp LICENSE-MIT LICENSE-APACHE CREDITS.html php-pkg/
     - cd php-pkg && zip -r ../aam-php-package.zip ./*
     - mkdir -p ../dist-php && mv ../aam-php-package.zip ../dist-php/
   artifacts:
     paths:
       - dist-php/aam-php-package.zip
 
-# ---------- C# ----------
+# ─── C# ──────────────────────────────────────────────────────────────
 build-csharp-linux:
   stage: build
   image: rust:latest
@@ -358,10 +404,7 @@ build-csharp-linux:
     paths:
       - dist-csharp/
 
-# C# под macOS и Windows собираются аналогично с соответствующими раннерами.
-# Для краткости опущены (можно добавить по аналогии).
-
-# ---------- Go ----------
+# ─── Go ──────────────────────────────────────────────────────────────
 build-go-linux:
   stage: build
   image: rust:latest
@@ -383,7 +426,7 @@ build-go-linux:
     paths:
       - dist-go/aam-go-linux-x86_64.zip
 
-# ---------- JNI ----------
+# ─── JNI ─────────────────────────────────────────────────────────────
 build-jni-linux:
   stage: build
   image: rust:latest
@@ -401,8 +444,7 @@ build-jni-linux:
     paths:
       - dist-jni/
 
-# ---------- Python Wheels ----------
-# Для Linux manylinux используем официальный образ
+# ─── Python Wheels ───────────────────────────────────────────────────
 .linux_wheels: &linux_wheels
   stage: build
   image: quay.io/pypa/manylinux_2_28_x86_64
@@ -431,7 +473,6 @@ build-python-wheels-linux-x64:
   before_script:
     - yum install -y zip
 
-# Для macOS и Windows используем нативные раннеры с maturin
 build-python-wheels-macos:
   stage: build
   tags: [saas-macos-medium]
@@ -467,7 +508,6 @@ build-python-wheels-windows:
     paths:
       - dist-python/
 
-# sdist
 build-python-sdist:
   stage: build
   image: python:3.13
@@ -482,12 +522,9 @@ build-python-sdist:
     paths:
       - dist-python/
 
-# ============================================================================
-# STAGE: upload-release – загрузка всех собранных артефактов в GitHub Release
-# ============================================================================
 upload-release:
   stage: upload-release
-  image: alpine:latest
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   needs:
@@ -508,43 +545,60 @@ upload-release:
     - build-python-wheels-macos
     - build-python-wheels-windows
     - build-python-sdist
-  before_script:
-    - apk add --no-cache gh
-    - gh auth login --with-token <<< "$GITHUB_TOKEN"
   script:
-    # Собираем все файлы из артефактов в одну папку (GitLab уже скачал их)
-    - mkdir -p all-artifacts
-    - cp dist-c/*.zip all-artifacts/ 2>/dev/null || true
-    - cp dist-node/*.node all-artifacts/ 2>/dev/null || true
-    - cp -r dist-wasm/pkg all-artifacts/wasm-pkg 2>/dev/null || true
-    - cp dist-ruby/aam-ruby.gem all-artifacts/ 2>/dev/null || true
-    - cp dist-php/aam-php-package.zip all-artifacts/ 2>/dev/null || true
-    - cp dist-csharp/runtimes all-artifacts/csharp-runtimes -r 2>/dev/null || true
-    - cp dist-go/aam-go-linux-x86_64.zip all-artifacts/ 2>/dev/null || true
-    - cp dist-jni/*.so all-artifacts/ 2>/dev/null || true
-    - cp dist-python/dist/*.whl all-artifacts/ 2>/dev/null || true
-    - cp dist-python/dist/*.tar.gz all-artifacts/ 2>/dev/null || true
-    - cd all-artifacts
-    - for f in *; do gh release upload "$CI_COMMIT_TAG" "$f" --clobber; done
+    - echo "Creating GitLab Release with assets"
+  release:
+    name: '$CI_COMMIT_TAG'
+    tag_name: '$CI_COMMIT_TAG'
+    description: 'Release $CI_COMMIT_TAG (автоматически собранные артефакты)'
+    assets:
+      links:
+        - name: 'C library – Linux x86_64'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-c/aam-c-linux-x86_64.zip?job=build-c-libs:linux'
+        - name: 'C library – macOS x86_64'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-c/aam-c-macos-x86_64.zip?job=build-c-libs:macos'
+        - name: 'C library – Windows x86_64'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-c/aam-c-windows-x86_64.zip?job=build-c-libs:windows'
+        - name: 'Node.js Linux'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-node/aam_rs_node.linux-x64-gnu.node?job=build-node-linux-x64'
+        - name: 'Node.js macOS Intel'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-node/aam_rs_node.darwin-x64.node?job=build-node-darwin-x64'
+        - name: 'Node.js macOS ARM'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-node/aam_rs_node.darwin-arm64.node?job=build-node-darwin-arm64'
+        - name: 'Node.js Windows'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-node/aam_rs_node.win32-x64-msvc.node?job=build-node-win32-x64'
+        - name: 'WASM package'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-wasm/pkg?job=build-wasm'
+        - name: 'Ruby gem'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-ruby/aam-ruby.gem?job=build-ruby'
+        - name: 'PHP package'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-php/aam-php-package.zip?job=build-php'
+        - name: 'C# runtimes'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-csharp/runtimes?job=build-csharp-linux'
+        - name: 'Go package'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-go/aam-go-linux-x86_64.zip?job=build-go-linux'
+        - name: 'JNI library'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-jni?job=build-jni-linux'
+        - name: 'Python wheels (Linux manylinux)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-python?job=build-python-wheels-linux-x64'
+        - name: 'Python wheels (macOS)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-python?job=build-python-wheels-macos'
+        - name: 'Python wheels (Windows)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-python?job=build-python-wheels-windows'
+        - name: 'Python sdist'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/$CI_JOB_ID/raw/dist-python?job=build-python-sdist'
   environment:
     name: release
 
-# ============================================================================
-# STAGE: publish – публикация пакетов в реестрах
-# ============================================================================
-
-# --- crates.io ---
 publish-crates-io:
   stage: publish
   image: rust:latest
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-  needs: []  # не зависит от артефактов
   script:
     - cargo publish --token "${CARGO_REGISTRY_TOKEN}" --no-verify
   when: manual
 
-# --- npm (основной пакет + платформенные) ---
 publish-npm:
   stage: publish
   image: node:24
@@ -555,12 +609,10 @@ publish-npm:
     - cd bindings/js
     - npm install
   script:
-    # Копируем аддоны в платформенные пакеты
     - cp ${CI_PROJECT_DIR}/dist-node/aam_rs_node.linux-x64-gnu.node npm/linux-x64-gnu/
     - cp ${CI_PROJECT_DIR}/dist-node/aam_rs_node.darwin-x64.node npm/darwin-x64/
     - cp ${CI_PROJECT_DIR}/dist-node/aam_rs_node.darwin-arm64.node npm/darwin-arm64/
     - cp ${CI_PROJECT_DIR}/dist-node/aam_rs_node.win32-x64-msvc.node npm/win32-x64-msvc/
-    # Синхронизируем версии из тега
     - export VERSION="${CI_COMMIT_TAG#v}"
     - node -e "const fs=require('fs'); ['package.json','npm/linux-x64-gnu/package.json','npm/darwin-x64/package.json','npm/darwin-arm64/package.json','npm/win32-x64-msvc/package.json'].forEach(p=>{const j=JSON.parse(fs.readFileSync(p,'utf8')); j.version='$VERSION'; if(j.optionalDependencies) for(let k in j.optionalDependencies) j.optionalDependencies[k]='$VERSION'; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')})"
     - npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
@@ -570,7 +622,6 @@ publish-npm:
     - npm publish ./npm/win32-x64-msvc --access public
     - npm publish --access public
 
-# --- PyPI ---
 publish-pypi:
   stage: publish
   image: python:3.13
@@ -582,7 +633,6 @@ publish-pypi:
     - mkdir -p dist && cp ${CI_PROJECT_DIR}/dist-python/dist/* dist/
     - twine upload dist/* -u __token__ -p "${PYPI_API_TOKEN}"
 
-# --- RubyGems ---
 publish-rubygems:
   stage: publish
   image: ruby:3.3
@@ -595,7 +645,6 @@ publish-rubygems:
     - chmod 600 ~/.gem/credentials
     - gem push ${CI_PROJECT_DIR}/dist-ruby/aam-ruby.gem
 
-# --- Maven Central (Java) ---
 publish-maven:
   stage: publish
   image: rust:latest
@@ -611,7 +660,6 @@ publish-maven:
   environment:
     name: maven-central
 
-# --- NuGet (C#) ---
 publish-nuget:
   stage: publish
   image: mcr.microsoft.com/dotnet/sdk:10.0
@@ -624,8 +672,7 @@ publish-nuget:
     - dotnet pack AamCsharp.sln -c Release -p:Version=${VERSION} -o artifacts
     - dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key "${NUGET_API_KEY}" --skip-duplicate
 
-# --- PHP (зеркало на Packagist) ---
-publish-php:
+publish-php-gitlab:
   stage: publish
   image: alpine:latest
   rules:
@@ -642,11 +689,12 @@ publish-php:
     - git add .
     - git commit -m "Release ${CI_COMMIT_TAG}"
     - git tag "${CI_COMMIT_TAG}"
-    - git remote add origin "https://${PHP_MIRROR_TOKEN}@github.com/${PHP_MIRROR_REPO}.git"
+    - git remote add origin "https://gitlab-ci-token:${PHP_MIRROR_TOKEN}@${CI_SERVER_HOST}/aam-rs/aam-php.git"
     - git push origin main --force
     - git push origin --tags
+  environment:
+    name: php-mirror-gitlab
 
-# --- WASM npm ---
 publish-wasm-npm:
   stage: publish
   image: node:24
