@@ -647,9 +647,10 @@ publish-rubygems:
   needs: ["build-ruby"]
   script:
     - mkdir -p ~/.gem
-    - echo ":rubygems_api_key: ${RUBY_GEMS_TOKEN}" > ~/.gem/credentials
+    - 'echo "---" > ~/.gem/credentials'
+    - 'echo ":rubygems_api_key: ${RUBY_GEMS_TOKEN}" >> ~/.gem/credentials'
     - chmod 600 ~/.gem/credentials
-    - gem push ${CI_PROJECT_DIR}/dist-ruby/aam-ruby.gem
+    - gem push "${CI_PROJECT_DIR}/dist-ruby/aam-ruby.gem"
 
 publish-maven:
   stage: publish
