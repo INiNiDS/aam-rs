@@ -84,7 +84,7 @@ test-go-bindings:
     - apt-get update && apt-get install -y golang-go
     - cargo build --release --features ffi
     - cd bindings/go && go test -v ./...
-  environment:
+  variables:
     LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
 
 test-csharp-bindings:
@@ -99,7 +99,7 @@ test-csharp-bindings:
     - dotnet restore AamCsharp.sln
     - dotnet build AamCsharp.sln --configuration Release --no-restore
     - dotnet test AamCsharp.sln --configuration Release --no-build -v normal
-  environment:
+  variables:
     LD_LIBRARY_PATH: ${CI_PROJECT_DIR}/target/release
 
 test-php-bindings:
