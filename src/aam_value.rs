@@ -6,14 +6,15 @@ use std::ops::Deref;
 #[derive(Debug, Clone, PartialEq)]
 pub enum AamValue {
     String(String),
-    List(Vec<AamValue>),
-    Object(HashMap<String, AamValue>),
+    List(Vec<Self>),
+    Object(HashMap<String, Self>),
 }
 
 impl AamValue {
     /// Returns the inner string if this is a `String` variant, otherwise returns `None`.
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
-        if let AamValue::String(s) = self {
+        if let Self::String(s) = self {
             Some(s)
         } else {
             None
@@ -21,8 +22,9 @@ impl AamValue {
     }
 
     /// Returns link for the list
-    pub fn as_list(&self) -> Option<&Vec<AamValue>> {
-        if let AamValue::List(l) = self {
+    #[must_use]
+    pub const fn as_list(&self) -> Option<&Vec<Self>> {
+        if let Self::List(l) = self {
             Some(l)
         } else {
             None
@@ -30,20 +32,23 @@ impl AamValue {
     }
 
     /// Returns links to the fields of an inline object.
-    pub fn as_object(&self) -> Option<&HashMap<String, AamValue>> {
-        if let AamValue::Object(o) = self {
+    #[must_use]
+    pub const fn as_object(&self) -> Option<&HashMap<String, Self>> {
+        if let Self::Object(o) = self {
             Some(o)
         } else {
             None
         }
     }
 
-    pub fn is_list(&self) -> bool {
-        matches!(self, AamValue::List(_))
+    #[must_use]
+    pub const fn is_list(&self) -> bool {
+        matches!(self, Self::List(_))
     }
 
-    pub fn is_object(&self) -> bool {
-        matches!(self, AamValue::Object(_))
+    #[must_use]
+    pub const fn is_object(&self) -> bool {
+        matches!(self, Self::Object(_))
     }
 }
 

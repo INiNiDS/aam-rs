@@ -3,6 +3,9 @@
 //! [`AAMBuilder`] accumulates lines in memory and can either return them as a
 //! `String` or write them directly to a file. Useful in tests and code generators.
 //!
+
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+
 //! # High-level directive API
 //!
 //! Instead of calling [`AAMBuilder::add_raw`] manually, use the dedicated methods:
@@ -95,6 +98,7 @@ impl SchemaField {
     }
 
     /// Renders the field as an AAML field declaration string.
+    #[must_use]
     pub fn to_aaml(&self) -> String {
         let mut s = String::new();
         self.to_aaml_writer(&mut s).unwrap();
@@ -157,35 +161,35 @@ pub enum BuiltInType {
     Custom(String),
 
     /// List of another type (e.g. `list<f64>`).
-    List(Box<BuiltInType>),
+    List(Box<Self>),
 }
 
 #[cfg(feature = "builder-extras")]
 impl std::fmt::Display for BuiltInType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BuiltInType::I32 => write!(f, "i32"),
-            BuiltInType::F64 => write!(f, "f64"),
-            BuiltInType::String => write!(f, "string"),
-            BuiltInType::Bool => write!(f, "bool"),
-            BuiltInType::Color => write!(f, "color"),
-            BuiltInType::Vector2 => write!(f, "math::vector2"),
-            BuiltInType::Vector3 => write!(f, "math::vector3"),
-            BuiltInType::Vector4 => write!(f, "math::vector4"),
-            BuiltInType::Quaternion => write!(f, "math::quaternion"),
-            BuiltInType::Matrix3x3 => write!(f, "math::matrix3x3"),
-            BuiltInType::Matrix4x4 => write!(f, "math::matrix4x4"),
-            BuiltInType::DateTime => write!(f, "time::datetime"),
-            BuiltInType::Duration => write!(f, "time::duration"),
-            BuiltInType::Year => write!(f, "time::year"),
-            BuiltInType::Day => write!(f, "time::day"),
-            BuiltInType::Hour => write!(f, "time::hour"),
-            BuiltInType::Minute => write!(f, "time::minute"),
-            BuiltInType::Kilogram => write!(f, "physics::kilogram"),
-            BuiltInType::Meter => write!(f, "physics::meter"),
-            BuiltInType::Schema => write!(f, "schema"),
-            BuiltInType::Custom(s) => write!(f, "{}", s),
-            BuiltInType::List(inner) => write!(f, "list<{}>", inner),
+            Self::I32 => write!(f, "i32"),
+            Self::F64 => write!(f, "f64"),
+            Self::String => write!(f, "string"),
+            Self::Bool => write!(f, "bool"),
+            Self::Color => write!(f, "color"),
+            Self::Vector2 => write!(f, "math::vector2"),
+            Self::Vector3 => write!(f, "math::vector3"),
+            Self::Vector4 => write!(f, "math::vector4"),
+            Self::Quaternion => write!(f, "math::quaternion"),
+            Self::Matrix3x3 => write!(f, "math::matrix3x3"),
+            Self::Matrix4x4 => write!(f, "math::matrix4x4"),
+            Self::DateTime => write!(f, "time::datetime"),
+            Self::Duration => write!(f, "time::duration"),
+            Self::Year => write!(f, "time::year"),
+            Self::Day => write!(f, "time::day"),
+            Self::Hour => write!(f, "time::hour"),
+            Self::Minute => write!(f, "time::minute"),
+            Self::Kilogram => write!(f, "physics::kilogram"),
+            Self::Meter => write!(f, "physics::meter"),
+            Self::Schema => write!(f, "schema"),
+            Self::Custom(s) => write!(f, "{s}"),
+            Self::List(inner) => write!(f, "list<{inner}>"),
         }
     }
 }
@@ -194,31 +198,31 @@ impl std::fmt::Display for BuiltInType {
 impl From<&str> for BuiltInType {
     fn from(s: &str) -> Self {
         match s {
-            "i32" => BuiltInType::I32,
-            "f64" => BuiltInType::F64,
-            "string" => BuiltInType::String,
-            "bool" => BuiltInType::Bool,
-            "color" => BuiltInType::Color,
-            "math::vector2" => BuiltInType::Vector2,
-            "math::vector3" => BuiltInType::Vector3,
-            "math::vector4" => BuiltInType::Vector4,
-            "math::quaternion" => BuiltInType::Quaternion,
-            "math::matrix3x3" => BuiltInType::Matrix3x3,
-            "math::matrix4x4" => BuiltInType::Matrix4x4,
-            "time::datetime" => BuiltInType::DateTime,
-            "time::duration" => BuiltInType::Duration,
-            "time::year" => BuiltInType::Year,
-            "time::day" => BuiltInType::Day,
-            "time::hour" => BuiltInType::Hour,
-            "time::minute" => BuiltInType::Minute,
-            "physics::kilogram" => BuiltInType::Kilogram,
-            "physics::meter" => BuiltInType::Meter,
-            "schema" => BuiltInType::Schema,
+            "i32" => Self::I32,
+            "f64" => Self::F64,
+            "string" => Self::String,
+            "bool" => Self::Bool,
+            "color" => Self::Color,
+            "math::vector2" => Self::Vector2,
+            "math::vector3" => Self::Vector3,
+            "math::vector4" => Self::Vector4,
+            "math::quaternion" => Self::Quaternion,
+            "math::matrix3x3" => Self::Matrix3x3,
+            "math::matrix4x4" => Self::Matrix4x4,
+            "time::datetime" => Self::DateTime,
+            "time::duration" => Self::Duration,
+            "time::year" => Self::Year,
+            "time::day" => Self::Day,
+            "time::hour" => Self::Hour,
+            "time::minute" => Self::Minute,
+            "physics::kilogram" => Self::Kilogram,
+            "physics::meter" => Self::Meter,
+            "schema" => Self::Schema,
             _ => {
                 if let Some(inner) = s.strip_prefix("list<").and_then(|s| s.strip_suffix('>')) {
-                    BuiltInType::List(Box::new(BuiltInType::from(inner)))
+                    Self::List(Box::new(Self::from(inner)))
                 } else {
-                    BuiltInType::Custom(s.to_string())
+                    Self::Custom(s.to_string())
                 }
             }
         }
@@ -253,11 +257,13 @@ pub struct InlineObject {
 #[cfg(feature = "builder-extras")]
 impl InlineObject {
     /// Creates a new empty inline object.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { fields: Vec::new() }
     }
 
     /// Adds a field to the inline object (builder-pattern, consumes self).
+    #[must_use]
     pub fn with_field(mut self, key: &str, value: &str) -> Self {
         self.fields.push((key.to_string(), value.to_string()));
         self
@@ -270,11 +276,13 @@ impl InlineObject {
     }
 
     /// Returns the fields as a slice.
+    #[must_use]
     pub fn fields(&self) -> &[(String, String)] {
         &self.fields
     }
 
     /// Renders the object as an AAML inline object string.
+    #[must_use]
     pub fn to_aaml(&self) -> String {
         self.to_string()
     }
@@ -295,7 +303,7 @@ impl std::fmt::Display for InlineObject {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{} = {}", k, v)?;
+            write!(f, "{k} = {v}")?;
         }
         write!(f, " }}")
     }
@@ -310,7 +318,7 @@ impl From<Vec<(String, String)>> for InlineObject {
 
 #[cfg(feature = "builder-extras")]
 impl From<InlineObject> for String {
-    fn from(obj: InlineObject) -> String {
+    fn from(obj: InlineObject) -> Self {
         obj.to_string()
     }
 }
@@ -357,13 +365,15 @@ pub struct AAMBuilder {
 
 impl AAMBuilder {
     /// Creates a new empty builder.
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             buffer: String::new(),
         }
     }
 
     /// Creates a new builder with the given initial buffer capacity.
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             buffer: String::with_capacity(capacity),
@@ -469,7 +479,7 @@ impl AAMBuilder {
         fields: impl IntoIterator<Item = SchemaField>,
     ) -> &mut Self {
         self.push_sep();
-        write!(&mut self.buffer, "@schema {} {{", name).unwrap();
+        write!(&mut self.buffer, "@schema {name} {{").unwrap();
         for field in fields {
             write!(&mut self.buffer, "\n    ").unwrap();
             field.to_aaml_writer(&mut self.buffer).unwrap();
@@ -628,11 +638,13 @@ impl AAMBuilder {
     }
 
     /// Consumes the builder and returns the accumulated content as a `String`.
+    #[must_use]
     pub fn build(self) -> String {
         self.buffer
     }
 
     /// Returns a clone of the accumulated content as a `String`.
+    #[must_use]
     pub fn as_string(&self) -> String {
         self.buffer.clone()
     }

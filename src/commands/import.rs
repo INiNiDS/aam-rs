@@ -21,7 +21,7 @@ use crate::pipeline::utils::resolve_relative_path;
 pub struct ImportCommand;
 
 impl Command for ImportCommand {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "import"
     }
 
@@ -38,11 +38,11 @@ impl Command for ImportCommand {
                 line: 0,
                 content: args.to_string(),
                 details: "Import path cannot be empty".to_string(),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Missing import path",
                     "@import directive requires a file path",
                     "Use format: @import \"path/to/file.aam\"",
-                )),
+                ))),
             });
         }
 

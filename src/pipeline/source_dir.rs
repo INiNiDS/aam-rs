@@ -7,7 +7,7 @@ thread_local! {
 
 /// RAII guard that sets a source directory for the current scope and restores
 /// the previous value (or clears it) when dropped — even across panics.
-pub(crate) struct SourceDirGuard {
+pub struct SourceDirGuard {
     prev: Option<PathBuf>,
 }
 
@@ -32,11 +32,11 @@ impl Drop for SourceDirGuard {
 }
 
 /// Sets the source directory for resolving relative paths in @import/@derive directives.
-pub(crate) fn set(dir: Option<PathBuf>) {
+pub fn set(dir: Option<PathBuf>) {
     PIPELINE_SOURCE_DIR.with(|d| *d.borrow_mut() = dir);
 }
 
 /// Gets the current source directory.
-pub(crate) fn get() -> Option<PathBuf> {
+pub fn get() -> Option<PathBuf> {
     PIPELINE_SOURCE_DIR.with(|d| d.borrow().clone())
 }

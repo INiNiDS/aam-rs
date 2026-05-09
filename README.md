@@ -55,7 +55,7 @@ Add the crate to your `Cargo.toml`:
 <!-- x-release-please-start-version -->
 ```toml
 [dependencies]
-aam-rs = "2.0.4"
+aam-rs = "2.5.1"
 ```
 
 <!-- x-release-please-end -->
@@ -280,11 +280,3 @@ See `LICENSE-MIT` and `LICENSE-APACHE`.
 
 - Docs.rs: https://docs.rs/aam-rs/
 - Project docs: https://aam.ininids.in.rs/
-
-# Repository 
-## GitLab
-GitLab the main repository for AAM, hosting the full source code, issues, and CI/CD pipelines:
-https://gitlab.com/ininids/aam-rs
-## GitHub Mirror
-A read-only mirror of the repository is available on GitHub for easier browsing and integration with GitHub-based tools:
-https://github.com/ininids/aam-rs

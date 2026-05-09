@@ -16,7 +16,7 @@ use smol_str::SmolStr;
 
 /// Trait for executing validation tasks.
 ///
-/// A ValidateExecutor takes a stream of ValidationTasks and executes them,
+/// A `ValidateExecutor` takes a stream of `ValidationTasks` and executes them,
 /// returning aggregated results suitable for LSP integration.
 pub trait ValidateExecutor: Send + Sync {
     /// Executes a single validation task within a given context.
@@ -68,9 +68,9 @@ pub trait ValidateExecutor: Send + Sync {
                 Err(e) => {
                     errors.push(TaskError {
                         line: task.line(),
-                        message: format!("Validation error: {}", e),
+                        message: format!("Validation error: {e}"),
                         task_description: task.description(),
-                        aaml_error: Some(format!("{:?}", e)),
+                        aaml_error: Some(format!("{e:?}")),
                     });
                 }
             }
@@ -86,7 +86,7 @@ pub trait ValidateExecutor: Send + Sync {
 
 /// Trait for executing parsing tasks.
 ///
-/// A ParserExecutor takes parse tasks and performs parsing operations,
+/// A `ParserExecutor` takes parse tasks and performs parsing operations,
 /// managing scopes, variables, and directive registration.
 pub trait ParserExecutor: Send + Sync {
     /// Executes a single parsing task.
@@ -127,9 +127,9 @@ pub trait ParserExecutor: Send + Sync {
                 Err(e) => {
                     errors.push(TaskError {
                         line: task.line(),
-                        message: format!("Parse error: {}", e),
+                        message: format!("Parse error: {e}"),
                         task_description: task.description(),
-                        aaml_error: Some(format!("{:?}", e)),
+                        aaml_error: Some(format!("{e:?}")),
                     });
                 }
             }
@@ -143,7 +143,7 @@ pub trait ParserExecutor: Send + Sync {
     }
 }
 
-/// Default implementation of ValidateExecutor.
+/// Default implementation of `ValidateExecutor`.
 ///
 /// This provides basic validation task execution with type checking and schema verification.
 pub struct DefaultValidateExecutor {
@@ -151,7 +151,8 @@ pub struct DefaultValidateExecutor {
 }
 
 impl DefaultValidateExecutor {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 
@@ -185,26 +186,26 @@ impl DefaultValidateExecutor {
         if !self.type_exists(context, type_name) {
             return Err(AamlError::InvalidType {
                 type_name: type_name.to_string(),
-                details: format!("Type not found in registry for key '{}'", key),
+                details: format!("Type not found in registry for key '{key}'"),
                 provided: value.to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown type",
-                    format!("Type '{}' is not registered", type_name),
+                    format!("Type '{type_name}' is not registered"),
                     "Register the type using @type directive".to_string(),
-                )),
+                ))),
             });
         }
 
         if let Err(e) = self.validate_type_value(value, type_name, context) {
             return Err(AamlError::InvalidType {
                 type_name: type_name.to_string(),
-                details: format!("Validation failed for key '{}'", key),
+                details: format!("Validation failed for key '{key}'"),
                 provided: value.to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Type validation failed",
                     e.to_string(),
-                    format!("Ensure '{}' conforms to type '{}'", value, type_name),
-                )),
+                    format!("Ensure '{value}' conforms to type '{type_name}'"),
+                ))),
             });
         }
 
@@ -223,11 +224,11 @@ impl DefaultValidateExecutor {
         Err(AamlError::NotFound {
             key: schema_name.to_string(),
             context: "Schema not found in registry".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Schema not defined",
-                format!("Schema '{}' referenced but not defined", schema_name),
+                format!("Schema '{schema_name}' referenced but not defined"),
                 "Define it using @schema directive".to_string(),
-            )),
+            ))),
         })
     }
 
@@ -237,12 +238,12 @@ impl DefaultValidateExecutor {
         }
 
         Err(AamlError::IoError {
-            details: format!("Imported file '{}' not found", path),
-            diagnostics: Some(ErrorDiagnostics::new(
+            details: format!("Imported file '{path}' not found"),
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "File missing",
-                format!("The file '{}' does not exist.", path),
+                format!("The file '{path}' does not exist."),
                 "Check the file path in your import directive.",
-            )),
+            ))),
         })
     }
 
@@ -257,12 +258,12 @@ impl DefaultValidateExecutor {
         while let Some(next_val) = context.map.get(current_key) {
             if !visited.insert(current_key) {
                 return Err(AamlError::CircularDependency {
-                    path: format!("{} -> {}", key, next_val),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    path: format!("{key} -> {next_val}"),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Circular reference detected",
-                        format!("Key '{}' references itself directly or indirectly", key),
+                        format!("Key '{key}' references itself directly or indirectly"),
                         "Break the reference loop".to_string(),
-                    )),
+                    ))),
                 });
             }
 
@@ -286,7 +287,7 @@ impl DefaultValidateExecutor {
         if current_key.is_empty() {
             field.to_string()
         } else {
-            format!("{}.{}", current_key, field)
+            format!("{current_key}.{field}")
         }
     }
 
@@ -302,14 +303,11 @@ impl DefaultValidateExecutor {
             .ok_or_else(|| AamlError::NotFound {
                 key: schema_name.to_string(),
                 context: "schema derivation".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Schema not defined",
-                    format!(
-                        "Schema '{}' referenced in derive chain but not defined",
-                        schema_name
-                    ),
+                    format!("Schema '{schema_name}' referenced in derive chain but not defined"),
                     "Ensure the file being derived from defines this schema",
-                )),
+                ))),
             })?;
 
         for (field, (type_name, is_optional)) in &schema.fields {
@@ -327,14 +325,13 @@ impl DefaultValidateExecutor {
                 field: field.to_string(),
                 type_name: type_name.to_string(),
                 details: format!(
-                    "Missing required field '{}' from derived schema '{}'",
-                    field, schema_name
+                    "Missing required field '{field}' from derived schema '{schema_name}'"
                 ),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Incomplete derivation",
-                    format!("Derived object missing required field: {}", field),
+                    format!("Derived object missing required field: {field}"),
                     "Add the field to satisfy the derived schema",
-                )),
+                ))),
             });
         }
 
@@ -370,7 +367,7 @@ impl DefaultValidateExecutor {
                 schema: schema_name.to_string(),
                 field: key.to_string(),
                 type_name: "schema".to_string(),
-                details: format!("Schema '{}' not found", schema_name),
+                details: format!("Schema '{schema_name}' not found"),
                 diagnostics: None,
             }
         })?;
@@ -403,17 +400,14 @@ impl DefaultValidateExecutor {
 
         let missing_str = missing_fields
             .iter()
-            .map(|s| s.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect::<Vec<_>>()
             .join(", ");
         Err(AamlError::SchemaValidationError {
             schema: schema_name.to_string(),
             field: missing_str.clone(),
             type_name: "required".to_string(),
-            details: format!(
-                "Schema incomplete: missing required fields: {}",
-                missing_str
-            ),
+            details: format!("Schema incomplete: missing required fields: {missing_str}"),
             diagnostics: None,
         })
     }
@@ -436,13 +430,13 @@ impl DefaultValidateExecutor {
             if let Err(e) = self.validate_type_value(&item.to_string(), element_type, context) {
                 return Err(AamlError::InvalidType {
                     type_name: element_type.to_string(),
-                    details: format!("List element invalid in '{}'", key),
+                    details: format!("List element invalid in '{key}'"),
                     provided: item.to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "List element validation failed",
                         e.to_string(),
-                        format!("All elements in list must be of type '{}'", element_type),
-                    )),
+                        format!("All elements in list must be of type '{element_type}'"),
+                    ))),
                 });
             }
         }
@@ -460,7 +454,7 @@ impl DefaultValidateExecutor {
     ) -> Result<bool, AamlError> {
         if pairs.is_empty() {
             return Err(AamlError::InvalidValue {
-                details: format!("Empty object for key '{}'", key),
+                details: format!("Empty object for key '{key}'"),
                 expected: "non-empty object".to_string(),
                 diagnostics: None,
             });
@@ -528,7 +522,7 @@ impl ValidateExecutor for DefaultValidateExecutor {
     }
 }
 
-/// Default implementation of ParserExecutor.
+/// Default implementation of `ParserExecutor`.
 ///
 /// This processes parsing tasks like variable registration, scope management,
 /// and directive execution.
@@ -537,25 +531,26 @@ pub struct DefaultParserExecutor {
 }
 
 impl DefaultParserExecutor {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 
-    fn process_variable<'a>(
+    fn process_variable(
         &self,
         variable_name: &std::borrow::Cow<'_, str>,
         value: &std::borrow::Cow<'_, str>,
         line: usize,
-        context: &mut ExecutionContext<'a>,
+        context: &mut ExecutionContext<'_>,
     ) {
         context.set_value(variable_name.as_ref(), value.as_ref(), line);
     }
 
-    fn manage_scope<'a>(
+    fn manage_scope(
         &self,
         scope: &std::borrow::Cow<'_, str>,
         is_entry: bool,
-        context: &mut ExecutionContext<'a>,
+        context: &mut ExecutionContext<'_>,
     ) {
         if is_entry {
             context.push_scope(scope.as_ref().to_string());
@@ -574,23 +569,23 @@ impl DefaultParserExecutor {
             "import" | "derive" => Ok(()),
             _ => Err(AamlError::ParseError {
                 line,
-                content: format!("@{} {}", directive_name, arguments),
-                details: format!("Unknown directive: @{}", directive_name),
-                diagnostics: Some(ErrorDiagnostics::new(
+                content: format!("@{directive_name} {arguments}"),
+                details: format!("Unknown directive: @{directive_name}"),
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown directive",
-                    format!("Directive '@{}' is not recognized", directive_name),
+                    format!("Directive '@{directive_name}' is not recognized"),
                     "Known directives: @import, @derive, @schema, @type",
-                )),
+                ))),
             }),
         }
     }
 
-    fn register_type<'a>(
+    fn register_type(
         &self,
         type_name: &std::borrow::Cow<'_, str>,
         type_spec: &std::borrow::Cow<'_, str>,
         line: usize,
-        context: &mut ExecutionContext<'a>,
+        context: &mut ExecutionContext<'_>,
     ) {
         let inferred_default = if type_spec.starts_with("list<") {
             Some("[]".to_string())
@@ -632,11 +627,11 @@ impl DefaultParserExecutor {
         schema_fields
     }
 
-    fn auto_register_list_types<'a>(
+    fn auto_register_list_types(
         &self,
         schema_fields: &PipelineHashMap<SmolStr, (SmolStr, bool)>,
         line: usize,
-        context: &mut ExecutionContext<'a>,
+        context: &mut ExecutionContext<'_>,
     ) {
         let field_type_names: Vec<SmolStr> = schema_fields
             .values()
@@ -659,12 +654,12 @@ impl DefaultParserExecutor {
         }
     }
 
-    fn register_schema<'a>(
+    fn register_schema(
         &self,
         schema_name: &std::borrow::Cow<'_, str>,
         fields: &str,
         line: usize,
-        context: &mut ExecutionContext<'a>,
+        context: &mut ExecutionContext<'_>,
     ) {
         let schema_fields = self.parse_schema_fields(fields);
         self.auto_register_list_types(&schema_fields, line, context);
@@ -707,21 +702,21 @@ impl DefaultParserExecutor {
         if !context.is_imported(&file_path) {
             let content_string =
                 std::fs::read_to_string(&resolved).map_err(|e| AamlError::IoError {
-                    details: format!("Failed to read imported file '{}': {}", file_path, e),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    details: format!("Failed to read imported file '{file_path}': {e}"),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Import failed",
-                        format!("Could not read file '{}'", file_path),
+                        format!("Could not read file '{file_path}'"),
                         "Check if the file exists and is readable",
-                    )),
+                    ))),
                 })?;
 
             let lexer = crate::pipeline::lexer::DefaultLexer::new();
             let parser = crate::pipeline::parser::DefaultParser::new();
             let _ctx_guard = crate::error::push_error_render_context(&file_path, &content_string);
 
-            let content = arena.alloc_str(&content_string);
+            let imported_content = arena.alloc_str(&content_string);
 
-            let tokens = lexer.tokenize(content)?;
+            let tokens = lexer.tokenize(imported_content)?;
             let parse_output = parser.parse_with_recovery(&tokens);
             if let Some(first_error) = parse_output.errors.into_iter().next() {
                 return Err(first_error);
@@ -730,7 +725,7 @@ impl DefaultParserExecutor {
             // Update source_dir to the imported file's directory for nested derives
             // RAII guard restores the previous value on drop (including panic)
             let _nested_guard = crate::pipeline::source_dir::SourceDirGuard::new(
-                resolved.parent().map(|p| p.to_path_buf()),
+                resolved.parent().map(std::path::Path::to_path_buf),
             );
 
             let sub_tasks = parser.generate_parse_tasks(&parse_output.ast);
@@ -747,26 +742,23 @@ impl DefaultParserExecutor {
         Ok(())
     }
 
-    fn resolve_module_reference<'a>(
+    fn resolve_module_reference(
         &self,
         module_name: &std::borrow::Cow<'_, str>,
         scope: &std::borrow::Cow<'_, str>,
-        context: &ExecutionContext<'a>,
+        context: &ExecutionContext<'_>,
     ) -> Result<(), AamlError> {
         if !context.imported_files.contains(module_name)
             && !context.schemas.contains_key(module_name.as_ref())
         {
             return Err(AamlError::NotFound {
                 key: module_name.to_string(),
-                context: format!("module reference in scope '{}'", scope),
-                diagnostics: Some(ErrorDiagnostics::new(
+                context: format!("module reference in scope '{scope}'"),
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Module not found",
-                    format!(
-                        "The module '{}' has not been imported or defined",
-                        module_name
-                    ),
+                    format!("The module '{module_name}' has not been imported or defined"),
                     "Check for a missing @import directive",
-                )),
+                ))),
             });
         }
 

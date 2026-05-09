@@ -16,10 +16,10 @@ use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::primitive_type::PrimitiveType;
 
-pub(crate) mod list;
+pub mod list;
 mod math;
-pub(crate) mod physics;
-pub(crate) mod primitive_type;
+pub mod physics;
+pub mod primitive_type;
 mod time;
 
 /// Core trait that every AAML type must implement.
@@ -71,11 +71,11 @@ pub fn resolve_builtin(path: &str) -> Result<Box<dyn Type>, AamlError> {
         _ => Err(AamlError::NotFound {
             key: path.to_string(),
             context: "builtin types".to_string(),
-            diagnostics: Some(crate::error::ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                 "Unknown builtin type",
-                format!("Type path '{}' does not match any builtin type", path),
+                format!("Type path '{path}' does not match any builtin type"),
                 "Valid formats: math::vector3, time::datetime, physics::kilogram, i32, list<i32>, etc.",
-            )),
+            ))),
         }),
     }
 }

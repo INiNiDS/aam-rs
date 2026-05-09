@@ -1,6 +1,7 @@
 //! Error types for the AAML parser and validation pipeline with beautiful colored output.
 
 use colored::Colorize;
+use smol_str::SmolStr;
 use std::cell::RefCell;
 use std::fmt;
 use std::io;
@@ -77,7 +78,7 @@ fn type_alias_line_info(source: &str, alias_name: &str) -> Option<(usize, String
             continue;
         }
 
-        let col = raw.find(alias_name).map(|p| p + 1).unwrap_or(1);
+        let col = raw.find(alias_name).map_or(1, |p| p + 1);
         return Some((line_num, raw.to_string(), col));
     }
     None
@@ -87,16 +88,16 @@ fn type_alias_line_info(source: &str, alias_name: &str) -> Option<(usize, String
 #[derive(Debug, Clone)]
 pub struct ErrorDiagnostics {
     /// What went wrong (short title).
-    pub what: String,
+    pub what: SmolStr,
     /// Why it happened (detailed explanation).
-    pub why: String,
+    pub why: SmolStr,
     /// How to fix it (suggested resolution).
-    pub fix: String,
+    pub fix: SmolStr,
 }
 
 impl ErrorDiagnostics {
     /// Create new diagnostics.
-    pub fn new(what: impl Into<String>, why: impl Into<String>, fix: impl Into<String>) -> Self {
+    pub fn new(what: impl Into<SmolStr>, why: impl Into<SmolStr>, fix: impl Into<SmolStr>) -> Self {
         Self {
             what: what.into(),
             why: why.into(),
@@ -105,6 +106,7 @@ impl ErrorDiagnostics {
     }
 
     /// Pretty-print with colors (like Cargo).
+    #[must_use]
     pub fn pretty_print(&self) -> String {
         format!(
             "{}\n{}\n\n{}\n{}\n\n{}\n{}\n",
@@ -124,7 +126,7 @@ pub enum AamlError {
     /// An I/O error occurred while reading a file.
     IoError {
         details: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A line could not be parsed as a valid AAML statement.
@@ -136,21 +138,21 @@ pub enum AamlError {
         /// Human-readable explanation of why parsing failed.
         details: String,
         /// Diagnostic guidance.
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A key or type name was not found in the registry or map.
     NotFound {
         key: String,
         context: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A value does not satisfy a basic type constraint (not schema-specific).
     InvalidValue {
         details: String,
         expected: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A value failed validation against a registered or built-in type.
@@ -162,14 +164,14 @@ pub enum AamlError {
         /// What was provided.
         provided: String,
         /// Diagnostic guidance.
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A directive (`@import`, `@derive`, …) encountered an error in its arguments.
     DirectiveError {
         directive: String,
         message: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// A schema constraint was violated during parsing or explicit validation.
@@ -183,7 +185,7 @@ pub enum AamlError {
         /// Human-readable description of the failure.
         details: String,
         /// Diagnostic guidance.
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Missing required field in schema.
@@ -191,13 +193,13 @@ pub enum AamlError {
         schema: String,
         field: String,
         field_type: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Circular dependency detected.
     CircularDependency {
         path: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Type registration conflict.
@@ -205,21 +207,21 @@ pub enum AamlError {
         type_name: String,
         existing: String,
         new: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Nesting depth exceeded (possible infinite loop).
     NestingDepthExceeded {
         depth: usize,
         context: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Malformed inline object or array literal.
     MalformedLiteral {
         literal_type: String,
         content: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Directive syntax is incorrect.
@@ -227,7 +229,7 @@ pub enum AamlError {
         directive: String,
         provided_syntax: String,
         expected_syntax: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Type conversion failed.
@@ -235,7 +237,7 @@ pub enum AamlError {
         from_type: String,
         to_type: String,
         value: String,
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 
     /// Lexical analysis error (invalid character or token).
@@ -247,7 +249,7 @@ pub enum AamlError {
         /// The invalid character
         character: String,
         /// Diagnostic guidance
-        diagnostics: Option<ErrorDiagnostics>,
+        diagnostics: Option<Box<ErrorDiagnostics>>,
     },
 }
 
@@ -255,81 +257,79 @@ pub enum AamlError {
 pub type AamError = AamlError;
 
 impl AamlError {
-    fn code(&self) -> &'static str {
+    const fn code(&self) -> &'static str {
         match self {
-            AamlError::CircularDependency { .. } => "E001",
-            AamlError::ParseError { .. } => "E002",
-            AamlError::InvalidType { .. } => "E003",
-            AamlError::SchemaValidationError { .. } => "E004",
-            AamlError::MissingRequiredField { .. } => "E005",
-            AamlError::NotFound { .. } => "E006",
-            AamlError::DirectiveError { .. } => "E007",
-            AamlError::DirectiveSyntaxError { .. } => "E008",
-            AamlError::MalformedLiteral { .. } => "E009",
-            AamlError::TypeRegistrationConflict { .. } => "E010",
-            AamlError::TypeConversionError { .. } => "E011",
-            AamlError::InvalidValue { .. } => "E012",
-            AamlError::NestingDepthExceeded { .. } => "E013",
-            AamlError::LexError { .. } => "E014",
-            AamlError::IoError { .. } => "E015",
+            Self::CircularDependency { .. } => "E001",
+            Self::ParseError { .. } => "E002",
+            Self::InvalidType { .. } => "E003",
+            Self::SchemaValidationError { .. } => "E004",
+            Self::MissingRequiredField { .. } => "E005",
+            Self::NotFound { .. } => "E006",
+            Self::DirectiveError { .. } => "E007",
+            Self::DirectiveSyntaxError { .. } => "E008",
+            Self::MalformedLiteral { .. } => "E009",
+            Self::TypeRegistrationConflict { .. } => "E010",
+            Self::TypeConversionError { .. } => "E011",
+            Self::InvalidValue { .. } => "E012",
+            Self::NestingDepthExceeded { .. } => "E013",
+            Self::LexError { .. } => "E014",
+            Self::IoError { .. } => "E015",
         }
     }
 
-    fn title(&self) -> &'static str {
+    const fn title(&self) -> &'static str {
         match self {
-            AamlError::CircularDependency { .. } => "cyclic dependency detected",
-            AamlError::ParseError { .. } => "parse error",
-            AamlError::InvalidType { .. } => "type validation failed",
-            AamlError::SchemaValidationError { .. } => "schema validation failed",
-            AamlError::MissingRequiredField { .. } => "missing required field",
-            AamlError::NotFound { .. } => "entry not found",
-            AamlError::DirectiveError { .. } => "directive execution failed",
-            AamlError::DirectiveSyntaxError { .. } => "directive syntax error",
-            AamlError::MalformedLiteral { .. } => "malformed literal",
-            AamlError::TypeRegistrationConflict { .. } => "type registration conflict",
-            AamlError::TypeConversionError { .. } => "type conversion failed",
-            AamlError::InvalidValue { .. } => "invalid value",
-            AamlError::NestingDepthExceeded { .. } => "nesting depth exceeded",
-            AamlError::LexError { .. } => "lexical analysis failed",
-            AamlError::IoError { .. } => "I/O operation failed",
+            Self::CircularDependency { .. } => "cyclic dependency detected",
+            Self::ParseError { .. } => "parse error",
+            Self::InvalidType { .. } => "type validation failed",
+            Self::SchemaValidationError { .. } => "schema validation failed",
+            Self::MissingRequiredField { .. } => "missing required field",
+            Self::NotFound { .. } => "entry not found",
+            Self::DirectiveError { .. } => "directive execution failed",
+            Self::DirectiveSyntaxError { .. } => "directive syntax error",
+            Self::MalformedLiteral { .. } => "malformed literal",
+            Self::TypeRegistrationConflict { .. } => "type registration conflict",
+            Self::TypeConversionError { .. } => "type conversion failed",
+            Self::InvalidValue { .. } => "invalid value",
+            Self::NestingDepthExceeded { .. } => "nesting depth exceeded",
+            Self::LexError { .. } => "lexical analysis failed",
+            Self::IoError { .. } => "I/O operation failed",
         }
     }
 
-    fn default_help(&self) -> &'static str {
+    const fn default_help(&self) -> &'static str {
         match self {
-            AamlError::CircularDependency { .. } => {
+            Self::CircularDependency { .. } => {
                 "types in AAM must be acyclic. Consider using a primitive type or breaking the loop."
             }
-            AamlError::ParseError { .. } => {
+            Self::ParseError { .. } => {
                 "check assignment/directive syntax near the highlighted line."
             }
-            AamlError::InvalidType { .. } => {
+            Self::InvalidType { .. } => {
                 "ensure the value matches the declared type or update the type declaration."
             }
-            AamlError::SchemaValidationError { .. } | AamlError::MissingRequiredField { .. } => {
+            Self::SchemaValidationError { .. } | Self::MissingRequiredField { .. } => {
                 "fill required fields and ensure each field value matches its declared type."
             }
-            AamlError::NotFound { .. } => {
+            Self::NotFound { .. } => {
                 "verify the referenced key/type/schema exists and is in scope."
             }
-            AamlError::DirectiveError { .. } | AamlError::DirectiveSyntaxError { .. } => {
+            Self::DirectiveError { .. } | Self::DirectiveSyntaxError { .. } => {
                 "check directive name and argument format."
             }
-            AamlError::MalformedLiteral { .. } => {
+            Self::MalformedLiteral { .. } => {
                 "ensure object/list literals are balanced and well-formed."
             }
-            AamlError::TypeRegistrationConflict { .. } => {
+            Self::TypeRegistrationConflict { .. } => {
                 "rename the type or remove duplicate @type declarations."
             }
-            AamlError::TypeConversionError { .. } => {
+            Self::TypeConversionError { .. } => {
                 "provide a value that can be converted to the requested type."
             }
-            AamlError::InvalidValue { .. } => "provide a value in the expected format.",
-            AamlError::NestingDepthExceeded { .. } => {
-                "reduce recursion depth or split nested data."
-            }
-            AamlError::LexError { .. } => "remove or replace unsupported characters.",
-            AamlError::IoError { .. } => "check file path and permissions.",
+            Self::InvalidValue { .. } => "provide a value in the expected format.",
+            Self::NestingDepthExceeded { .. } => "reduce recursion depth or split nested data.",
+            Self::LexError { .. } => "remove or replace unsupported characters.",
+            Self::IoError { .. } => "check file path and permissions.",
         }
     }
 
@@ -344,7 +344,7 @@ impl AamlError {
         ));
 
         match self {
-            AamlError::CircularDependency { path, .. } => {
+            Self::CircularDependency { path, .. } => {
                 let nodes: Vec<String> = path
                     .split("->")
                     .map(str::trim)
@@ -356,7 +356,7 @@ impl AamlError {
                     .cloned()
                     .unwrap_or_else(|| "unknown".to_string());
                 let chain = if nodes.is_empty() {
-                    path.to_string()
+                    path.clone()
                 } else {
                     nodes.join(" -> ")
                 };
@@ -415,7 +415,7 @@ impl AamlError {
                     cycle_start
                 ));
             }
-            AamlError::ParseError {
+            Self::ParseError {
                 line,
                 content,
                 details,
@@ -430,10 +430,7 @@ impl AamlError {
                 ));
                 out.push_str(&format!(" {}\n", "|".blue().bold()));
                 let display_line = source_line(&ctx.source, *line).unwrap_or(content.as_str());
-                let caret_col = display_line
-                    .find(content.trim())
-                    .map(|v| v + 1)
-                    .unwrap_or(1);
+                let caret_col = display_line.find(content.trim()).map_or(1, |v| v + 1);
                 out.push_str(&format!(
                     " {} {} {}\n",
                     line.to_string().blue().bold(),
@@ -453,7 +450,7 @@ impl AamlError {
                     "^-- here".red().bold()
                 ));
             }
-            AamlError::LexError {
+            Self::LexError {
                 line,
                 column,
                 character,
@@ -514,142 +511,129 @@ impl AamlError {
     }
 
     /// Get the primary error message (short form).
+    #[must_use]
     pub fn short_message(&self) -> String {
         match self {
-            AamlError::IoError { details, .. } => format!("IO error: {}", details),
-            AamlError::ParseError {
+            Self::IoError { details, .. } => format!("IO error: {details}"),
+            Self::ParseError {
                 line,
                 content,
                 details,
                 ..
             } => {
-                format!("Parse error at line {}: {} ({})", line, content, details)
+                format!("Parse error at line {line}: {content} ({details})")
             }
-            AamlError::NotFound { key, context, .. } => {
-                format!("Key '{}' not found ({})", key, context)
+            Self::NotFound { key, context, .. } => {
+                format!("Key '{key}' not found ({context})")
             }
-            AamlError::InvalidValue {
+            Self::InvalidValue {
                 details, expected, ..
             } => {
-                format!("Invalid value: {} (expected: {})", details, expected)
+                format!("Invalid value: {details} (expected: {expected})")
             }
-            AamlError::InvalidType {
+            Self::InvalidType {
                 type_name,
                 provided,
                 details,
                 ..
             } => {
-                format!(
-                    "Invalid type '{}': {} (got: {})",
-                    type_name, details, provided
-                )
+                format!("Invalid type '{type_name}': {details} (got: {provided})")
             }
-            AamlError::DirectiveError {
+            Self::DirectiveError {
                 directive, message, ..
             } => {
-                format!("Directive '@{}' error: {}", directive, message)
+                format!("Directive '@{directive}' error: {message}")
             }
-            AamlError::SchemaValidationError {
+            Self::SchemaValidationError {
                 schema,
                 field,
                 type_name,
                 details,
                 ..
             } => {
-                format!(
-                    "Schema '{}' field '{}' ({}): {}",
-                    schema, field, type_name, details
-                )
+                format!("Schema '{schema}' field '{field}' ({type_name}): {details}")
             }
-            AamlError::MissingRequiredField {
+            Self::MissingRequiredField {
                 schema,
                 field,
                 field_type,
                 ..
             } => {
                 format!(
-                    "Missing required field '{}' in schema '{}' (type: {})",
-                    field, schema, field_type
+                    "Missing required field '{field}' in schema '{schema}' (type: {field_type})"
                 )
             }
-            AamlError::CircularDependency { path, .. } => {
-                format!("Circular dependency detected: {}", path)
+            Self::CircularDependency { path, .. } => {
+                format!("Circular dependency detected: {path}")
             }
-            AamlError::TypeRegistrationConflict {
+            Self::TypeRegistrationConflict {
                 type_name,
                 existing,
                 new,
                 ..
             } => {
                 format!(
-                    "Type '{}' already defined as '{}', cannot redefine as '{}'",
-                    type_name, existing, new
+                    "Type '{type_name}' already defined as '{existing}', cannot redefine as '{new}'"
                 )
             }
-            AamlError::NestingDepthExceeded { depth, context, .. } => {
-                format!("Nesting depth exceeded ({}): {}", depth, context)
+            Self::NestingDepthExceeded { depth, context, .. } => {
+                format!("Nesting depth exceeded ({depth}): {context}")
             }
-            AamlError::MalformedLiteral {
+            Self::MalformedLiteral {
                 literal_type,
                 content,
                 ..
             } => {
-                format!("Malformed {} literal: {}", literal_type, content)
+                format!("Malformed {literal_type} literal: {content}")
             }
-            AamlError::DirectiveSyntaxError {
+            Self::DirectiveSyntaxError {
                 directive,
                 provided_syntax,
                 expected_syntax,
                 ..
             } => {
                 format!(
-                    "Directive '@{}' syntax error: got '{}', expected '{}'",
-                    directive, provided_syntax, expected_syntax
+                    "Directive '@{directive}' syntax error: got '{provided_syntax}', expected '{expected_syntax}'"
                 )
             }
-            AamlError::TypeConversionError {
+            Self::TypeConversionError {
                 from_type,
                 to_type,
                 value,
                 ..
             } => {
-                format!(
-                    "Cannot convert '{}' from {} to {}",
-                    value, from_type, to_type
-                )
+                format!("Cannot convert '{value}' from {from_type} to {to_type}")
             }
-            AamlError::LexError {
+            Self::LexError {
                 line,
                 column,
                 character,
                 ..
             } => {
-                format!(
-                    "Lexical error at {}:{}: invalid character '{}'",
-                    line, column, character
-                )
+                format!("Lexical error at {line}:{column}: invalid character '{character}'")
             }
         }
     }
 
     /// Get the detailed diagnostics if available.
+    #[must_use]
     pub fn diagnostics(&self) -> Option<&ErrorDiagnostics> {
         match self {
-            AamlError::IoError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::ParseError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::NotFound { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::InvalidValue { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::InvalidType { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::DirectiveError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::SchemaValidationError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::MissingRequiredField { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::CircularDependency { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::TypeRegistrationConflict { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::NestingDepthExceeded { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::MalformedLiteral { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::DirectiveSyntaxError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::TypeConversionError { diagnostics, .. } => diagnostics.as_ref(),
-            AamlError::LexError { diagnostics, .. } => diagnostics.as_ref(),
+            Self::IoError { diagnostics, .. }
+            | Self::ParseError { diagnostics, .. }
+            | Self::NotFound { diagnostics, .. }
+            | Self::InvalidValue { diagnostics, .. }
+            | Self::InvalidType { diagnostics, .. }
+            | Self::DirectiveError { diagnostics, .. }
+            | Self::SchemaValidationError { diagnostics, .. }
+            | Self::MissingRequiredField { diagnostics, .. }
+            | Self::CircularDependency { diagnostics, .. }
+            | Self::TypeRegistrationConflict { diagnostics, .. }
+            | Self::NestingDepthExceeded { diagnostics, .. }
+            | Self::MalformedLiteral { diagnostics, .. }
+            | Self::DirectiveSyntaxError { diagnostics, .. }
+            | Self::TypeConversionError { diagnostics, .. }
+            | Self::LexError { diagnostics, .. } => diagnostics.as_deref(),
         }
     }
 }
@@ -665,12 +649,12 @@ impl std::error::Error for AamlError {}
 impl From<io::Error> for AamlError {
     fn from(err: io::Error) -> Self {
         let details = err.to_string();
-        let diagnostics = Some(ErrorDiagnostics::new(
+        let diagnostics = Some(Box::new(ErrorDiagnostics::new(
             "I/O operation failed",
-            format!("Could not read or write file: {}", details),
+            format!("Could not read or write file: {details}"),
             "Check file permissions and ensure the path exists",
-        ));
-        AamlError::IoError {
+        )));
+        Self::IoError {
             details,
             diagnostics,
         }

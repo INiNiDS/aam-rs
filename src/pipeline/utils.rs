@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 /// If `file_path` is absolute, returns it as-is.
 /// If `source_dir` is `Some`, joins it with the relative `file_path`.
 /// Otherwise, returns `file_path` unchanged (relative to CWD).
+#[must_use]
 pub fn resolve_relative_path(file_path: &str, source_dir: Option<&Path>) -> PathBuf {
     let path = Path::new(file_path);
     if path.is_absolute() {
@@ -38,8 +39,7 @@ pub fn validate_type_value(
         if !crate::aaml::parsing::is_inline_object(value) {
             return Err(AamlError::InvalidValue {
                 details: format!(
-                    "Value for type 'schema' must be an inline object '{{ k = v, ... }}', got: '{}'",
-                    value
+                    "Value for type 'schema' must be an inline object '{{ k = v, ... }}', got: '{value}'"
                 ),
                 expected: "inline object format: { key = value, ... }".to_string(),
                 diagnostics: None,
@@ -58,7 +58,7 @@ pub fn validate_type_value(
         Ok(validator) => validator.validate(value, context),
         Err(_) => Err(AamlError::InvalidType {
             type_name: type_name.to_string(),
-            details: format!("Unknown type '{}'", type_name),
+            details: format!("Unknown type '{type_name}'"),
             provided: value.to_string(),
             diagnostics: None,
         }),

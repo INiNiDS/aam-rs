@@ -56,13 +56,13 @@ impl Type for TypeDefinition {
     /// Returns the underlying [`PrimitiveType`] that best represents this type.
     fn base_type(&self) -> PrimitiveType {
         match self {
-            TypeDefinition::Builtin(path) => resolve_builtin(path)
-                .map(|t| t.base_type())
-                .unwrap_or(PrimitiveType::String),
-            TypeDefinition::Primitive(name) => PrimitiveType::from_name(name)
+            Self::Builtin(path) => {
+                resolve_builtin(path).map_or(PrimitiveType::String, |t| t.base_type())
+            }
+            Self::Primitive(name) => PrimitiveType::from_name(name)
                 .unwrap_or(PrimitiveType::String)
                 .base_type(),
-            TypeDefinition::Alias(_) => PrimitiveType::String,
+            Self::Alias(_) => PrimitiveType::String,
         }
     }
 
@@ -73,11 +73,9 @@ impl Type for TypeDefinition {
     /// - `Alias` — always returns `Ok(())`.
     fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
         match self {
-            TypeDefinition::Builtin(path) => resolve_builtin(path)?.validate(value, aaml),
-            TypeDefinition::Primitive(name) => {
-                PrimitiveType::from_name(name)?.validate(value, aaml)
-            }
-            TypeDefinition::Alias(_) => Ok(()),
+            Self::Builtin(path) => resolve_builtin(path)?.validate(value, aaml),
+            Self::Primitive(name) => PrimitiveType::from_name(name)?.validate(value, aaml),
+            Self::Alias(_) => Ok(()),
         }
     }
 }
@@ -87,7 +85,7 @@ impl Type for TypeDefinition {
 pub struct TypeCommand;
 
 impl Command for TypeCommand {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "type"
     }
 
@@ -105,11 +103,11 @@ impl Command for TypeCommand {
                     directive: "type".to_string(),
                     provided_syntax: args.to_string(),
                     expected_syntax: "name = definition".to_string(),
-                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                         "Invalid @type syntax",
                         "Type definition must have an '=' sign",
                         "Use format: @type name = primitive_type or @type name = module::type",
-                    )),
+                    ))),
                 })?;
 
         let name = name.trim();
@@ -119,22 +117,22 @@ impl Command for TypeCommand {
             return Err(AamlError::InvalidValue {
                 details: "Type name is empty".to_string(),
                 expected: "non-empty type name".to_string(),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Empty type name",
                     "Type name cannot be empty before '='",
                     "Provide a type name: @type myType = ...",
-                )),
+                ))),
             });
         }
         if definition.is_empty() {
             return Err(AamlError::InvalidValue {
                 details: "Type definition is empty".to_string(),
                 expected: "type definition (primitive or module path)".to_string(),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Empty type definition",
                     "Type definition cannot be empty after '='",
                     "Provide a type: @type myType = i32, f64, string, etc.",
-                )),
+                ))),
             });
         }
 

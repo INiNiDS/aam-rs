@@ -19,19 +19,19 @@ impl TypeAAM for PrimitiveType {
         Self: Sized,
     {
         match name {
-            "i32" => Ok(PrimitiveType::I32),
-            "f64" => Ok(PrimitiveType::F64),
-            "string" => Ok(PrimitiveType::String),
-            "bool" => Ok(PrimitiveType::Bool),
-            "color" => Ok(PrimitiveType::Color),
+            "i32" => Ok(Self::I32),
+            "f64" => Ok(Self::F64),
+            "string" => Ok(Self::String),
+            "bool" => Ok(Self::Bool),
+            "color" => Ok(Self::Color),
             _ => Err(AamlError::NotFound {
                 key: name.to_string(),
                 context: "primitive types".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown primitive type",
-                    format!("Primitive type '{}' does not exist", name),
+                    format!("Primitive type '{name}' does not exist"),
                     "Valid types: i32, f64, string, bool, color",
-                )),
+                ))),
             }),
         }
     }
@@ -42,70 +42,67 @@ impl TypeAAM for PrimitiveType {
 
     fn validate(&self, value: &str, _context: &ExecutionContext) -> Result<(), AamlError> {
         match self {
-            PrimitiveType::I32 => {
+            Self::I32 => {
                 value.parse::<i32>().map_err(|_| AamlError::InvalidValue {
-                    details: format!("'{}' cannot be parsed as i32", value),
+                    details: format!("'{value}' cannot be parsed as i32"),
                     expected: "32-bit signed integer".to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Invalid integer",
-                        format!("Value '{}' is not a valid i32", value),
+                        format!("Value '{value}' is not a valid i32"),
                         "Use integer format: 42, -100, 0, etc.",
-                    )),
+                    ))),
                 })?;
             }
-            PrimitiveType::F64 => {
+            Self::F64 => {
                 value.parse::<f64>().map_err(|_| AamlError::InvalidValue {
-                    details: format!("'{}' cannot be parsed as f64", value),
+                    details: format!("'{value}' cannot be parsed as f64"),
                     expected: "64-bit floating-point number".to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Invalid floating-point number",
-                        format!("Value '{}' is not a valid f64", value),
+                        format!("Value '{value}' is not a valid f64"),
                         "Use decimal format: 3.14, 2.0, -1.5, etc.",
-                    )),
+                    ))),
                 })?;
             }
-            PrimitiveType::String => {
+            Self::String => {
                 // Any string is valid, so no validation needed.
             }
-            PrimitiveType::Bool => match value.to_lowercase().as_str() {
+            Self::Bool => match value.to_lowercase().as_str() {
                 "true" | "false" | "1" | "0" => {}
                 _ => {
                     return Err(AamlError::InvalidValue {
-                        details: format!("'{}' is not a valid boolean", value),
+                        details: format!("'{value}' is not a valid boolean"),
                         expected: "true, false, 1, or 0".to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
+                        diagnostics: Some(Box::new(ErrorDiagnostics::new(
                             "Invalid boolean value",
-                            format!("Value '{}' is not a recognized boolean", value),
+                            format!("Value '{value}' is not a recognized boolean"),
                             "Use: true, false, 1, or 0",
-                        )),
+                        ))),
                     });
                 }
             },
-            PrimitiveType::Color => {
+            Self::Color => {
                 // Waiting hex #RRGGBB or #RRGGBBAA
                 if !value.starts_with('#') || (value.len() != 7 && value.len() != 9) {
                     return Err(AamlError::InvalidValue {
-                        details: format!("'{}' is not in valid color format", value),
+                        details: format!("'{value}' is not in valid color format"),
                         expected: "#RRGGBB or #RRGGBBAA hex format".to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
+                        diagnostics: Some(Box::new(ErrorDiagnostics::new(
                             "Invalid color format",
-                            format!(
-                                "Color '{}' must be #RRGGBB (RGB) or #RRGGBBAA (RGBA)",
-                                value
-                            ),
+                            format!("Color '{value}' must be #RRGGBB (RGB) or #RRGGBBAA (RGBA)"),
                             "Use hex notation: #ff0000 (red), #00ff00 (green), #0000ff (blue), etc.",
-                        )),
+                        ))),
                     });
                 }
                 if u64::from_str_radix(&value[1..], 16).is_err() {
                     return Err(AamlError::InvalidValue {
-                        details: format!("'{}' contains invalid hexadecimal digits", value),
+                        details: format!("'{value}' contains invalid hexadecimal digits"),
                         expected: "valid hexadecimal (0-9, a-f)".to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
+                        diagnostics: Some(Box::new(ErrorDiagnostics::new(
                             "Invalid hex in color",
-                            format!("Color '{}' contains non-hexadecimal characters", value),
+                            format!("Color '{value}' contains non-hexadecimal characters"),
                             "Use only 0-9 and a-f in hex colors",
-                        )),
+                        ))),
                     });
                 }
             }
@@ -117,12 +114,12 @@ impl TypeAAM for PrimitiveType {
 impl fmt::Display for PrimitiveType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            PrimitiveType::I32 => "i32",
-            PrimitiveType::F64 => "f64",
-            PrimitiveType::String => "string",
-            PrimitiveType::Bool => "bool",
-            PrimitiveType::Color => "color",
+            Self::I32 => "i32",
+            Self::F64 => "f64",
+            Self::String => "string",
+            Self::Bool => "bool",
+            Self::Color => "color",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }

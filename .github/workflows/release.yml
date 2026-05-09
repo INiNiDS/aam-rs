@@ -749,7 +749,7 @@ jobs:
       - name: Install cbindgen
         run: cargo binstall cbindgen -y
       - name: Build release library
-        run: cargo build --release
+        run: cargo build --release --features ffi
       - name: Prepare C/C++ Package Structure
         run: |
           mkdir -p package/include package/lib/cmake/aam-c package/bin package/examples

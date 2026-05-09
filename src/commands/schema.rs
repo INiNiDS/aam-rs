@@ -38,6 +38,7 @@ pub struct SchemaDef {
 
 impl SchemaDef {
     /// Returns `true` when `field` was declared with `*` (optional).
+    #[must_use]
     pub fn is_optional(&self, field: &str) -> bool {
         self.optional_fields.contains(field)
     }
@@ -55,11 +56,11 @@ impl SchemaCommand {
                 .ok_or_else(|| AamlError::DirectiveError {
                     directive: "schema".to_string(),
                     message: "Expected '{' after schema name".to_string(),
-                    diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                         "Invalid @schema syntax",
                         "Schema definition must start with '{' after the name",
                         "Use format: @schema Name { field: type, ... }",
-                    )),
+                    ))),
                 })?;
 
         let name = name_part.trim();
@@ -67,11 +68,11 @@ impl SchemaCommand {
             return Err(AamlError::DirectiveError {
                 directive: "schema".to_string(),
                 message: "Schema name is empty".to_string(),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Missing schema name",
                     "Schema directive must have a name before '{'",
                     "Use format: @schema SchemaName { ... }",
-                )),
+                ))),
             });
         }
 
@@ -80,11 +81,11 @@ impl SchemaCommand {
             .ok_or_else(|| AamlError::DirectiveError {
                 directive: "schema".to_string(),
                 message: "Expected '}' to close schema body".to_string(),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Unclosed schema definition",
                     "Schema body must be closed with '}'",
                     "Ensure your @schema has matching braces: { ... }",
-                )),
+                ))),
             })?
             .0;
 
@@ -104,24 +105,24 @@ impl SchemaCommand {
             .split_once(':')
             .ok_or_else(|| AamlError::DirectiveError {
                 directive: "schema".to_string(),
-                message: format!("Bad field: '{}' — missing ':' separator", token),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                message: format!("Bad field: '{token}' — missing ':' separator"),
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Invalid field definition",
-                    format!("Field '{}' must use format: field:type", token),
+                    format!("Field '{token}' must use format: field:type"),
                     "Use ':' to separate field name from type, e.g., x:f64",
-                )),
+                ))),
             })?;
 
         // "field:type" or "field:" — type may follow as the next token.
         let ty = if ty.is_empty() {
             tokens.next().ok_or_else(|| AamlError::DirectiveError {
                 directive: "schema".to_string(),
-                message: format!("Field '{}:' has no type specified", field_raw),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                message: format!("Field '{field_raw}:' has no type specified"),
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Missing field type",
-                    format!("Field '{}' must have a type after ':'", field_raw),
+                    format!("Field '{field_raw}' must have a type after ':'"),
                     "Provide a type: field:i32, field:string, etc.",
-                )),
+                ))),
             })?
         } else {
             ty
@@ -137,15 +138,12 @@ impl SchemaCommand {
         if field.is_empty() || ty.is_empty() {
             return Err(AamlError::DirectiveError {
                 directive: "schema".to_string(),
-                message: format!(
-                    "Bad field definition: '{}:{}' — empty name or type",
-                    field, ty
-                ),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                message: format!("Bad field definition: '{field}:{ty}' — empty name or type"),
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Empty field or type",
                     "Field name and type cannot be empty",
                     "Use format: fieldName:typeName",
-                )),
+                ))),
             });
         }
 
@@ -184,7 +182,7 @@ impl SchemaCommand {
 }
 
 impl Command for SchemaCommand {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "schema"
     }
 

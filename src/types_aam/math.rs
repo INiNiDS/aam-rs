@@ -19,20 +19,20 @@ impl TypeAAM for MathTypes {
         Self: Sized,
     {
         match name {
-            "vector2" => Ok(MathTypes::Vector2),
-            "vector3" => Ok(MathTypes::Vector3),
-            "vector4" => Ok(MathTypes::Vector4),
-            "quaternion" => Ok(MathTypes::Quaternion),
-            "matrix3x3" => Ok(MathTypes::Matrix3x3),
-            "matrix4x4" => Ok(MathTypes::Matrix4x4),
+            "vector2" => Ok(Self::Vector2),
+            "vector3" => Ok(Self::Vector3),
+            "vector4" => Ok(Self::Vector4),
+            "quaternion" => Ok(Self::Quaternion),
+            "matrix3x3" => Ok(Self::Matrix3x3),
+            "matrix4x4" => Ok(Self::Matrix4x4),
             _ => Err(AamlError::NotFound {
                 key: name.to_string(),
                 context: "math types".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown math type",
-                    format!("Math type '{}' is not recognized", name),
+                    format!("Math type '{name}' is not recognized"),
                     "Valid types: vector2, vector3, vector4, quaternion, matrix3x3, matrix4x4",
-                )),
+                ))),
             }),
         }
     }
@@ -43,11 +43,11 @@ impl TypeAAM for MathTypes {
 
     fn validate(&self, value: &str, _context: &ExecutionContext) -> Result<(), AamlError> {
         let expected_len = match self {
-            MathTypes::Vector2 => 2,
-            MathTypes::Vector3 => 3,
-            MathTypes::Vector4 | MathTypes::Quaternion => 4,
-            MathTypes::Matrix3x3 => 9,
-            MathTypes::Matrix4x4 => 16,
+            Self::Vector2 => 2,
+            Self::Vector3 => 3,
+            Self::Vector4 | Self::Quaternion => 4,
+            Self::Matrix3x3 => 9,
+            Self::Matrix4x4 => 16,
         };
 
         let mut count = 0usize;
@@ -55,13 +55,13 @@ impl TypeAAM for MathTypes {
             let part = part.trim();
             if part.parse::<f64>().is_err() {
                 return Err(AamlError::InvalidValue {
-                    details: format!("'{}' is not a valid number", part),
+                    details: format!("'{part}' is not a valid number"),
                     expected: "floating-point number (f64)".to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Invalid number in vector/matrix",
-                        format!("Component '{}' could not be parsed as a number", part),
+                        format!("Component '{part}' could not be parsed as a number"),
                         "Use decimal notation: 1.0, 2.5, -3.14, etc.",
-                    )),
+                    ))),
                 });
             }
             count += 1;
@@ -69,27 +69,23 @@ impl TypeAAM for MathTypes {
 
         if count != expected_len {
             let type_name = match self {
-                MathTypes::Vector2 => "vector2",
-                MathTypes::Vector3 => "vector3",
-                MathTypes::Vector4 => "vector4",
-                MathTypes::Quaternion => "quaternion",
-                MathTypes::Matrix3x3 => "matrix3x3",
-                MathTypes::Matrix4x4 => "matrix4x4",
+                Self::Vector2 => "vector2",
+                Self::Vector3 => "vector3",
+                Self::Vector4 => "vector4",
+                Self::Quaternion => "quaternion",
+                Self::Matrix3x3 => "matrix3x3",
+                Self::Matrix4x4 => "matrix4x4",
             };
             return Err(AamlError::InvalidValue {
-                details: format!("Expected {} components, got {}", expected_len, count),
-                expected: format!("{} comma-separated numbers", expected_len),
-                diagnostics: Some(ErrorDiagnostics::new(
+                details: format!("Expected {expected_len} components, got {count}"),
+                expected: format!("{expected_len} comma-separated numbers"),
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Wrong number of components",
                     format!(
-                        "Type '{}' requires {} values, but {} were provided",
-                        type_name, expected_len, count
+                        "Type '{type_name}' requires {expected_len} values, but {count} were provided"
                     ),
-                    format!(
-                        "Provide exactly {} numbers separated by commas",
-                        expected_len
-                    ),
-                )),
+                    format!("Provide exactly {expected_len} numbers separated by commas"),
+                ))),
             });
         }
 

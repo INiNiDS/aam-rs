@@ -2,7 +2,6 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder as CoreAamBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
-#[cfg(feature = "translator")]
 use aam_rs::translator::TOMLTranslator;
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -35,6 +34,12 @@ pub struct JsLspResult {
 #[napi(js_name = "AAMBuilder")]
 pub struct JsAamBuilder {
     inner: CoreAamBuilder,
+}
+
+impl Default for JsAamBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[napi]
@@ -297,6 +302,12 @@ pub struct JsInlineObject {
     inner: InlineObject,
 }
 
+impl Default for JsInlineObject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[napi]
 impl JsInlineObject {
     #[napi(constructor)]
@@ -312,7 +323,7 @@ impl JsInlineObject {
     }
 
     #[napi(js_name = "toString")]
-    pub fn to_string(&self) -> String {
+    pub fn as_string(&self) -> String {
         self.inner.to_string()
     }
 }
@@ -325,11 +336,9 @@ pub fn js_parse_inline_to_map(content: String) -> Result<HashMap<String, String>
 
 // ── TOMLTranslator ──────────────────────────────────────────────────────────
 
-#[cfg(feature = "translator")]
 #[napi(js_name = "TOMLTranslator")]
 pub struct JsTOMLTranslator;
 
-#[cfg(feature = "translator")]
 #[napi]
 impl JsTOMLTranslator {
     #[napi(js_name = "tomlToAAM")]

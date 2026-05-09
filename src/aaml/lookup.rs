@@ -7,6 +7,7 @@ use std::collections::HashSet;
 impl AAML {
     /// Looks up `key` in the map. If not found as a key, performs a reverse
     /// lookup — searching for an entry whose *value* matches `key`.
+    #[must_use]
     pub fn find_obj(&self, key: &str) -> Option<FoundValue> {
         self.map
             .get(key)
@@ -15,6 +16,7 @@ impl AAML {
     }
 
     /// Reverse lookup: finds the key whose value equals `value`.
+    #[must_use]
     pub fn find_key(&self, value: &str) -> Option<FoundValue> {
         self.map
             .iter()
@@ -23,6 +25,7 @@ impl AAML {
 
     /// Follows a chain of key -> value -> key lookups until a terminal value
     /// is reached or a cycle is detected.
+    #[must_use]
     pub fn find_deep(&self, key: &str) -> Option<FoundValue> {
         let mut current_key = key;
         let mut last_found = None;

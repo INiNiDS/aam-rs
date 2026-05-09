@@ -19,6 +19,8 @@
 //! println!("{}", cfg.find_obj("host").unwrap());
 //! ```
 
+#![warn(clippy::pedantic, clippy::cargo, clippy::nursery)]
+
 #[allow(deprecated)]
 pub mod aaml;
 pub mod builder;

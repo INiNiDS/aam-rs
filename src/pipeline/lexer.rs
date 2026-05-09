@@ -8,7 +8,7 @@ use crate::error::{AamlError, ErrorDiagnostics};
 /// A single token produced by the Lexer.
 ///
 /// Each token carries its line and column number for error reporting.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub line: usize,
@@ -77,12 +77,13 @@ pub trait Lexer: Send + Sync {
 pub struct DefaultLexer;
 
 impl DefaultLexer {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
     /// Checks if a character is whitespace (excluding newlines)
-    fn is_whitespace(c: char) -> bool {
+    const fn is_whitespace(c: char) -> bool {
         c == ' ' || c == '\t' || c == '\r'
     }
 
@@ -111,12 +112,12 @@ impl DefaultLexer {
     }
 
     /// Checks if a character is a digit
-    fn is_digit(c: char) -> bool {
+    const fn is_digit(c: char) -> bool {
         c.is_ascii_digit()
     }
 
     /// Checks if a character can be part of a number
-    fn is_number_part(c: char) -> bool {
+    const fn is_number_part(c: char) -> bool {
         c.is_ascii_digit() || c == '.' || c == '-' || c == 'e' || c == 'E'
     }
 }
@@ -229,11 +230,11 @@ impl Lexer for DefaultLexer {
                         line,
                         column,
                         character: ch.to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
+                        diagnostics: Some(Box::new(ErrorDiagnostics::new(
                             "Invalid character in input",
-                            format!("Unexpected character '{}' at {}:{}", ch, line, column),
+                            format!("Unexpected character '{ch}' at {line}:{column}"),
                             "Check for typos or unsupported characters",
-                        )),
+                        ))),
                     });
                 }
             }
@@ -306,7 +307,7 @@ impl DefaultLexer {
         chars.next();
         *col_ref += 1;
     }
-    fn update_string_scan_state(
+    const fn update_string_scan_state(
         c: char,
         quote: char,
         escaped: &mut bool,

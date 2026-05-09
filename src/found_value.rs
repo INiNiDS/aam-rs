@@ -18,8 +18,9 @@ pub struct FoundValue {
 
 impl FoundValue {
     /// Creates a new `FoundValue` from a string slice.
-    pub fn new(value: &str) -> FoundValue {
-        FoundValue {
+    #[must_use]
+    pub fn new(value: &str) -> Self {
+        Self {
             inner: value.to_string(),
         }
     }
@@ -33,6 +34,7 @@ impl FoundValue {
     }
 
     /// Returns the inner value as a string slice.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.inner
     }
@@ -48,6 +50,7 @@ impl FoundValue {
     /// let v = FoundValue::new("[rust, aam, config]");
     /// assert_eq!(v.as_list().unwrap(), vec!["rust", "aam", "config"]);
     /// ```
+    #[must_use]
     pub fn as_list(&self) -> Option<Vec<String>> {
         ListType::parse_items(&self.inner)
     }
@@ -64,6 +67,7 @@ impl FoundValue {
     /// let map = v.as_object().unwrap();
     /// assert_eq!(map["x"], "1.0");
     /// ```
+    #[must_use]
     pub fn as_object(&self) -> Option<HashMap<String, String>> {
         if !parsing::is_inline_object(&self.inner) {
             return None;
@@ -74,18 +78,24 @@ impl FoundValue {
     }
 
     /// Returns `true` when this value is a list literal `[...]`.
+    #[must_use]
     pub fn is_list(&self) -> bool {
         let s = self.inner.trim();
         s.starts_with('[') && s.ends_with(']')
     }
 
     /// Returns `true` when this value is an inline object literal `{...}`.
+    #[must_use]
     pub fn is_object(&self) -> bool {
         parsing::is_inline_object(&self.inner)
     }
 
-    /// Attempts to parse the inner value into any type that implements FromStr.
+    /// Attempts to parse the inner value into any type that implements `FromStr`.
     /// Suitable for u32, f32, bool, etc.
+    ///
+    /// # Errors
+    ///
+    /// Returns `FromStr`'s associated error type if parsing fails (e.g., invalid format for the target type).
     pub fn parse<T>(&self) -> Result<T, T::Err>
     where
         T: std::str::FromStr,
@@ -97,6 +107,7 @@ impl FoundValue {
     /// into a vector of elements of the desired type.
     ///
     /// Returns `None` if this is not a list, or a `Result` with the element parsing error.
+    #[must_use]
     pub fn parse_list<T>(&self) -> Option<Result<Vec<T>, T::Err>>
     where
         T: std::str::FromStr,
@@ -112,7 +123,7 @@ impl FoundValue {
 
 impl From<String> for FoundValue {
     fn from(value: String) -> Self {
-        FoundValue { inner: value }
+        Self { inner: value }
     }
 }
 

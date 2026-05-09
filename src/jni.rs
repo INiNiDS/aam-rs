@@ -36,14 +36,6 @@ unsafe fn get_aam<'a>(ptr: jlong) -> Option<&'a AAM> {
     Some(unsafe { &*(ptr as *const AAM) })
 }
 
-unsafe fn get_aam_mut<'a>(ptr: jlong) -> Option<&'a mut AAM> {
-    if ptr == 0 {
-        return None;
-    }
-
-    Some(unsafe { &mut *(ptr as *mut AAM) })
-}
-
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_rustgames_aam_AAM_new<'local>(
     mut _env: Env<'local>,
@@ -90,10 +82,10 @@ pub extern "system" fn Java_com_rustgames_aam_AAM_get<'local>(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    if let Some(found) = aam.get(&key) {
-        if let Ok(js) = env.new_string(found) {
-            return js.into_raw();
-        }
+    if let Some(found) = aam.get(&key)
+        && let Ok(js) = env.new_string(found)
+    {
+        return js.into_raw();
     }
     std::ptr::null_mut()
 }

@@ -24,5 +24,10 @@ pub trait Command: Send + Sync {
     ///
     /// `args` contains everything after the directive name on the same line,
     /// with leading whitespace preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directive is malformed, references are invalid,
+    /// or execution would violate schema constraints or circular dependency rules.
     fn execute(&self, aaml: &mut AAML, args: &str) -> Result<(), AamlError>;
 }

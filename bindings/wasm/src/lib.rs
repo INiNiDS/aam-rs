@@ -2,7 +2,6 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
-#[cfg(feature = "translator")]
 use aam_rs::translator::TOMLTranslator;
 use wasm_bindgen::prelude::*;
 
@@ -24,6 +23,12 @@ pub struct AamDocument {
 #[wasm_bindgen(js_name = AAMBuilder)]
 pub struct WasmAamBuilder {
     inner: AAMBuilder,
+}
+
+impl Default for WasmAamBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn parse_schema_fields(fields: Vec<String>) -> Vec<SchemaField> {
@@ -122,6 +127,12 @@ impl WasmAamBuilder {
 #[wasm_bindgen(js_name = InlineObject)]
 pub struct WasmInlineObject {
     inner: InlineObject,
+}
+
+impl Default for WasmInlineObject {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[wasm_bindgen]
@@ -302,10 +313,10 @@ pub fn split_aam(content: &str) -> js_sys::Object {
             continue;
         }
 
-        if current_name.is_some() {
-            if let Some((key, value)) = parse_assignment(line) {
-                current_builder.add_line(key, value);
-            }
+        if current_name.is_some()
+            && let Some((key, value)) = parse_assignment(line)
+        {
+            current_builder.add_line(key, value);
         }
     }
 
@@ -322,11 +333,9 @@ pub fn split_aam(content: &str) -> js_sys::Object {
 
 // ── TOMLTranslator ───────────────────────────────────────────────────────────
 
-#[cfg(feature = "translator")]
 #[wasm_bindgen(js_name = TOMLTranslator)]
 pub struct WasmTOMLTranslator;
 
-#[cfg(feature = "translator")]
 #[wasm_bindgen]
 impl WasmTOMLTranslator {
     #[wasm_bindgen(js_name = tomlToAAM)]

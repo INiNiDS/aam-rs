@@ -11,25 +11,23 @@ use crate::pipeline::tasks::{ExecutionTask, ParseTask};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueNode<'a> {
     Literal(std::borrow::Cow<'a, str>),
-    Object(std::sync::Arc<[(std::borrow::Cow<'a, str>, ValueNode<'a>)]>),
-    List(std::sync::Arc<[ValueNode<'a>]>),
+    Object(std::sync::Arc<[(std::borrow::Cow<'a, str>, Self)]>),
+    List(std::sync::Arc<[Self]>),
 }
 
-impl<'a> ValueNode<'a> {
-    /// Converts the value node back to a string representation
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for ValueNode<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValueNode::Literal(s) => s.to_string(),
+            ValueNode::Literal(s) => write!(f, "{s}"),
             ValueNode::Object(pairs) => {
-                let formatted_pairs: Vec<String> = pairs
-                    .iter()
-                    .map(|(k, v)| format!("{} = {}", k, v.to_string()))
-                    .collect();
-                format!("{{ {} }}", formatted_pairs.join(", "))
+                let formatted_pairs: Vec<String> =
+                    pairs.iter().map(|(k, v)| format!("{k} = {v}")).collect();
+                write!(f, "{{ {} }}", formatted_pairs.join(", "))
             }
             ValueNode::List(items) => {
-                let formatted_items: Vec<String> = items.iter().map(|v| v.to_string()).collect();
-                format!("[{}]", formatted_items.join(", "))
+                let formatted_items: Vec<String> =
+                    items.iter().map(std::string::ToString::to_string).collect();
+                write!(f, "[{}]", formatted_items.join(", "))
             }
         }
     }
@@ -53,9 +51,10 @@ pub enum AstNode<'a> {
     },
 }
 
-impl<'a> AstNode<'a> {
+impl AstNode<'_> {
     /// Returns the line number where this node appears
-    pub fn line(&self) -> usize {
+    #[must_use]
+    pub const fn line(&self) -> usize {
         match self {
             AstNode::Assignment { line, .. } => *line,
             AstNode::Directive { line, .. } => *line,
@@ -91,7 +90,8 @@ pub struct ParseOutput<'a> {
 pub struct DefaultParser;
 
 impl DefaultParser {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
@@ -113,14 +113,14 @@ impl DefaultParser {
 
         if start >= tokens.len() {
             return Err(AamlError::ParseError {
-                line: tokens.get(start).map(|t| t.line).unwrap_or(1),
+                line: tokens.get(start).map_or(1, |t| t.line),
                 content: "incomplete assignment".to_string(),
                 details: "Expected: key = value".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Incomplete assignment",
                     "Assignment must have at least 3 tokens: key, =, value".to_string(),
                     "Check format: key = value".to_string(),
-                )),
+                ))),
             });
         }
 
@@ -142,16 +142,10 @@ impl DefaultParser {
         }
 
         if assign_pos >= tokens.len() || tokens[assign_pos].kind != TokenKind::Assign {
-            let got = tokens
-                .get(start + 1)
-                .map(|t| t.text.as_ref())
-                .unwrap_or("<eof>");
+            let got = tokens.get(start + 1).map_or("<eof>", |t| t.text.as_ref());
             return Err(AamlError::ParseError {
-                line: tokens
-                    .get(start + 1)
-                    .map(|t| t.line)
-                    .unwrap_or(tokens[start].line),
-                content: format!("Expected '=', got '{}'", got),
+                line: tokens.get(start + 1).map_or(tokens[start].line, |t| t.line),
+                content: format!("Expected '=', got '{got}'"),
                 details: "Assignment operator '=' expected after key".to_string(),
                 diagnostics: None,
             });
@@ -250,8 +244,7 @@ impl DefaultParser {
                                 | TokenKind::Comma
                         )
                     })
-                    .map(|p| start + p)
-                    .unwrap_or(tokens.len());
+                    .map_or(tokens.len(), |p| start + p);
 
                 if end_pos == start {
                     return Err(AamlError::ParseError {
@@ -399,11 +392,11 @@ impl DefaultParser {
             line,
             content: "@".to_string(),
             details: "Directive name expected after '@'".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Missing directive name",
                 "Directive requires a name after '@'".to_string(),
                 "Use format: @directive_name arguments".to_string(),
-            )),
+            ))),
         }
     }
 
@@ -413,10 +406,7 @@ impl DefaultParser {
             && (*kind == TokenKind::At || *kind == TokenKind::Newline)
     }
 
-    fn collect_directive_args<'a>(
-        tokens_filtered: &[&Token<'a>],
-        start_pos: usize,
-    ) -> (String, usize) {
+    fn collect_directive_args(tokens_filtered: &[&Token<'_>], start_pos: usize) -> (String, usize) {
         let mut args = String::new();
         let mut arg_pos = start_pos;
         let mut brace_count = 0;
@@ -467,7 +457,7 @@ impl DefaultParser {
         }
 
         let body = body_opt.trim_end_matches('}').trim();
-        for field in body.split(|c| c == ',' || c == '\n') {
+        for field in body.split([',', '\n']) {
             let field = field.trim();
             if field.is_empty() {
                 continue;
@@ -477,7 +467,7 @@ impl DefaultParser {
                 return Err(AamlError::ParseError {
                     line,
                     content: "invalid schema field".to_string(),
-                    details: format!("Field '{}' must be of the form 'name: type'", field),
+                    details: format!("Field '{field}' must be of the form 'name: type'"),
                     diagnostics: None,
                 });
             }
@@ -546,7 +536,7 @@ impl DefaultParser {
 
         if let ValueNode::Object(pairs) = value {
             for (field, child_value) in pairs.iter() {
-                let child_key = format!("{}.{}", key, field);
+                let child_key = format!("{key}.{field}");
                 Self::emit_assignment_parse_tasks(tasks, child_key.into(), child_value, line);
             }
         }
@@ -555,8 +545,7 @@ impl DefaultParser {
     fn build_type_task<'a>(args: &str, line: usize) -> ParseTask<'a> {
         let (type_name, type_spec) = args
             .split_once('=')
-            .map(|(lhs, rhs)| (lhs.trim(), rhs.trim()))
-            .unwrap_or(("", ""));
+            .map_or(("", ""), |(lhs, rhs)| (lhs.trim(), rhs.trim()));
 
         ParseTask::RegisterType {
             type_name: type_name.to_string().into(),
@@ -570,10 +559,9 @@ impl DefaultParser {
         let body = args
             .split_once('{')
             .and_then(|(_, b)| b.rsplit_once('}'))
-            .map(|(b, _)| b)
-            .unwrap_or("");
+            .map_or("", |(b, _)| b);
         let fields = body
-            .split(|c: char| c == ',' || c == '\n')
+            .split([',', '\n'])
             .filter_map(|field_def| {
                 let (field_name, type_name) = field_def.split_once(':')?;
                 let field_name = field_name.trim();
@@ -583,7 +571,7 @@ impl DefaultParser {
                     return None;
                 }
 
-                Some(format!("{}:{}", field_name, type_name))
+                Some(format!("{field_name}:{type_name}"))
             })
             .collect::<Vec<_>>()
             .join(",");
@@ -745,7 +733,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("key = value").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(&*tokens).unwrap();
+        let ast = parser.parse(&tokens).unwrap();
 
         assert_eq!(ast.len(), 1);
         match &ast[0] {
@@ -766,7 +754,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("@import base.aam").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(&*tokens).unwrap();
+        let ast = parser.parse(&tokens).unwrap();
 
         assert_eq!(ast.len(), 1);
         match &ast[0] {
@@ -782,7 +770,7 @@ mod tests {
         let lexer = DefaultLexer::new();
         let tokens = lexer.tokenize("a = b\nc = d").unwrap();
         let parser = DefaultParser::new();
-        let ast = parser.parse(&*tokens).unwrap();
+        let ast = parser.parse(&tokens).unwrap();
 
         assert_eq!(ast.len(), 2);
     }

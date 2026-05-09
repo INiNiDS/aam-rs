@@ -1,7 +1,7 @@
 //! Validator stage: generates validation tasks from AST.
 //!
-//! The Validator analyzes AST nodes and generates declarative ValidationTask items.
-//! These tasks are later executed by ValidateExecutor, enabling lazy evaluation,
+//! The Validator analyzes AST nodes and generates declarative `ValidationTask` items.
+//! These tasks are later executed by `ValidateExecutor`, enabling lazy evaluation,
 //! error aggregation (critical for LSP), and potential parallel execution.
 
 use crate::error::{AamlError, ErrorDiagnostics};
@@ -10,13 +10,13 @@ use crate::pipeline::tasks::ValidationTask;
 
 /// Trait for task-based semantic validation.
 ///
-/// Instead of directly validating, the Validator generates ValidationTask items.
+/// Instead of directly validating, the Validator generates `ValidationTask` items.
 /// This enables deferred execution and better error handling for LSP integration.
 pub trait Validator: Send + Sync {
     /// Analyzes an AST and generates validation tasks.
     ///
     /// This method performs static analysis on the AST and produces a list of
-    /// validation tasks that will be executed later by a ValidateExecutor.
+    /// validation tasks that will be executed later by a `ValidateExecutor`.
     /// It does NOT mutate state or execute validations directly.
     ///
     /// # Arguments
@@ -25,12 +25,20 @@ pub trait Validator: Send + Sync {
     /// # Returns
     /// - `Ok(Vec<ValidationTask>)` containing all validation tasks to be executed
     /// - `Err(AamlError)` if AST analysis itself fails (e.g., syntax errors)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if AST analysis fails or the validator cannot produce tasks.
     fn validate<'a>(&self, ast: &[AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError>;
 
     /// Performs quick syntactic checks that don't require deferred validation.
     ///
     /// This is called immediately during parsing to catch obvious issues early.
-    fn check_syntax<'a>(&self, ast: &[AstNode<'a>]) -> Result<(), AamlError>;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the AST contains malformed assignments or directives.
+    fn check_syntax(&self, ast: &[AstNode<'_>]) -> Result<(), AamlError>;
 }
 
 /// Default implementation of the Validator stage.
@@ -40,7 +48,8 @@ pub trait Validator: Send + Sync {
 pub struct DefaultValidator;
 
 impl DefaultValidator {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
@@ -54,7 +63,7 @@ impl DefaultValidator {
         }
     }
 
-    fn infer_value_type<'a>(value: &ValueNode<'a>) -> std::borrow::Cow<'static, str> {
+    fn infer_value_type(value: &ValueNode<'_>) -> std::borrow::Cow<'static, str> {
         match value {
             ValueNode::Literal(literal) => Self::infer_literal_type(literal.as_ref()).into(),
             ValueNode::Object(_) => "object".into(),
@@ -63,13 +72,13 @@ impl DefaultValidator {
                 if inner == "any" {
                     "list".into()
                 } else {
-                    format!("list<{}>", inner).into()
+                    format!("list<{inner}>").into()
                 }
             }
         }
     }
 
-    fn infer_list_element_type<'a>(items: &[ValueNode<'a>]) -> std::borrow::Cow<'static, str> {
+    fn infer_list_element_type(items: &[ValueNode<'_>]) -> std::borrow::Cow<'static, str> {
         let mut inferred: Option<std::borrow::Cow<'static, str>> = None;
         for item in items {
             let current = Self::infer_value_type(item);
@@ -139,13 +148,11 @@ impl DefaultValidator {
         let mut tasks = Vec::new();
 
         match name.as_ref() {
-            "import" => {
-                if !args.is_empty() {
-                    tasks.push(ValidationTask::VerifyFileExists {
-                        path: args.to_string().into(),
-                        line,
-                    });
-                }
+            "import" if !args.is_empty() => {
+                tasks.push(ValidationTask::VerifyFileExists {
+                    path: args.to_string().into(),
+                    line,
+                });
             }
             "derive" => {
                 tasks.push(ValidationTask::CheckDeriveCompleteness {
@@ -202,20 +209,20 @@ impl Validator for DefaultValidator {
         Ok(tasks)
     }
 
-    fn check_syntax<'a>(&self, ast: &[AstNode<'a>]) -> Result<(), AamlError> {
+    fn check_syntax(&self, ast: &[AstNode<'_>]) -> Result<(), AamlError> {
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
                     if key.is_empty() {
                         return Err(AamlError::ParseError {
                             line: *line,
-                            content: format!("= {}", value.to_string()),
+                            content: format!("= {value}"),
                             details: "Empty key in assignment".to_string(),
-                            diagnostics: Some(ErrorDiagnostics::new(
+                            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                                 "Empty key",
                                 "Assignment keys must be non-empty".to_string(),
                                 "Provide a valid key name".to_string(),
-                            )),
+                            ))),
                         });
                     }
                 }

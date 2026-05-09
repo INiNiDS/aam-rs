@@ -1,6 +1,6 @@
 //! Executer stage: materializes validated tasks into final runtime state.
 //!
-//! The Executer receives an ExecutionDescriptor containing pre-computed tasks
+//! The Executer receives an `ExecutionDescriptor` containing pre-computed tasks
 //! and executes them in a completely decoupled manner, WITHOUT any AAML struct dependency.
 //! This enables clean separation of concerns, better LSP integration, and potential
 //! parallel execution in future iterations.
@@ -17,10 +17,10 @@ use std::path::Path;
 
 /// Trait for executing the final materialization of configuration state.
 ///
-/// The Executer operates purely on ExecutionDescriptor and task queues.
+/// The Executer operates purely on `ExecutionDescriptor` and task queues.
 /// It NO LONGER instantiates or depends on the AAML struct.
 pub trait Executer: Send + Sync {
-    /// Executes the manifest to produce a final FoundValue.
+    /// Executes the manifest to produce a final `FoundValue`.
     ///
     /// # Arguments
     /// - `manifest`: Comprehensive execution manifest with all tasks and context
@@ -34,52 +34,45 @@ pub trait Executer: Send + Sync {
 /// Default implementation of the Executer stage.
 ///
 /// This executor handles all execution tasks in a clean, isolated manner:
-/// 1. Processes SetValue and MergeValue tasks to populate the output map
-/// 2. Handles ApplySchema tasks for schema validation and enforcement
-/// 3. Manages ExecuteInheritance for configuration inheritance
-/// 4. Resolves cross-references via ResolveReference tasks
-/// 5. Handles ImportFile tasks for external configuration merging
+/// 1. Processes `SetValue` and `MergeValue` tasks to populate the output map
+/// 2. Handles `ApplySchema` tasks for schema validation and enforcement
+/// 3. Manages `ExecuteInheritance` for configuration inheritance
+/// 4. Resolves cross-references via `ResolveReference` tasks
+/// 5. Handles `ImportFile` tasks for external configuration merging
 pub struct DefaultExecuter {
     // Can hold shared registries or execution strategies
 }
 
 impl DefaultExecuter {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 
-    fn set_value(
-        output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
-        key: &std::borrow::Cow<'_, str>,
-        value: &std::borrow::Cow<'_, str>,
-    ) {
-        output_map.insert(SmolStr::from(key.as_ref()), SmolStr::from(value.as_ref()));
+    fn set_value(output_map: &mut PipelineHashMap<SmolStr, SmolStr>, key: &str, value: &str) {
+        output_map.insert(SmolStr::from(key), SmolStr::from(value));
     }
 
-    fn merge_value(
-        output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
-        key: &std::borrow::Cow<'_, str>,
-        value: &std::borrow::Cow<'_, str>,
-    ) {
+    fn merge_value(output_map: &mut PipelineHashMap<SmolStr, SmolStr>, key: &str, value: &str) {
         let existing = output_map
-            .get(key.as_ref())
-            .map(|v| v.to_string())
+            .get(key)
+            .map(std::string::ToString::to_string)
             .unwrap_or_default();
 
         let merged: std::borrow::Cow<'_, str> = if existing.is_empty() {
-            value.clone()
+            value.into()
         } else {
-            format!("{} {}", existing, value).into()
+            format!("{existing} {value}").into()
         };
 
-        output_map.insert(SmolStr::from(key.as_ref()), SmolStr::from(merged.as_ref()));
+        output_map.insert(SmolStr::from(key), SmolStr::from(merged.as_ref()));
     }
 
     fn build_full_key(root: &str, field: &str) -> String {
         if root.is_empty() {
             field.to_string()
         } else {
-            format!("{}.{}", root, field)
+            format!("{root}.{field}")
         }
     }
 
@@ -87,11 +80,11 @@ impl DefaultExecuter {
         AamlError::NotFound {
             key: schema_name.to_string(),
             context: "schema registry".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Schema not found",
-                format!("Schema '{}' does not exist", schema_name),
+                format!("Schema '{schema_name}' does not exist"),
                 "Check your @schema definitions",
-            )),
+            ))),
         }
     }
 
@@ -128,7 +121,7 @@ impl DefaultExecuter {
                 schema_name,
                 field,
                 type_name,
-                format!("Missing required field '{}'", field),
+                format!("Missing required field '{field}'"),
             ));
         };
 
@@ -150,19 +143,19 @@ impl DefaultExecuter {
     }
 
     fn apply_schema(
-        schema_name: &std::borrow::Cow<'_, str>,
+        schema_name: &str,
         root_keys: &[std::borrow::Cow<'_, str>],
-        output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
+        output_map: &PipelineHashMap<SmolStr, SmolStr>,
         context: &crate::pipeline::execution_descriptor::ExecutionContext,
     ) -> Result<(), AamlError> {
         let schema = context
             .schemas
-            .get(schema_name.as_ref())
+            .get(schema_name)
             .ok_or_else(|| Self::schema_not_found_error(schema_name))?;
 
         for key in root_keys {
             for (field, (type_name, is_optional)) in &schema.fields {
-                let full_key = Self::build_full_key(key, field);
+                let full_key = Self::build_full_key(key.as_ref(), field);
                 Self::validate_schema_field(
                     schema_name,
                     field,
@@ -182,7 +175,7 @@ impl DefaultExecuter {
         if child_key.is_empty() {
             field.to_string()
         } else {
-            format!("{}.{}", child_key, field)
+            format!("{child_key}.{field}")
         }
     }
 
@@ -204,8 +197,8 @@ impl DefaultExecuter {
     }
 
     fn execute_inheritance(
-        derive_path: &std::borrow::Cow<'_, str>,
-        child_key: &std::borrow::Cow<'_, str>,
+        derive_path: &str,
+        child_key: &str,
         output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
         context: &crate::pipeline::execution_descriptor::ExecutionContext,
     ) {
@@ -226,15 +219,15 @@ impl DefaultExecuter {
     }
 
     fn import_file(
-        file_path: &std::borrow::Cow<'_, str>,
-        merge_strategy: &std::borrow::Cow<'_, str>,
+        file_path: &str,
+        merge_strategy: &str,
         output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
         source_dir: Option<&Path>,
     ) -> Result<(), AamlError> {
-        let resolved = resolve_relative_path(file_path.as_ref(), source_dir);
+        let resolved = resolve_relative_path(file_path, source_dir);
         let content = std::fs::read_to_string(&resolved).map_err(|e| AamlError::IoError {
             details: e.to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "I/O operation failed",
                 format!(
                     "Could not read imported file '{}': {}",
@@ -242,7 +235,7 @@ impl DefaultExecuter {
                     e
                 ),
                 "Check file permissions and ensure the path exists",
-            )),
+            ))),
         })?;
 
         let sub_pipeline = crate::pipeline::Pipeline::new();
@@ -274,20 +267,19 @@ impl DefaultExecuter {
     }
 
     fn resolve_reference(
-        source_key: &std::borrow::Cow<'_, str>,
-        target_key: &std::borrow::Cow<'_, str>,
+        source_key: &str,
+        target_key: &str,
         output_map: &mut PipelineHashMap<SmolStr, SmolStr>,
     ) -> Result<(), AamlError> {
-        if let Some(target_value) = output_map.get(target_key.as_ref()) {
-            output_map.insert(SmolStr::from(source_key.as_ref()), target_value.clone());
+        if let Some(target_value) = output_map.get(target_key) {
+            output_map.insert(SmolStr::from(source_key), target_value.clone());
             return Ok(());
         }
 
         Err(AamlError::NotFound {
             key: target_key.to_string(),
             context: format!(
-                "Reference target '{}' not found when resolving '{}'",
-                target_key, source_key
+                "Reference target '{target_key}' not found when resolving '{source_key}'"
             ),
             diagnostics: None,
         })
@@ -301,24 +293,29 @@ impl DefaultExecuter {
     ) -> Result<(), AamlError> {
         match task {
             ExecutionTask::SetValue { key, value, .. } => {
-                Self::set_value(output_map, key, value);
+                Self::set_value(output_map, key.as_ref(), value.as_ref());
                 Ok(())
             }
             ExecutionTask::MergeValue { key, value, .. } => {
-                Self::merge_value(output_map, key, value);
+                Self::merge_value(output_map, key.as_ref(), value.as_ref());
                 Ok(())
             }
             ExecutionTask::ApplySchema {
                 schema_name,
                 root_keys,
                 line: _,
-            } => Self::apply_schema(schema_name, root_keys, output_map, context),
+            } => Self::apply_schema(schema_name.as_ref(), root_keys, output_map, context),
             ExecutionTask::ExecuteInheritance {
                 derive_path,
                 child_key,
                 line: _,
             } => {
-                Self::execute_inheritance(derive_path, child_key, output_map, context);
+                Self::execute_inheritance(
+                    derive_path.as_ref(),
+                    child_key.as_ref(),
+                    output_map,
+                    context,
+                );
                 Ok(())
             }
             ExecutionTask::ImportFile {
@@ -326,8 +323,8 @@ impl DefaultExecuter {
                 merge_strategy,
                 line: _,
             } => Self::import_file(
-                file_path,
-                merge_strategy,
+                file_path.as_ref(),
+                merge_strategy.as_ref(),
                 output_map,
                 crate::pipeline::source_dir::get().as_deref(),
             ),
@@ -335,7 +332,7 @@ impl DefaultExecuter {
                 source_key,
                 target_key,
                 ..
-            } => Self::resolve_reference(source_key, target_key, output_map),
+            } => Self::resolve_reference(source_key.as_ref(), target_key.as_ref(), output_map),
         }
     }
 }

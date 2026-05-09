@@ -147,6 +147,7 @@ impl std::fmt::Debug for PipelineOutput {
 }
 
 impl PipelineOutput {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: new_pipeline_hash_map(),
@@ -174,12 +175,20 @@ pub struct Pipeline {
 
 impl Pipeline {
     /// Processes AAML content using the 5-stage arena-based pipeline.
+    ///
+    /// # Errors
+    ///
+    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process(&self, content: &str) -> Result<PipelineOutput, Vec<AamlError>> {
         let arena = Bump::new();
         self.process_with_arena(content, &arena)
     }
 
     /// Processes AAML content with a source directory for relative path resolution.
+    ///
+    /// # Errors
+    ///
+    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_source_dir(
         &self,
         content: &str,
@@ -192,6 +201,7 @@ impl Pipeline {
     /// Creates a pipeline instance.
     ///
     /// Enable the `parallel` feature to run stateless parse-task pre-validation in parallel.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             lexer: Box::new(DefaultLexer::new()),
@@ -215,7 +225,7 @@ impl Pipeline {
     }
 
     fn collect_parse_errors(all_errors: &mut ErrorAccumulator, errors: Vec<TaskError>) {
-        for err in errors.into_iter() {
+        for err in errors {
             all_errors.push(Some(AamlError::ParseError {
                 line: err.line,
                 content: String::new(),
@@ -226,7 +236,7 @@ impl Pipeline {
     }
 
     fn collect_validation_errors(all_errors: &mut ErrorAccumulator, errors: Vec<TaskError>) {
-        for err in errors.into_iter() {
+        for err in errors {
             all_errors.push(Some(AamlError::DirectiveError {
                 directive: "validation".to_string(),
                 message: err.message,
@@ -338,7 +348,7 @@ impl Pipeline {
         let Some(type_info) = context.types.get(type_name) else {
             return Err(AamlError::InvalidType {
                 type_name: type_name.to_string(),
-                details: format!("Unknown type '{}'", type_name),
+                details: format!("Unknown type '{type_name}'"),
                 provided: String::new(),
                 diagnostics: None,
             });
@@ -360,7 +370,7 @@ impl Pipeline {
         if type_info.spec == type_name {
             return Err(AamlError::InvalidType {
                 type_name: type_name.to_string(),
-                details: format!("Unknown type '{}'", type_name),
+                details: format!("Unknown type '{type_name}'"),
                 provided: String::new(),
                 diagnostics: None,
             });
@@ -414,8 +424,7 @@ impl Pipeline {
                                 field: field.to_string(),
                                 type_name: type_name.to_string(),
                                 details: format!(
-                                    "Unknown type '{}' declared for field '{}'",
-                                    type_name, field
+                                    "Unknown type '{type_name}' declared for field '{field}'"
                                 ),
                                 diagnostics: None,
                             })
@@ -467,7 +476,7 @@ impl Pipeline {
                             schema: schema_name.to_string(),
                             field: field.to_string(),
                             type_name: type_name.to_string(),
-                            details: format!("Missing required field '{}'", field),
+                            details: format!("Missing required field '{field}'"),
                             diagnostics: None,
                         })
                     })
@@ -546,8 +555,9 @@ impl Pipeline {
         let mut descriptor = ExecutionDescriptor::new(ast.clone(), "inline".to_string());
 
         // RAII guard: resets thread-local source_dir on drop (including panic)
-        let _guard =
-            crate::pipeline::source_dir::SourceDirGuard::new(source_dir.map(|p| p.to_path_buf()));
+        let _guard = crate::pipeline::source_dir::SourceDirGuard::new(
+            source_dir.map(std::path::Path::to_path_buf),
+        );
 
         self.run_parse_tasks(&ast, arena, &mut descriptor, &mut all_errors);
         self.run_validation_tasks(&ast, &mut descriptor, &mut all_errors);
@@ -569,6 +579,11 @@ impl Pipeline {
         })
     }
 
+    /// Processes AAML content with an arena allocator provided by the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_arena<'a>(
         &self,
         content: &'a str,
@@ -577,6 +592,11 @@ impl Pipeline {
         self.process_with_tasks(content, arena, None)
     }
 
+    /// Processes AAML content with an arena allocator and explicit source directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_arena_and_source_dir<'a>(
         &self,
         content: &'a str,
@@ -586,6 +606,11 @@ impl Pipeline {
         self.process_with_tasks(content, arena, source_dir)
     }
 
+    /// Formats a parsed document using the configured formatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns formatting errors if the formatter rejects the AST or options.
     pub fn format(
         &self,
         nodes: &[AstNode],
@@ -594,6 +619,11 @@ impl Pipeline {
         self.formatter.format_document(nodes, options)
     }
 
+    /// Formats only a selected range of parsed nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns formatting errors if the formatter rejects the AST, range, or options.
     pub fn format_range(
         &self,
         nodes: &[AstNode],

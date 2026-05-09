@@ -29,7 +29,7 @@ pub struct ListType {
 
 impl ListType {
     /// Creates a `ListType` wrapping the given inner type name.
-    pub fn new(inner_type: String) -> Self {
+    pub const fn new(inner_type: String) -> Self {
         Self { inner_type }
     }
 
@@ -55,7 +55,7 @@ impl ListType {
 }
 
 /// Splits `s` on commas that are not inside `{}` or `[]` nesting.
-pub(crate) fn split_top_level(s: &str) -> Vec<String> {
+pub fn split_top_level(s: &str) -> Vec<String> {
     let mut items = Vec::new();
     let mut depth: i32 = 0;
     let mut cur = String::new();
@@ -121,14 +121,14 @@ impl Type for ListType {
     /// Validates the list literal `[item, item, ...]` where each item must
     /// satisfy the inner type.
     fn validate(&self, value: &str, aaml: &AAML) -> Result<(), AamlError> {
-        let items = ListType::parse_items(value).ok_or_else(|| AamlError::InvalidValue {
-            details: format!("'{}' is not a valid list literal", value),
+        let items = Self::parse_items(value).ok_or_else(|| AamlError::InvalidValue {
+            details: format!("'{value}' is not a valid list literal"),
             expected: "[item, item, ...] format".to_string(),
-            diagnostics: Some(crate::error::ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                 "Malformed list literal",
                 "List must be wrapped in square brackets: [item1, item2, ...]".to_string(),
                 "Use format: [value1, value2, value3]",
-            )),
+            ))),
         })?;
 
         for item in &items {
@@ -141,7 +141,7 @@ impl Type for ListType {
             .map_err(|e| AamlError::InvalidValue {
                 details: format!("'{}' does not match type '{}'", item, self.inner_type),
                 expected: format!("value of type {}", self.inner_type),
-                diagnostics: Some(crate::error::ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(crate::error::ErrorDiagnostics::new(
                     "Invalid list item",
                     format!(
                         "List item '{}' failed type validation: {}",
@@ -152,7 +152,7 @@ impl Type for ListType {
                         "Ensure all items match the list type: list<{}>",
                         self.inner_type
                     ),
-                )),
+                ))),
             })?;
         }
 

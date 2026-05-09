@@ -28,13 +28,13 @@ fn validate_date_part(date: &str) -> bool {
 fn validate_datetime(value: &str) -> Result<(), AamlError> {
     if value.len() < 10 || !validate_date_part(&value[..10]) {
         return Err(AamlError::InvalidValue {
-            details: format!("'{}' is not a valid ISO 8601 date/time", value),
+            details: format!("'{value}' is not a valid ISO 8601 date/time"),
             expected: "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS format".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Invalid datetime format",
-                format!("DateTime '{}' does not match ISO 8601 format", value),
+                format!("DateTime '{value}' does not match ISO 8601 format"),
                 "Use format: 2024-03-24 or 2024-03-24T14:30:00",
-            )),
+            ))),
         });
     }
     Ok(())
@@ -46,13 +46,13 @@ fn validate_numeric(value: &str, label: &str) -> Result<(), AamlError> {
         .parse::<f64>()
         .map(|_| ())
         .map_err(|_| AamlError::InvalidValue {
-            details: format!("'{}' is not a valid number", value),
+            details: format!("'{value}' is not a valid number"),
             expected: "floating-point number".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
-                format!("Invalid {}", label),
-                format!("Value '{}' cannot be parsed as a number", value),
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
+                format!("Invalid {label}"),
+                format!("Value '{value}' cannot be parsed as a number"),
                 "Use numeric notation: 10.5, 3, -2.5, etc.",
-            )),
+            ))),
         })
 }
 
@@ -62,20 +62,20 @@ impl TypeAAM for TimeTypes {
         Self: Sized,
     {
         match name {
-            "datetime" => Ok(TimeTypes::DateTime),
-            "duration" => Ok(TimeTypes::Duration),
-            "year" => Ok(TimeTypes::Year),
-            "day" => Ok(TimeTypes::Day),
-            "hour" => Ok(TimeTypes::Hour),
-            "minute" => Ok(TimeTypes::Minute),
+            "datetime" => Ok(Self::DateTime),
+            "duration" => Ok(Self::Duration),
+            "year" => Ok(Self::Year),
+            "day" => Ok(Self::Day),
+            "hour" => Ok(Self::Hour),
+            "minute" => Ok(Self::Minute),
             _ => Err(AamlError::NotFound {
                 key: name.to_string(),
                 context: "time types".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown time type",
-                    format!("Time type '{}' is not recognized", name),
+                    format!("Time type '{name}' is not recognized"),
                     "Valid types: datetime, duration, year, day, hour, minute",
-                )),
+                ))),
             }),
         }
     }
@@ -86,8 +86,8 @@ impl TypeAAM for TimeTypes {
 
     fn validate(&self, value: &str, _context: &ExecutionContext) -> Result<(), AamlError> {
         match self {
-            TimeTypes::DateTime => validate_datetime(value),
-            TimeTypes::Duration => {
+            Self::DateTime => validate_datetime(value),
+            Self::Duration => {
                 // ISO 8601 duration (PnYnMnDTnHnMnS) or plain seconds as f64.
                 if value.starts_with('P') {
                     Ok(())
@@ -95,10 +95,10 @@ impl TypeAAM for TimeTypes {
                     validate_numeric(value, "Duration")
                 }
             }
-            TimeTypes::Year => validate_numeric(value, "Year"),
-            TimeTypes::Day => validate_numeric(value, "Day"),
-            TimeTypes::Hour => validate_numeric(value, "Hour"),
-            TimeTypes::Minute => validate_numeric(value, "Minute"),
+            Self::Year => validate_numeric(value, "Year"),
+            Self::Day => validate_numeric(value, "Day"),
+            Self::Hour => validate_numeric(value, "Hour"),
+            Self::Minute => validate_numeric(value, "Minute"),
         }
     }
 }

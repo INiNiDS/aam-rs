@@ -1,6 +1,6 @@
-//! Enhanced ExecutionDescriptor serving as the comprehensive execution manifest.
+//! Enhanced `ExecutionDescriptor` serving as the comprehensive execution manifest.
 //!
-//! The ExecutionDescriptor replaces direct AAML struct dependency in the Executer.
+//! The `ExecutionDescriptor` replaces direct AAML struct dependency in the Executer.
 //! It bundles all necessary context, tasks, and metadata for clean execution.
 
 use crate::pipeline::parser::AstNode;
@@ -16,7 +16,7 @@ fn new_pipeline_map<K, V>() -> PipelineHashMap<K, V> {
 
 /// A comprehensive execution manifest that completely replaces AAML struct usage.
 ///
-/// ExecutionDescriptor aggregates all necessary information for the Executer to
+/// `ExecutionDescriptor` aggregates all necessary information for the Executer to
 /// materialize the configuration without requiring the legacy AAML struct.
 #[derive(Debug)]
 pub struct ExecutionDescriptor<'a> {
@@ -51,7 +51,7 @@ pub struct ExecutionContext<'a> {
     /// Source file path or identifier (for error reporting)
     pub source: std::borrow::Cow<'a, str>,
 
-    /// Key-value map accumulated during parsing (using SmolStr for SSO)
+    /// Key-value map accumulated during parsing (using `SmolStr` for SSO)
     pub map: PipelineHashMap<SmolStr, SmolStr>,
 
     /// Schema definitions accumulated from @schema directives
@@ -82,7 +82,7 @@ pub struct SchemaInfo {
     /// Schema name
     pub name: SmolStr,
 
-    /// Field name → (type_name, is_optional)
+    /// Field name → (`type_name`, `is_optional`)
     pub fields: PipelineHashMap<SmolStr, (SmolStr, bool)>,
 
     /// Line number where schema was defined
@@ -166,6 +166,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Returns the registered inheritance default for a given type.
+    #[must_use]
     pub fn default_value_for_type(&self, type_name: &str) -> Option<&str> {
         self.types
             .get(type_name)
@@ -173,6 +174,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Returns the current scope as a string path.
+    #[must_use]
     pub fn current_scope(&self) -> String {
         self.scope_stack.join("::")
     }
@@ -198,8 +200,9 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Gets a value from the map.
+    #[must_use]
     pub fn get_value(&self, key: &str) -> Option<&str> {
-        self.map.get(key).map(|v| v.as_ref())
+        self.map.get(key).map(std::convert::AsRef::as_ref)
     }
 
     /// Registers a schema definition.
@@ -223,6 +226,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Checks if a key has been visited.
+    #[must_use]
     pub fn is_visited(&self, key: &str) -> bool {
         self.visited_keys.contains(key)
     }
@@ -238,11 +242,13 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Checks if a file has already been imported.
+    #[must_use]
     pub fn is_imported(&self, file_path: &str) -> bool {
         self.imported_files.contains(file_path)
     }
 
     /// Returns the line number where a key was defined.
+    #[must_use]
     pub fn get_line_for_key(&self, key: &str) -> Option<usize> {
         self.key_line_map.get(key).copied()
     }
@@ -298,11 +304,13 @@ impl<'a> ExecutionDescriptor<'a> {
     }
 
     /// Returns the total number of tasks.
-    pub fn task_count(&self) -> usize {
+    #[must_use]
+    pub const fn task_count(&self) -> usize {
         self.parse_tasks.len() + self.validation_tasks.len() + self.execution_tasks.len()
     }
 
     /// Returns a summary of tasks by type.
+    #[must_use]
     pub fn task_summary(&self) -> String {
         format!(
             "Parse tasks: {}, Validation tasks: {}, Execution tasks: {}",
@@ -313,22 +321,24 @@ impl<'a> ExecutionDescriptor<'a> {
     }
 
     /// Updates execution statistics.
-    pub fn update_stats(&mut self, stats: ExecutionStats) {
+    pub const fn update_stats(&mut self, stats: ExecutionStats) {
         self.stats = stats;
     }
 
     /// Retrieves the source identifier.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.context.source
     }
 
     /// Returns a mutable reference to the execution context.
-    pub fn context_mut(&mut self) -> &mut ExecutionContext<'a> {
+    pub const fn context_mut(&mut self) -> &mut ExecutionContext<'a> {
         &mut self.context
     }
 
     /// Returns an immutable reference to the execution context.
-    pub fn context(&self) -> &ExecutionContext<'a> {
+    #[must_use]
+    pub const fn context(&self) -> &ExecutionContext<'a> {
         &self.context
     }
 }
@@ -352,7 +362,7 @@ mod tests {
     #[test]
     fn test_execution_context_key_value_operations() {
         let mut ctx = ExecutionContext::new("test.aam".to_string());
-        ctx.set_value("key1".to_string(), "value1".to_string(), 1);
+        ctx.set_value("key1", "value1", 1);
 
         assert_eq!(ctx.get_value("key1"), Some("value1"));
         assert_eq!(ctx.get_line_for_key("key1"), Some(1));

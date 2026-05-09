@@ -345,7 +345,7 @@ impl PyInlineObject {
     }
 
     fn __repr__(&self) -> String {
-        format!("InlineObject({})", self.inner.to_string())
+        format!("InlineObject({})", self.inner)
     }
 }
 

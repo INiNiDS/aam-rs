@@ -52,12 +52,22 @@ pub struct FormatRange {
 }
 
 pub trait Formatter: Send + Sync {
+    /// Formats an entire document from AST nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the AST is invalid or formatting cannot be completed.
     fn format_document(
         &self,
         nodes: &[AstNode],
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
+    /// Formats only a selected AST range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the AST is invalid, the range is out of bounds, or formatting fails.
     fn format_range(
         &self,
         nodes: &[AstNode],
@@ -65,6 +75,11 @@ pub trait Formatter: Send + Sync {
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
+    /// Formats a single AST node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the node cannot be rendered with the provided indentation or options.
     fn format_node(
         &self,
         node: &AstNode,
@@ -72,19 +87,30 @@ pub trait Formatter: Send + Sync {
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
+    /// Normalizes comments in a document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be processed into a normalized comment layout.
     fn normalize_comments(
         &self,
         content: &str,
         options: &FormattingOptions,
     ) -> Result<String, AamlError>;
 
+    /// Normalizes whitespace in a document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if whitespace normalization cannot be completed.
     fn normalize_whitespace(&self, content: &str) -> Result<String, AamlError>;
 }
 
 pub struct DefaultFormatter;
 
 impl DefaultFormatter {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
@@ -128,7 +154,7 @@ impl DefaultFormatter {
         }
     }
 
-    /// Разворачивает или схлопывает @schema в зависимости от line_width
+    /// Разворачивает или схлопывает @schema в зависимости от `line_width`
     fn format_schema(args: &str, indent_level: usize, options: &FormattingOptions) -> String {
         let indent = Self::create_indent(indent_level, options);
 
@@ -143,8 +169,8 @@ impl DefaultFormatter {
 
         // Парсим пары ключ-значение
         let pairs: Vec<_> = body
-            .split(|c| c == ',' || c == '\n')
-            .map(|s| s.trim())
+            .split([',', '\n'])
+            .map(str::trim)
             .filter(|s| !s.is_empty())
             .collect();
 
@@ -175,9 +201,9 @@ impl DefaultFormatter {
         let mut lines = vec![format!("{}@schema {} {{", indent, schema_name)];
 
         for pair in formatted_pairs {
-            lines.push(format!("{}{}", inner_indent, pair));
+            lines.push(format!("{inner_indent}{pair}"));
         }
-        lines.push(format!("{}}}", indent));
+        lines.push(format!("{indent}}}"));
 
         lines.join("\n")
     }
@@ -250,7 +276,7 @@ impl Formatter for DefaultFormatter {
                 let formatted = self.format_node(node, 0, options)?;
                 output.push(formatted);
             } else {
-                output.push(format!("(original line {})", line));
+                output.push(format!("(original line {line})"));
             }
         }
 

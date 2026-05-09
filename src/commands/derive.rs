@@ -39,7 +39,7 @@ fn parse_derive_arg(raw: &str) -> (&str, Vec<&str>) {
         let q = raw.chars().next().unwrap();
         match raw[1..].find(q) {
             Some(end) => {
-                let path = &raw[1..end + 1];
+                let path = &raw[1..=end];
                 let after = raw[end + 2..].trim_start_matches(':').trim();
                 (path, after)
             }
@@ -62,7 +62,7 @@ fn parse_derive_arg(raw: &str) -> (&str, Vec<&str>) {
 }
 
 impl Command for DeriveCommand {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "derive"
     }
 
@@ -86,7 +86,10 @@ impl Command for DeriveCommand {
 
         aaml.merge_map_weak(base.get_map_mut());
 
-        let refs: Vec<&str> = original_schemas.iter().map(|s| s.as_str()).collect();
+        let refs: Vec<&str> = original_schemas
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
         aaml.validate_schemas_completeness_for(&refs)?;
 
         Ok(())

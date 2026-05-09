@@ -7,6 +7,8 @@
 //! - Runtime type validation via registered or built-in types
 //! - Schema-based struct validation with [`AAML::apply_schema`]
 
+#![allow(clippy::missing_errors_doc)]
+
 use crate::commands::schema::SchemaDef;
 use crate::commands::{self, Command};
 use crate::error::{AamlError, ErrorDiagnostics};
@@ -67,8 +69,9 @@ impl std::fmt::Debug for AAML {
 
 impl AAML {
     /// Creates a new empty [`AAML`] instance with all default commands registered.
-    pub fn new() -> AAML {
-        let mut instance = AAML {
+    #[must_use]
+    pub fn new() -> Self {
+        let mut instance = Self {
             map: HashMap::with_hasher(Hasher::new()),
             commands: HashMap::new(),
             types: HashMap::new(),
@@ -79,13 +82,15 @@ impl AAML {
         instance
     }
 
-    pub fn get_schemas(&self) -> &HashMap<String, SchemaDef> {
+    #[must_use]
+    pub const fn get_schemas(&self) -> &HashMap<String, SchemaDef> {
         &self.schemas
     }
 
     /// Creates a new [`AAML`] instance pre-allocated for `capacity` key-value entries.
-    pub fn with_capacity(capacity: usize) -> AAML {
-        let mut instance = AAML {
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut instance = Self {
             map: HashMap::with_capacity_and_hasher(capacity, Hasher::default()),
             commands: HashMap::new(),
             types: HashMap::new(),
@@ -98,15 +103,16 @@ impl AAML {
 
     // ── Internal accessors used by commands ──────────────────────────────────
 
-    pub(crate) fn get_schemas_mut(&mut self) -> &mut HashMap<String, SchemaDef> {
+    pub(crate) const fn get_schemas_mut(&mut self) -> &mut HashMap<String, SchemaDef> {
         &mut self.schemas
     }
 
+    #[must_use]
     pub fn get_schema(&self, name: &str) -> Option<&SchemaDef> {
         self.schemas.get(name)
     }
 
-    pub(crate) fn get_map_mut(&mut self) -> &mut HashMap<AamlString, AamlString, Hasher> {
+    pub(crate) const fn get_map_mut(&mut self) -> &mut HashMap<AamlString, AamlString, Hasher> {
         &mut self.map
     }
 
@@ -138,8 +144,9 @@ impl AAML {
     }
 
     /// Returns the type handler registered under `name`, or `None`.
+    #[must_use]
     pub fn get_type(&self, name: &str) -> Option<&dyn Type> {
-        self.types.get(name).map(|b| b.as_ref())
+        self.types.get(name).map(std::convert::AsRef::as_ref)
     }
 
     /// Removes the type registered under `name`.
@@ -148,23 +155,29 @@ impl AAML {
     }
 
     /// Validates `value` against a type registered under `type_name`.
+    ///
+    /// # Errors
+    /// Returns `AamlError` if the type is not found or validation fails.
     pub fn check_type(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
         self.types
             .get(type_name)
             .ok_or_else(|| AamlError::NotFound {
                 key: type_name.to_string(),
                 context: "type registry".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Type not found",
-                    format!("Type '{}' is not registered", type_name),
+                    format!("Type '{type_name}' is not registered"),
                     "Check your @type directives or use a built-in type",
-                )),
+                ))),
             })?
             .validate(value, self)
     }
 
     /// Validates `value` against the type registered as `type_name`, also
     /// resolving built-in primitive types and module paths.
+    ///
+    /// # Errors
+    /// Returns `AamlError` if the type is not found or validation fails.
     pub fn validate_value(&self, type_name: &str, value: &str) -> Result<(), AamlError> {
         let make_err = |e: AamlError| AamlError::InvalidType {
             type_name: type_name.to_string(),
@@ -181,14 +194,11 @@ impl AAML {
             .map_err(|_| AamlError::NotFound {
                 key: type_name.to_string(),
                 context: "builtin type registry".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Type not found",
-                    format!(
-                        "Type '{}' is neither registered nor a built-in type",
-                        type_name
-                    ),
+                    format!("Type '{type_name}' is neither registered nor a built-in type"),
                     "Check the type name or register a custom type with @type",
-                )),
+                ))),
             })?
             .validate(value, self)
             .map_err(make_err)
@@ -198,8 +208,8 @@ impl AAML {
 
     /// Parses AAML content from a string, merging it into this instance.
     ///
-    /// Multi-line directives (e.g. a `@schema` body spread across several lines)
-    /// are accumulated until the opening `{` is matched by a closing `}`.
+    /// # Errors
+    /// Returns `AamlError` if parsing fails (e.g., syntax errors, IO errors).
     pub fn merge_content(&mut self, content: &str) -> Result<(), AamlError> {
         self.map.reserve(content.len() / 40);
         let mut pending: Option<(String, usize)> = None;
@@ -263,7 +273,7 @@ impl AAML {
 
     /// Parses an AAML string and returns a new [`AAML`] instance.
     pub fn parse(content: &str) -> Result<Self, AamlError> {
-        let mut aaml = AAML::new();
+        let mut aaml = Self::new();
         aaml.merge_content(content)?;
         Ok(aaml)
     }
@@ -273,17 +283,18 @@ impl AAML {
         let file_path = file_path.as_ref();
         let content = fs::read_to_string(file_path)?;
         let mut aaml = Self::parse(&content)?;
-        aaml.source_dir = file_path.parent().map(|p| p.to_path_buf());
+        aaml.source_dir = file_path.parent().map(std::path::Path::to_path_buf);
         Ok(aaml)
     }
 
     /// Strips surrounding `"…"` or `'…'` quotes. Returns the trimmed string unchanged
     /// if it is not quoted.
+    #[must_use]
     pub fn unwrap_quotes(s: &str) -> &str {
         parsing::unwrap_quotes(s)
     }
 
-    pub fn import_schema(&mut self, name: &str, source: &mut AAML) -> Result<(), AamlError> {
+    pub fn import_schema(&mut self, name: &str, source: &mut Self) -> Result<(), AamlError> {
         // Already imported (e.g., as a transitive dependency of another schema) — skip.
         if self.get_schemas().contains_key(name) {
             return Ok(());
@@ -295,12 +306,12 @@ impl AAML {
                 .remove(name)
                 .ok_or_else(|| AamlError::DirectiveError {
                     directive: "derive".to_string(),
-                    message: format!("Schema '{}' not found", name),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    message: format!("Schema '{name}' not found"),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Schema not found for inheritance",
-                        format!("Cannot derive from schema '{}': it does not exist", name),
+                        format!("Cannot derive from schema '{name}': it does not exist"),
                         "Ensure the schema is defined before using @derive",
-                    )),
+                    ))),
                 })?;
 
         // Collect field type strings before `schema` is moved into the map.
@@ -339,11 +350,13 @@ impl AAML {
     }
 
     /// Returns all keys currently stored in the map.
+    #[must_use]
     pub fn keys(&self) -> Vec<&str> {
-        self.map.keys().map(|k| k.as_ref()).collect()
+        self.map.keys().map(std::convert::AsRef::as_ref).collect()
     }
 
     /// Returns all key-value pairs as a `HashMap<String, String>`.
+    #[must_use]
     pub fn to_map(&self) -> HashMap<String, String> {
         self.map
             .iter()
@@ -386,20 +399,20 @@ impl AAML {
                 if let AamlError::MalformedLiteral { diagnostics, .. } = &mut err
                     && diagnostics.is_none()
                 {
-                    *diagnostics = Some(ErrorDiagnostics::new(
+                    *diagnostics = Some(Box::new(ErrorDiagnostics::new(
                         "Failed to parse assignment",
-                        format!("Line {}: '{}'", line_num, line),
+                        format!("Line {line_num}: '{line}'"),
                         "Check the format: key = value",
-                    ));
+                    )));
                 }
                 if let AamlError::InvalidValue { diagnostics, .. } = &mut err
                     && diagnostics.is_none()
                 {
-                    *diagnostics = Some(ErrorDiagnostics::new(
+                    *diagnostics = Some(Box::new(ErrorDiagnostics::new(
                         "Invalid assignment value",
-                        format!("Line {}: '{}'", line_num, line),
+                        format!("Line {line_num}: '{line}'"),
                         "Ensure key and value are properly formatted",
-                    ));
+                    )));
                 }
                 Err(err)
             }
@@ -416,11 +429,11 @@ impl AAML {
                 line: line_num,
                 content: content.to_string(),
                 details: "Empty directive".to_string(),
-                diagnostics: Some(ErrorDiagnostics::new(
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Empty directive",
                     "Directive name is missing after '@'",
                     "Use format: @directive_name args",
-                )),
+                ))),
             });
         }
 
@@ -430,12 +443,12 @@ impl AAML {
             None => Err(AamlError::ParseError {
                 line: line_num,
                 content: content.to_string(),
-                details: format!("Unknown directive: @{}", command_name),
-                diagnostics: Some(ErrorDiagnostics::new(
+                details: format!("Unknown directive: @{command_name}"),
+                diagnostics: Some(Box::new(ErrorDiagnostics::new(
                     "Unknown directive",
-                    format!("Directive '@{}' is not recognized", command_name),
+                    format!("Directive '@{command_name}' is not recognized"),
                     "Known directives: @import, @derive, @schema, @type",
-                )),
+                ))),
             }),
         }
     }

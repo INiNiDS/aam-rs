@@ -6,6 +6,7 @@ use crate::error::{AamlError, ErrorDiagnostics};
 ///
 /// A `#` is a comment start only when it is preceded by whitespace (or at line start),
 /// so unquoted color values like `tint = #ff6600` are stored correctly.
+#[must_use]
 pub fn strip_comment(line: &str) -> &str {
     let mut quote_state: Option<char> = None;
     let bytes = line.as_bytes();
@@ -14,8 +15,8 @@ pub fn strip_comment(line: &str) -> &str {
         match (quote_state, c) {
             (None, '#') => {
                 let preceded_by_space =
-                    idx == 0 || bytes.get(idx - 1).is_some_and(|b| b.is_ascii_whitespace());
-                let followed_by_space = bytes.get(idx + 1).is_none_or(|b| b.is_ascii_whitespace());
+                    idx == 0 || bytes.get(idx - 1).is_some_and(u8::is_ascii_whitespace);
+                let followed_by_space = bytes.get(idx + 1).is_none_or(u8::is_ascii_whitespace);
                 if preceded_by_space && followed_by_space {
                     return &line[..idx];
                 }
@@ -54,11 +55,11 @@ pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), AamlError> {
     let pos = eq_pos.ok_or_else(|| AamlError::MalformedLiteral {
         literal_type: "assignment".to_string(),
         content: line.to_string(),
-        diagnostics: Some(ErrorDiagnostics::new(
+        diagnostics: Some(Box::new(ErrorDiagnostics::new(
             "Missing assignment operator",
-            format!("Line '{}' does not contain '=' separator", line),
+            format!("Line '{line}' does not contain '=' separator"),
             "Use format: key = value",
-        )),
+        ))),
     })?;
     let key = line[..pos].trim();
     let raw_val = line[pos + 1..].trim();
@@ -67,11 +68,11 @@ pub(super) fn parse_assignment(line: &str) -> Result<(&str, &str), AamlError> {
         return Err(AamlError::InvalidValue {
             details: "Key is empty".to_string(),
             expected: "non-empty key name".to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Empty key in assignment",
-                format!("Line '{}' has no key before '='", line),
+                format!("Line '{line}' has no key before '='"),
                 "Provide a valid key name before the '=' operator",
-            )),
+            ))),
         });
     }
 
@@ -112,31 +113,27 @@ fn validate_balanced_delimiters(value: &str, line: &str) -> Result<(), AamlError
         match ch {
             '"' | '\'' => quote_state = Some(ch),
             '{' | '[' => stack.push(ch),
-            '}' => {
-                if stack.pop() != Some('{') {
-                    return Err(AamlError::MalformedLiteral {
-                        literal_type: "assignment".to_string(),
-                        content: line.to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Mismatched delimiters",
-                            format!("Assignment '{}' has an unmatched '}}'", line),
-                            "Ensure inline objects and lists use balanced braces/brackets",
-                        )),
-                    });
-                }
+            '}' if stack.pop() != Some('{') => {
+                return Err(AamlError::MalformedLiteral {
+                    literal_type: "assignment".to_string(),
+                    content: line.to_string(),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
+                        "Mismatched delimiters",
+                        format!("Assignment '{line}' has an unmatched '}}'"),
+                        "Ensure inline objects and lists use balanced braces/brackets",
+                    ))),
+                });
             }
-            ']' => {
-                if stack.pop() != Some('[') {
-                    return Err(AamlError::MalformedLiteral {
-                        literal_type: "assignment".to_string(),
-                        content: line.to_string(),
-                        diagnostics: Some(ErrorDiagnostics::new(
-                            "Mismatched delimiters",
-                            format!("Assignment '{}' has an unmatched ']'", line),
-                            "Ensure inline objects and lists use balanced braces/brackets",
-                        )),
-                    });
-                }
+            ']' if stack.pop() != Some('[') => {
+                return Err(AamlError::MalformedLiteral {
+                    literal_type: "assignment".to_string(),
+                    content: line.to_string(),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
+                        "Mismatched delimiters",
+                        format!("Assignment '{line}' has an unmatched ']'"),
+                        "Ensure inline objects and lists use balanced braces/brackets",
+                    ))),
+                });
             }
             _ => {}
         }
@@ -146,14 +143,11 @@ fn validate_balanced_delimiters(value: &str, line: &str) -> Result<(), AamlError
         return Err(AamlError::MalformedLiteral {
             literal_type: "assignment".to_string(),
             content: line.to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Unterminated quote",
-                format!(
-                    "Assignment '{}' contains an unterminated quoted value",
-                    line
-                ),
+                format!("Assignment '{line}' contains an unterminated quoted value"),
                 "Close the opening quote in the assignment value",
-            )),
+            ))),
         });
     }
 
@@ -161,11 +155,11 @@ fn validate_balanced_delimiters(value: &str, line: &str) -> Result<(), AamlError
         return Err(AamlError::MalformedLiteral {
             literal_type: "assignment".to_string(),
             content: line.to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Unclosed delimiters",
-                format!("Assignment '{}' has unclosed '{{' or '['", line),
+                format!("Assignment '{line}' has unclosed '{{' or '['"),
                 "Ensure inline objects and lists use balanced braces/brackets",
-            )),
+            ))),
         });
     }
 
@@ -175,6 +169,7 @@ fn validate_balanced_delimiters(value: &str, line: &str) -> Result<(), AamlError
 /// Strips a matching pair of surrounding `"…"` or `'…'` quotes from `s`.
 ///
 /// Returns `s` unchanged (trimmed) if it is not quoted.
+#[must_use]
 pub fn unwrap_quotes(s: &str) -> &str {
     let s = s.trim();
     if s.len() >= 2 {
@@ -207,6 +202,7 @@ pub(super) fn block_is_complete(buf: &str) -> bool {
 }
 
 /// Returns `true` when `value` is an inline object literal `{ ... }`.
+#[must_use]
 pub fn is_inline_object(value: &str) -> bool {
     let v = value.trim();
     v.starts_with('{') && v.ends_with('}')
@@ -224,11 +220,11 @@ pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, AamlErr
         .ok_or_else(|| AamlError::MalformedLiteral {
             literal_type: "inline object".to_string(),
             content: value.to_string(),
-            diagnostics: Some(ErrorDiagnostics::new(
+            diagnostics: Some(Box::new(ErrorDiagnostics::new(
                 "Malformed inline object",
-                format!("Inline object must be wrapped in '{{}}', got: '{}'", value),
+                format!("Inline object must be wrapped in '{{}}', got: '{value}'"),
                 "Wrap your object with curly braces: { key = value }",
-            )),
+            ))),
         })?;
 
     split_top_level_fields(inner)
@@ -241,19 +237,19 @@ pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, AamlErr
 
             if k.is_empty() {
                 return Err(AamlError::InvalidValue {
-                    details: format!("Empty key in field '{}'", entry),
+                    details: format!("Empty key in field '{entry}'"),
                     expected: "non-empty field name".to_string(),
-                    diagnostics: Some(ErrorDiagnostics::new(
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
                         "Empty field name in inline object",
-                        format!("Field entry '{}' has no valid key", entry),
+                        format!("Field entry '{entry}' has no valid key"),
                         "Provide a valid key name before '=' or ':'",
-                    )),
+                    ))),
                 });
             }
 
             let v = v.trim();
             let final_v = match v.chars().next() {
-                Some('{') | Some('[') => v,
+                Some('{' | '[') => v,
                 _ => unwrap_quotes(v),
             };
 
@@ -300,10 +296,10 @@ fn split_field_pair(entry: &str) -> Result<(&str, &str), AamlError> {
     Err(AamlError::MalformedLiteral {
         literal_type: "field pair".to_string(),
         content: entry.to_string(),
-        diagnostics: Some(ErrorDiagnostics::new(
+        diagnostics: Some(Box::new(ErrorDiagnostics::new(
             "Missing field separator",
-            format!("Field entry '{}' has no '=' or ':' separator", entry),
+            format!("Field entry '{entry}' has no '=' or ':' separator"),
             "Use format: key = value or key: value",
-        )),
+        ))),
     })
 }

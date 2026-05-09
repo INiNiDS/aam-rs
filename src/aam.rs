@@ -48,6 +48,7 @@ impl AAM {
     }
 
     /// Creates an empty dynamic AAM document.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             backend: AamBackend::Dynamic(PipelineOutput::new()),
@@ -57,8 +58,12 @@ impl AAM {
     /// Parses an AAM string using the default Pipeline and returns a new [`AAM`] instance.
     ///
     /// If `text` is a path to an existing file on disk, it is loaded and parsed dynamically
-    /// (with full schema support), bypassing the AOT cache. Otherwise `text` is treated as
+    /// (with full schema support), bypassing the AOT cache. Otherwise, `text` is treated as
     /// raw AAM content.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the content fails to parse, or validation fails.
     pub fn parse(text: &str) -> Result<Self, Vec<AamlError>> {
         let path = Path::new(text);
         if path.is_file() {
@@ -82,7 +87,11 @@ impl AAM {
     /// Use this if you need to register custom commands, parsers, or validators.
     ///
     /// If `text` is a path to an existing file on disk, it is loaded and parsed as a file.
-    /// Otherwise `text` is treated as raw AAM content.
+    /// Otherwise, `text` is treated as raw AAM content.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the content fails to parse, or validation fails.
     pub fn from_pipeline(pipeline: Pipeline, text: &str) -> Result<Self, Vec<AamlError>> {
         let path = Path::new(text);
         if path.is_file() {
@@ -110,13 +119,18 @@ impl AAM {
     /// With `aot` enabled (default), this uses cooked `.aam.bin` cache as the
     /// primary path and only invokes parsing/cooking when cache is missing/stale.
     /// This provides zero-copy memory mapping without any allocations.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the cache cannot be memory-mapped,
+    /// or the content fails to parse/validate.
     pub fn load(path: impl AsRef<Path>) -> Result<Self, Vec<AamlError>> {
         #[cfg(feature = "aot")]
         {
             let mapped = AamLoader::load_fast(path)?;
-            return Ok(Self {
+            Ok(Self {
                 backend: AamBackend::Mapped(mapped),
-            });
+            })
         }
 
         #[cfg(not(feature = "aot"))]
@@ -142,6 +156,10 @@ impl AAM {
     }
 
     /// Formats arbitrary AAM content using parser + pipeline formatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if parsing or formatting fails.
     pub fn format(&self, content: &str, options: &FormattingOptions) -> Result<String, AamlError> {
         set_error_render_context("<format>", content);
         let lexer = DefaultLexer::new();
@@ -158,6 +176,10 @@ impl AAM {
     }
 
     /// Formats only a selected line range of arbitrary AAM content.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if parsing or formatting fails.
     pub fn format_range(
         &self,
         content: &str,
@@ -179,6 +201,7 @@ impl AAM {
     }
 
     /// Convenience method for LSP servers: parse with recovery and optional formatting result.
+    #[must_use]
     pub fn lsp_assist(content: &str, options: &FormattingOptions) -> AamLspAssist {
         set_error_render_context("<lsp>", content);
         let lexer = DefaultLexer::new();
@@ -208,12 +231,22 @@ impl AAM {
     }
 
     /// Explicitly cooks an `.aam` file into `.aam.bin` cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the cache cannot be created,
+    /// or the content fails to parse/validate.
     #[cfg(feature = "aot")]
     pub fn cook(path: impl AsRef<Path>) -> Result<std::path::PathBuf, Vec<AamlError>> {
         AamCompiler::cook(path)
     }
 
     /// Exposes zero-copy fast loading for advanced runtime integrations.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the cache cannot be memory-mapped,
+    /// or the source file is invalid and rebuilding fails.
     #[cfg(feature = "aot")]
     pub fn load_fast(path: impl AsRef<Path>) -> Result<MappedAam, Vec<AamlError>> {
         AamLoader::load_fast(path)
@@ -222,11 +255,13 @@ impl AAM {
     // ── Search & Filtering ───────────────────────────────────────────
 
     /// Deep Search: Finds all key-value pairs where the key contains the specified pattern.
+    #[must_use]
     pub fn deep_search(&self, pattern: &str) -> Vec<(&str, &str)> {
         self.iter().filter(|(k, _)| k.contains(pattern)).collect()
     }
 
     /// Reverse Search: Finds all keys that match the specified target value.
+    #[must_use]
     pub fn reverse_search(&self, target_value: &str) -> Vec<&str> {
         self.iter()
             .filter(|(_, v)| *v == target_value)
@@ -239,12 +274,13 @@ impl AAM {
     where
         F: Fn(&str, &str) -> bool,
     {
-        self.iter().filter(|(k, v)| predicate(*k, *v)).collect()
+        self.iter().filter(|(k, v)| predicate(k, v)).collect()
     }
 
     /// Find by key or value with fallback.
     /// First tries to find exactly by key (O(1) lookup), if not found,
     /// searches for matching values (O(N) iteration).
+    #[must_use]
     pub fn find<'a>(&'a self, query: &'a str) -> Vec<(&'a str, &'a str)> {
         if let Some(v) = self.get(query) {
             return vec![(query, v)];
@@ -258,16 +294,18 @@ impl AAM {
     /// Retrieves a string value by its key. Performs an O(1) lookup.
     /// When AOT is enabled, this is a zero-copy operation straight from the memory-mapped file.
     #[inline]
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         match &self.backend {
-            AamBackend::Dynamic(output) => output.map.get(key).map(|v| v.as_ref()),
+            AamBackend::Dynamic(output) => output.map.get(key).map(AsRef::as_ref),
             #[cfg(feature = "aot")]
             AamBackend::Mapped(mapped) => mapped.get(key),
         }
     }
 
     /// Iterates over all key-value pairs without allocating memory.
-    /// Supports both dynamic HashMaps and memory-mapped AOT iterators.
+    /// Supports both dynamic `HashMaps` and memory-mapped AOT iterators.
+    #[must_use]
     pub fn iter(&self) -> Box<dyn Iterator<Item = (&str, &str)> + '_> {
         match &self.backend {
             AamBackend::Dynamic(output) => {
@@ -281,6 +319,7 @@ impl AAM {
     /// Returns all keys currently stored.
     /// Prefer [`AAM::iter`] for zero-allocation iteration.
     #[inline]
+    #[must_use]
     pub fn keys(&self) -> Vec<&str> {
         self.iter().map(|(k, _)| k).collect()
     }
@@ -288,6 +327,7 @@ impl AAM {
     /// Returns all key-value pairs as a standard allocated map.
     /// Prefer [`AAM::iter`] for zero-allocation iteration.
     #[inline]
+    #[must_use]
     pub fn to_map(&self) -> PipelineHashMap<String, String> {
         self.iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -299,7 +339,8 @@ impl AAM {
     /// Returns a reference to all registered schemas, if loaded dynamically.
     /// Returns `None` if the configuration was loaded via an AOT memory map.
     #[inline]
-    pub fn schemas(&self) -> Option<&PipelineHashMap<SmolStr, SchemaInfo>> {
+    #[must_use]
+    pub const fn schemas(&self) -> Option<&PipelineHashMap<SmolStr, SchemaInfo>> {
         match &self.backend {
             AamBackend::Dynamic(output) => Some(&output.schemas),
             #[cfg(feature = "aot")]
@@ -308,6 +349,7 @@ impl AAM {
     }
 
     /// Returns a specific schema by name, if it exists and was loaded dynamically.
+    #[must_use]
     pub fn get_schema(&self, name: &str) -> Option<&SchemaInfo> {
         self.schemas().and_then(|schemas| schemas.get(name))
     }
@@ -315,7 +357,8 @@ impl AAM {
     /// Returns a reference to all registered types, if loaded dynamically.
     /// Returns `None` if the configuration was loaded via an AOT memory map.
     #[inline]
-    pub fn types(&self) -> Option<&PipelineHashMap<SmolStr, TypeInfo>> {
+    #[must_use]
+    pub const fn types(&self) -> Option<&PipelineHashMap<SmolStr, TypeInfo>> {
         match &self.backend {
             AamBackend::Dynamic(output) => Some(&output.types),
             #[cfg(feature = "aot")]
@@ -324,7 +367,23 @@ impl AAM {
     }
 
     /// Returns a specific type info by name, if it exists and was loaded dynamically.
+    #[must_use]
     pub fn get_type(&self, name: &str) -> Option<&TypeInfo> {
         self.types().and_then(|types| types.get(name))
+    }
+}
+
+impl Default for AAM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> IntoIterator for &'a AAM {
+    type Item = (&'a str, &'a str);
+    type IntoIter = Box<dyn Iterator<Item = (&'a str, &'a str)> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }

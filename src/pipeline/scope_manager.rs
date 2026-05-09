@@ -15,6 +15,11 @@ pub enum BlockType {
     DirectiveBlock,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeError {
+    UnbalancedExit,
+}
+
 /// Tracks syntactic nesting and block context during parsing.
 #[derive(Debug)]
 pub struct ScopeManager {
@@ -30,7 +35,8 @@ pub struct ScopeManager {
 
 impl ScopeManager {
     /// Creates a new, empty scope manager
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             nesting_depth: 0,
             current_block: BlockType::None,
@@ -40,17 +46,20 @@ impl ScopeManager {
     }
 
     /// Returns the current nesting depth
-    pub fn nesting_depth(&self) -> i32 {
+    #[must_use]
+    pub const fn nesting_depth(&self) -> i32 {
         self.nesting_depth
     }
 
     /// Returns the current block type
-    pub fn current_block(&self) -> BlockType {
+    #[must_use]
+    pub const fn current_block(&self) -> BlockType {
         self.current_block
     }
 
     /// Returns true if we're currently inside any nested structure
-    pub fn in_nested_context(&self) -> bool {
+    #[must_use]
+    pub const fn in_nested_context(&self) -> bool {
         self.nesting_depth > 0
     }
 
@@ -65,9 +74,9 @@ impl ScopeManager {
     ///
     /// Returns `Ok(())` if the block nesting is balanced, or `Err(())` if
     /// we're trying to exit without having entered.
-    pub fn exit_block(&mut self) -> Result<(), ()> {
+    pub fn exit_block(&mut self) -> Result<(), ScopeError> {
         if self.nesting_depth <= 0 {
-            return Err(());
+            return Err(ScopeError::UnbalancedExit);
         }
         self.nesting_depth -= 1;
         self.current_block = self.block_stack.pop().unwrap_or(BlockType::None);
@@ -75,6 +84,7 @@ impl ScopeManager {
     }
 
     /// Returns the accumulated content for multi-line directives
+    #[must_use]
     pub fn accumulated_content(&self) -> &str {
         &self.accumulated_content
     }
@@ -93,7 +103,8 @@ impl ScopeManager {
     }
 
     /// Returns true if a multi-line block has been completed (balanced braces)
-    pub fn block_is_complete(&self) -> bool {
+    #[must_use]
+    pub const fn block_is_complete(&self) -> bool {
         self.nesting_depth == 0 && !self.accumulated_content.is_empty()
     }
 

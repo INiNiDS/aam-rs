@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     fn test_display_trait() {
-        let res = FoundValue::new(&*"hello".to_string());
+        let res = FoundValue::new("hello");
         let formatted = format!("{}", res);
         assert_eq!(formatted, "hello");
     }

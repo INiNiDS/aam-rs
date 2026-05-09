@@ -44,7 +44,7 @@ pub struct Span {
     pub len: u32,
 }
 
-/// Fixed-size (16-byte) node used by the cooked SoA layout.
+/// Fixed-size (16-byte) node used by the cooked `SoA` layout.
 #[repr(C)]
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Debug, Clone, Copy)]
 pub struct FlatNode {
@@ -442,6 +442,8 @@ fn compile_text(text: &str, source_dir: Option<&Path>) -> Result<CookedAotBlob, 
         let _ = dev_root_children;
     }
 
+    builder.symbols.sort_unstable_by_key(|entry| entry.hash);
+
     #[cfg(feature = "release")]
     if let Err(err) = builder.run_release_validation() {
         return Err(vec![err]);
@@ -452,7 +454,7 @@ fn compile_text(text: &str, source_dir: Option<&Path>) -> Result<CookedAotBlob, 
 
 fn compile_via_pipeline(
     text: &str,
-    source_dir: Option<&std::path::Path>,
+    source_dir: Option<&Path>,
 ) -> Result<CookedAotBlob, Vec<AamlError>> {
     let pipeline = Pipeline::new();
     let output = pipeline.process_with_source_dir(text, source_dir)?;
@@ -474,6 +476,8 @@ fn compile_via_pipeline(
     if let Some(errors) = finalize_frontend_errors(errors) {
         return Err(errors);
     }
+
+    builder.symbols.sort_unstable_by_key(|entry| entry.hash);
 
     #[cfg(feature = "release")]
     if let Err(err) = builder.run_release_validation() {
@@ -522,7 +526,12 @@ fn cache_needs_rebuild(source: &Path, cache: &Path) -> Result<bool, AamlError> {
 pub struct AamCompiler;
 
 impl AamCompiler {
-    /// Compiles a text `.aam` asset into a cooked SoA `.aam.bin` blob.
+    /// Compiles a text `.aam` asset into a cooked `SoA` `.aam.bin` blob.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the source file cannot be read, fails to parse/validate,
+    /// fails to serialize or write the cooked binary cache, or encounters I/O issues.
     pub fn cook(source_path: impl AsRef<Path>) -> Result<PathBuf, Vec<AamlError>> {
         let source_path = source_path.as_ref();
         let cache = cache_path(source_path);
@@ -571,56 +580,19 @@ pub struct MappedAam {
 }
 
 impl MappedAam {
+    #[must_use]
     pub fn archived(&self) -> &rkyv::Archived<CookedAotBlob> {
         // SAFETY: `AamLoader::load_fast` validates archive format in checked modes.
         unsafe { rkyv::access_unchecked::<rkyv::Archived<CookedAotBlob>>(&self.mmap) }
     }
 
-    fn span_bounds(span: &rkyv::Archived<Span>) -> (usize, usize) {
+    const fn span_bounds(span: &rkyv::Archived<Span>) -> (usize, usize) {
         let start = span.start.to_native() as usize;
         let end = start + span.len.to_native() as usize;
         (start, end)
     }
 
-    #[cfg(feature = "unsafe_fast_path")]
-    fn key_equals(&self, node_index: usize, key: &[u8]) -> bool {
-        let archived = self.archived();
-        let span = &archived.key_spans.as_slice()[node_index];
-        let (start, end) = Self::span_bounds(span);
-        archived
-            .string_blob
-            .as_slice()
-            .get(start..end)
-            .is_some_and(|bytes| bytes == key)
-    }
-
-    #[cfg(feature = "unsafe_fast_path")]
-    fn find_symbol_index(&self, hash: u64, key: &[u8]) -> Option<usize> {
-        let table = self.archived().hash_table.as_slice();
-        if table.is_empty() {
-            return None;
-        }
-
-        let mask = table.len() - 1;
-        let mut idx = (hash as usize) & mask;
-
-        loop {
-            // SAFETY: idx always < than table.len in binary mask
-            let entry = unsafe { table.get_unchecked(idx) };
-            let node_idx = entry.node_index.to_native();
-
-            if node_idx == INVALID_INDEX {
-                return None; // Наткнулись на пустой слот - ключа нет
-            }
-
-            if entry.hash.to_native() == hash && self.key_equals(node_idx as usize, key) {
-                return Some(node_idx as usize);
-            }
-
-            idx = (idx + 1) & mask;
-        }
-    }
-
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         let archived = self.archived();
         let table = archived.hash_table.as_slice();
@@ -664,10 +636,12 @@ impl MappedAam {
             idx = (idx + 1) & mask;
         }
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.archived().hash_table.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -693,6 +667,14 @@ impl MappedAam {
 pub struct AamLoader;
 
 impl AamLoader {
+    /// Loads a cooked `.aam.bin` cache into a zero-copy memory-mapped view.
+    ///
+    /// Rebuilds the cache if the source `.aam` file is newer than the `.aam.bin`.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the file cannot be read, the cache cannot be memory-mapped,
+    /// or the source file is invalid and rebuilding the cache fails.
     pub fn load_fast(source_path: impl AsRef<Path>) -> Result<MappedAam, Vec<AamlError>> {
         let source_path = source_path.as_ref();
         let cache = cache_path(source_path);

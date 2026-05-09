@@ -6,6 +6,7 @@ pub struct TOMLTranslator;
 impl TOMLTranslator {
     /// Translate TOML source string into a vector of AAMBuilder modules.
     /// Each module is a new .aam-file
+    // High Complexity
     pub fn toml_to_aam(toml_source: &str) -> Result<Vec<AAMBuilder>, Box<dyn Error>> {
         let root: toml::Value = toml::from_str(toml_source.trim()).expect("Failed to parse TOML");
 
@@ -35,7 +36,7 @@ impl TOMLTranslator {
                             fields.push(SchemaField::required(field_key, type_name));
                         }
                         if !fields.is_empty() {
-                            mod_builder.schema(key, fields.into_iter());
+                            mod_builder.schema(key, fields);
                         }
 
                         for (field_key, field_value) in inner {

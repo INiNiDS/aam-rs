@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// ```
 /// # use std::collections::HashMap;
 /// # use aam_rs::builder::AAMBuilder;
-/// # use aam_rs::breaker::split_aam;
+/// # use aam_rs::splitter::split_aam;
 /// let input = "# kvantum.aam\na = b\nx = d\n# another.aam\nc = d\ng = f\n";
 /// let map = split_aam(input);
 /// assert_eq!(map.len(), 2);
@@ -33,17 +33,17 @@ pub fn split_aam(input: &str) -> HashMap<String, AAMBuilder> {
 
         if let Some(filename) = parse_section_header(trimmed) {
             if let Some(prev_name) = current_name.take() {
-                let old_builder = std::mem::replace(&mut current_builder, AAMBuilder::new());
+                let old_builder = std::mem::take(&mut current_builder);
                 result.insert(prev_name, old_builder);
             }
             current_name = Some(filename.to_owned());
             continue;
         }
 
-        if current_name.is_some() {
-            if let Some((key, value)) = parse_assignment(trimmed) {
-                current_builder.add_line(key, value);
-            }
+        if current_name.is_some()
+            && let Some((key, value)) = parse_assignment(trimmed)
+        {
+            current_builder.add_line(key, value);
         }
     }
 
@@ -56,17 +56,13 @@ pub fn split_aam(input: &str) -> HashMap<String, AAMBuilder> {
 
 /// Checks if a line is a section header (`# filename.aam`) and returns the file name.
 fn parse_section_header(s: &str) -> Option<&str> {
-    if s.starts_with('#') {
-        let rest = s[1..].trim();
+    if let Some(without_hash) = s.strip_prefix('#') {
+        let rest = without_hash.trim();
         if rest.ends_with(".aam") {
             return Some(rest);
         }
     }
     None
-}
-
-fn easter_egg() {
-    // Easter EGG
 }
 
 /// Splits a string `key = value` into a key-value pair, trimming whitespace.
