@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.6.0](https://github.com/INiNiDS/aam-rs/compare/2.5.1...2.6.0) - 2026-05-10
+
+### Added
+
+- add RubyInlineObject struct and methods for inline object manipulation
+- enhance code quality with Clippy lints and improve formatting
+- *(ci)* update GitLab CI configuration to include variables for binding tests
+- *(ci)* enhance GitLab CI configuration with additional testing stages and update repository URL
+- *(ci)* add GitLab CI configuration for automated builds and releases
+- *(aam)* add dynamic file parsing support for AAM strings
+- *(pipeline)* implement relative path resolution for @import and @derive directives
+- *(builder)* add InlineObject and parsing functionality for inline object literals
+
+### Fixed
+
+- *(ci)* Fixed incompatible strings
+- *(ci)* update GitLab CI configuration to replace 'environment' with 'variables'
+- update Cargo.toml and Python bindings for consistency
+
+### Other
+
+- update version to 2.6.0 across multiple project files
+- streamline JNI exports and improve internal function organization
+- improve code quality with Clippy lints and enhance documentation
+- Refactored to GitLab
+
 ## [2.5.1](https://github.com/INiNiDS/aam-rs/compare/2.5.0...2.5.1) - 2026-05-03
 
 ### Fixed
