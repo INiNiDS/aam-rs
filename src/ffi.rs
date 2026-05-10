@@ -13,12 +13,15 @@ use crate::error::AamlError;
 use crate::pipeline::formatter::FormattingOptions as FormatterRules;
 
 fn first_error(errors: Vec<AamlError>) -> AamlError {
-    errors.into_iter().next().unwrap_or(AamlError::ParseError {
-        line: 1,
-        content: String::new(),
-        details: "unexpected empty parse error list".to_string(),
-        diagnostics: None,
-    })
+    errors
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| AamlError::ParseError {
+            line: 1,
+            content: String::new(),
+            details: "unexpected empty parse error list".to_string(),
+            diagnostics: None,
+        })
 }
 
 // ── Opaque handle ────────────────────────────────────────────────────────────
@@ -29,7 +32,7 @@ pub struct AamHandle {
 }
 
 impl AamHandle {
-    fn set_error(&mut self, err: impl ToString) {
+    fn set_error(&mut self, err: &(impl ToString + ?Sized)) {
         let msg = err.to_string().replace('\0', "<NUL>");
         self.last_error = CString::new(msg).ok();
     }
@@ -65,12 +68,9 @@ pub unsafe extern "C" fn aam_parse(handle: *mut AamHandle, content: *const c_cha
     }
     let handle = unsafe { &mut *handle };
 
-    let content = match unsafe { CStr::from_ptr(content) }.to_str() {
-        Ok(s) => s,
-        Err(e) => {
-            handle.set_error(e);
-            return -1;
-        }
+    let Ok(content) = (unsafe { CStr::from_ptr(content) }).to_str() else {
+        handle.set_error(&"invalid utf-8");
+        return -1;
     };
 
     match AAM::parse(content) {
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn aam_parse(handle: *mut AamHandle, content: *const c_cha
             0
         }
         Err(e) => {
-            handle.set_error(first_error(e));
+            handle.set_error(&first_error(e));
             -1
         }
     }
@@ -93,12 +93,9 @@ pub unsafe extern "C" fn aam_load(handle: *mut AamHandle, path: *const c_char) -
     }
     let handle = unsafe { &mut *handle };
 
-    let path = match unsafe { CStr::from_ptr(path) }.to_str() {
-        Ok(s) => s,
-        Err(e) => {
-            handle.set_error(e);
-            return -1;
-        }
+    let Ok(path) = (unsafe { CStr::from_ptr(path) }).to_str() else {
+        handle.set_error(&"invalid utf-8");
+        return -1;
     };
 
     match AAM::load(path) {
@@ -108,7 +105,7 @@ pub unsafe extern "C" fn aam_load(handle: *mut AamHandle, path: *const c_char) -
             0
         }
         Err(e) => {
-            handle.set_error(first_error(e));
+            handle.set_error(&first_error(e));
             -1
         }
     }
@@ -121,19 +118,16 @@ pub unsafe extern "C" fn aam_format(handle: *mut AamHandle, content: *const c_ch
     }
     let handle_ref = unsafe { &mut *handle };
 
-    let content_str = match unsafe { CStr::from_ptr(content) }.to_str() {
-        Ok(s) => s,
-        Err(e) => {
-            handle_ref.set_error(e);
-            return std::ptr::null_mut();
-        }
+    let Ok(content_str) = (unsafe { CStr::from_ptr(content) }).to_str() else {
+        handle_ref.set_error("invalid utf-8");
+        return std::ptr::null_mut();
     };
 
     let rules = FormatterRules::default();
     match handle_ref.inner.format(content_str, &rules) {
         Ok(formatted) => to_c_string(&formatted),
         Err(e) => {
-            handle_ref.set_error(e);
+            handle_ref.set_error(&e);
             std::ptr::null_mut()
         }
     }
@@ -148,15 +142,14 @@ pub unsafe extern "C" fn aam_get(handle: *const AamHandle, key: *const c_char) -
     }
     let handle = unsafe { &*handle };
 
-    let key = match unsafe { CStr::from_ptr(key) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(key) = (unsafe { CStr::from_ptr(key) }).to_str() else {
+        return std::ptr::null_mut();
     };
 
-    match handle.inner.get(key) {
-        Some(v) => to_c_string(v),
-        None => std::ptr::null_mut(),
-    }
+    handle
+        .inner
+        .get(key)
+        .map_or(std::ptr::null_mut(), to_c_string)
 }
 
 #[unsafe(no_mangle)]
@@ -166,9 +159,8 @@ pub unsafe extern "C" fn aam_find(handle: *const AamHandle, query: *const c_char
     }
     let handle = unsafe { &*handle };
 
-    let query = match unsafe { CStr::from_ptr(query) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(query) = (unsafe { CStr::from_ptr(query) }).to_str() else {
+        return std::ptr::null_mut();
     };
 
     to_c_string_map(handle.inner.find(query))
@@ -184,9 +176,8 @@ pub unsafe extern "C" fn aam_deep_search(
     }
     let handle = unsafe { &*handle };
 
-    let pattern = match unsafe { CStr::from_ptr(pattern) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(pattern) = (unsafe { CStr::from_ptr(pattern) }).to_str() else {
+        return std::ptr::null_mut();
     };
 
     to_c_string_map(handle.inner.deep_search(pattern))
@@ -202,12 +193,11 @@ pub unsafe extern "C" fn aam_reverse_search(
     }
     let handle = unsafe { &*handle };
 
-    let value = match unsafe { CStr::from_ptr(value) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(value) = (unsafe { CStr::from_ptr(value) }).to_str() else {
+        return std::ptr::null_mut();
     };
 
-    to_c_string_list(handle.inner.reverse_search(value))
+    to_c_string_list(&handle.inner.reverse_search(value))
 }
 
 // ── Schemas & Types ──────────────────────────────────────────────────────────
@@ -219,12 +209,13 @@ pub unsafe extern "C" fn aam_schema_names(handle: *const AamHandle) -> *mut c_ch
     }
     let handle = unsafe { &*handle };
 
-    if let Some(schemas) = handle.inner.schemas() {
-        let keys: Vec<&str> = schemas.keys().map(|k| k.as_str()).collect();
-        to_c_string_list(keys)
-    } else {
-        std::ptr::null_mut()
-    }
+    handle
+        .inner
+        .schemas()
+        .map_or(std::ptr::null_mut(), |schemas| {
+            let keys: Vec<&str> = schemas.keys().map(smol_str::SmolStr::as_str).collect();
+            to_c_string_list(&keys)
+        })
 }
 
 #[unsafe(no_mangle)]
@@ -234,12 +225,10 @@ pub unsafe extern "C" fn aam_type_names(handle: *const AamHandle) -> *mut c_char
     }
     let handle = unsafe { &*handle };
 
-    if let Some(types) = handle.inner.types() {
-        let keys: Vec<&str> = types.keys().map(|k| k.as_str()).collect();
-        to_c_string_list(keys)
-    } else {
-        std::ptr::null_mut()
-    }
+    handle.inner.types().map_or(std::ptr::null_mut(), |types| {
+        let keys: Vec<&str> = types.keys().map(smol_str::SmolStr::as_str).collect();
+        to_c_string_list(&keys)
+    })
 }
 
 // ── Memory management ────────────────────────────────────────────────────────
@@ -259,10 +248,10 @@ pub unsafe extern "C" fn aam_last_error(handle: *const AamHandle) -> *const c_ch
         return std::ptr::null();
     }
     let handle = unsafe { &*handle };
-    match &handle.last_error {
-        Some(cs) => cs.as_ptr(),
-        None => std::ptr::null(),
-    }
+    handle
+        .last_error
+        .as_ref()
+        .map_or(std::ptr::null(), |cs| cs.as_ptr())
 }
 
 // ── Private helpers ──────────────────────────────────────────────────────────
@@ -275,7 +264,7 @@ fn to_c_string(s: &str) -> *mut c_char {
     }
 }
 
-fn to_c_string_list(list: Vec<&str>) -> *mut c_char {
+fn to_c_string_list(list: &[&str]) -> *mut c_char {
     if list.is_empty() {
         return std::ptr::null_mut();
     }
@@ -289,7 +278,7 @@ fn to_c_string_map(map: Vec<(&str, &str)>) -> *mut c_char {
     }
     let joined = map
         .into_iter()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>()
         .join("\n");
     to_c_string(&joined)
@@ -326,13 +315,11 @@ pub unsafe extern "C" fn aam_inline_add(
         return -1;
     }
     let handle = unsafe { &mut *handle };
-    let key = match unsafe { CStr::from_ptr(key) }.to_str() {
-        Ok(k) => k,
-        Err(_) => return -1,
+    let Ok(key) = (unsafe { CStr::from_ptr(key) }).to_str() else {
+        return -1;
     };
-    let value = match unsafe { CStr::from_ptr(value) }.to_str() {
-        Ok(v) => v,
-        Err(_) => return -1,
+    let Ok(value) = (unsafe { CStr::from_ptr(value) }).to_str() else {
+        return -1;
     };
     handle.inner.add_field(key, value);
     0
@@ -352,15 +339,14 @@ pub unsafe extern "C" fn aam_parse_inline_to_map(content: *const c_char) -> *mut
     if content.is_null() {
         return std::ptr::null_mut();
     }
-    let s = match unsafe { CStr::from_ptr(content) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(s) = (unsafe { CStr::from_ptr(content) }).to_str() else {
+        return std::ptr::null_mut();
     };
     match crate::builder::parse_inline_to_map(s) {
         Ok(map) => {
             let joined = map
                 .into_iter()
-                .map(|(k, v)| format!("{}={}", k, v))
+                .map(|(k, v)| format!("{k}={v}"))
                 .collect::<Vec<_>>()
                 .join("\n");
             to_c_string(&joined)

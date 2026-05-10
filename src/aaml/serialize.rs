@@ -28,7 +28,7 @@ impl<'de> serde::Deserialize<'de> for AAML {
         }
 
         let data = AAMLData::deserialize(deserializer)?;
-        let mut aaml = AAML::new();
+        let mut aaml = Self::new();
         *aaml.get_map_mut() = data.map;
         *aaml.get_schemas_mut() = data.schemas;
         Ok(aaml)

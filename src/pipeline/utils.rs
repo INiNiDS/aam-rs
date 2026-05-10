@@ -7,6 +7,10 @@ use std::path::{Path, PathBuf};
 /// If `file_path` is absolute, returns it as-is.
 /// If `source_dir` is `Some`, joins it with the relative `file_path`.
 /// Otherwise, returns `file_path` unchanged (relative to CWD).
+///
+/// # Errors
+///
+/// This function never returns an error; it always produces a `PathBuf`.
 #[must_use]
 pub fn resolve_relative_path(file_path: &str, source_dir: Option<&Path>) -> PathBuf {
     let path = Path::new(file_path);
@@ -20,6 +24,14 @@ pub fn resolve_relative_path(file_path: &str, source_dir: Option<&Path>) -> Path
 }
 
 /// Validates a value against a type, handling built-ins, registered custom types, and nested schemas.
+/// Validates a value against a type, handling built-ins, registered custom types, and nested schemas.
+///
+/// # Errors
+///
+/// Returns `Err(AamlError)` when:
+/// - The value does not match the expected inline object format for `schema`.
+/// - The referenced schema is missing required fields or a field value fails its type validation.
+/// - The requested type is unknown.
 pub fn validate_type_value(
     value: &str,
     type_name: &str,
@@ -54,17 +66,27 @@ pub fn validate_type_value(
     }
 
     // 4. Built-in types
-    match crate::types_aam::resolve_builtin(type_name) {
-        Ok(validator) => validator.validate(value, context),
-        Err(_) => Err(AamlError::InvalidType {
-            type_name: type_name.to_string(),
-            details: format!("Unknown type '{type_name}'"),
-            provided: value.to_string(),
-            diagnostics: None,
-        }),
-    }
+    crate::types_aam::resolve_builtin(type_name).map_or_else(
+        |_| {
+            Err(AamlError::InvalidType {
+                type_name: type_name.to_string(),
+                details: format!("Unknown type '{type_name}'"),
+                provided: value.to_string(),
+                diagnostics: None,
+            })
+        },
+        |validator| validator.validate(value, context),
+    )
 }
 
+/// Validates an inline object string against a schema definition.
+///
+/// # Errors
+///
+/// Returns `Err(AamlError)` when:
+/// - `value` is not a valid inline object string (`{ k = v, ... }`).
+/// - A required field in the schema is missing.
+/// - A field's value fails its type validation.
 pub fn validate_inline_object_against_schema(
     value: &str,
     schema_info: &crate::pipeline::execution_descriptor::SchemaInfo,

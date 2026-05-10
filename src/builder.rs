@@ -218,13 +218,13 @@ impl From<&str> for BuiltInType {
             "physics::kilogram" => Self::Kilogram,
             "physics::meter" => Self::Meter,
             "schema" => Self::Schema,
-            _ => {
-                if let Some(inner) = s.strip_prefix("list<").and_then(|s| s.strip_suffix('>')) {
-                    Self::List(Box::new(Self::from(inner)))
-                } else {
-                    Self::Custom(s.to_string())
-                }
-            }
+            _ => s
+                .strip_prefix("list<")
+                .and_then(|s| s.strip_suffix('>'))
+                .map_or_else(
+                    || Self::Custom(s.to_string()),
+                    |inner| Self::List(Box::new(Self::from(inner))),
+                ),
         }
     }
 }
@@ -564,11 +564,11 @@ impl AAMBuilder {
     /// use aam_rs::builder::{AAMBuilder, BuiltInType};
     ///
     /// let mut b = AAMBuilder::new();
-    /// b.type_alias_builtin("pos", BuiltInType::Vector3);
+    /// b.type_alias_builtin("pos", &BuiltInType::Vector3);
     /// assert!(b.build().contains("@type pos = math::vector3"));
     /// ```
     #[cfg(feature = "builder-extras")]
-    pub fn type_alias_builtin(&mut self, alias: &str, builtin: BuiltInType) -> &mut Self {
+    pub fn type_alias_builtin(&mut self, alias: &str, builtin: &BuiltInType) -> &mut Self {
         self.type_alias(alias, &builtin.to_string())
     }
 

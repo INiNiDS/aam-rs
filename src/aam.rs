@@ -92,7 +92,7 @@ impl AAM {
     /// # Errors
     ///
     /// Returns errors if the file cannot be read, the content fails to parse, or validation fails.
-    pub fn from_pipeline(pipeline: Pipeline, text: &str) -> Result<Self, Vec<AamlError>> {
+    pub fn from_pipeline(pipeline: &Pipeline, text: &str) -> Result<Self, Vec<AamlError>> {
         let path = Path::new(text);
         if path.is_file() {
             let content = std::fs::read_to_string(path).map_err(|e| {
@@ -297,7 +297,7 @@ impl AAM {
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         match &self.backend {
-            AamBackend::Dynamic(output) => output.map.get(key).map(AsRef::as_ref),
+            AamBackend::Dynamic(output) => output.map.get(key).map(std::convert::AsRef::as_ref),
             #[cfg(feature = "aot")]
             AamBackend::Mapped(mapped) => mapped.get(key),
         }

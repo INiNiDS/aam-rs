@@ -126,15 +126,15 @@ impl ValidationTask<'_> {
     #[must_use]
     pub const fn line(&self) -> usize {
         match self {
-            ValidationTask::CheckTypeMatch { line, .. } => *line,
-            ValidationTask::VerifySchemaExists { line, .. } => *line,
-            ValidationTask::VerifyFileExists { line, .. } => *line,
-            ValidationTask::ValidateAgainstSchema { line, .. } => *line,
-            ValidationTask::CheckSchemaCompleteness { line, .. } => *line,
-            ValidationTask::CheckDeriveCompleteness { line, .. } => *line,
-            ValidationTask::CheckNoCircularReference { line, .. } => *line,
-            ValidationTask::ValidateListElements { line, .. } => *line,
-            ValidationTask::ValidateObjectStructure { line, .. } => *line,
+            ValidationTask::CheckTypeMatch { line, .. }
+            | ValidationTask::VerifySchemaExists { line, .. }
+            | ValidationTask::VerifyFileExists { line, .. }
+            | ValidationTask::ValidateAgainstSchema { line, .. }
+            | ValidationTask::CheckSchemaCompleteness { line, .. }
+            | ValidationTask::CheckDeriveCompleteness { line, .. }
+            | ValidationTask::CheckNoCircularReference { line, .. }
+            | ValidationTask::ValidateListElements { line, .. }
+            | ValidationTask::ValidateObjectStructure { line, .. } => *line,
         }
     }
 
@@ -269,13 +269,13 @@ impl ParseTask<'_> {
     #[must_use]
     pub const fn line(&self) -> usize {
         match self {
-            ParseTask::ResolveModuleReference { line, .. } => *line,
-            ParseTask::ResolveDeriveImport { line, .. } => *line,
-            ParseTask::ProcessVariable { line, .. } => *line,
-            ParseTask::ManageScope { line, .. } => *line,
-            ParseTask::ExecuteDirective { line, .. } => *line,
-            ParseTask::RegisterType { line, .. } => *line,
-            ParseTask::RegisterSchema { line, .. } => *line,
+            ParseTask::ResolveModuleReference { line, .. }
+            | ParseTask::ResolveDeriveImport { line, .. }
+            | ParseTask::ProcessVariable { line, .. }
+            | ParseTask::ManageScope { line, .. }
+            | ParseTask::ExecuteDirective { line, .. }
+            | ParseTask::RegisterType { line, .. }
+            | ParseTask::RegisterSchema { line, .. } => *line,
         }
     }
 
@@ -311,6 +311,12 @@ impl ParseTask<'_> {
     }
 
     /// Performs checks that do not require mutable execution context.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(TaskError)` when the task is invalid in a stateless context
+    /// (for example, executing a non-whitelisted directive without execution
+    /// context).
     pub fn validate_stateless(&self) -> Result<(), TaskError> {
         if let ParseTask::ExecuteDirective {
             directive_name,
@@ -415,12 +421,12 @@ impl ExecutionTask<'_> {
     #[must_use]
     pub const fn line(&self) -> usize {
         match self {
-            ExecutionTask::SetValue { line, .. } => *line,
-            ExecutionTask::MergeValue { line, .. } => *line,
-            ExecutionTask::ApplySchema { line, .. } => *line,
-            ExecutionTask::ExecuteInheritance { line, .. } => *line,
-            ExecutionTask::ImportFile { line, .. } => *line,
-            ExecutionTask::ResolveReference { line, .. } => *line,
+            ExecutionTask::SetValue { line, .. }
+            | ExecutionTask::MergeValue { line, .. }
+            | ExecutionTask::ApplySchema { line, .. }
+            | ExecutionTask::ExecuteInheritance { line, .. }
+            | ExecutionTask::ImportFile { line, .. }
+            | ExecutionTask::ResolveReference { line, .. } => *line,
         }
     }
 

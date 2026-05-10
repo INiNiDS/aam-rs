@@ -1,4 +1,4 @@
-//! PyO3 bindings — exposes `AAM` to Python as `aam_rs.AAM`.
+//! `PyO3` bindings — exposes `AAM` to Python as `aam_rs.AAM`.
 
 use crate::aam::AAM;
 use crate::builder::{AAMBuilder, InlineObject, SchemaField};
@@ -13,17 +13,20 @@ use crate::translator::TOMLTranslator;
 
 // ── Error conversion ─────────────────────────────────────────────────────────
 
-fn to_py(err: AamlError) -> PyErr {
+fn to_py(err: &AamlError) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
 fn first_error(errors: Vec<AamlError>) -> AamlError {
-    errors.into_iter().next().unwrap_or(AamlError::ParseError {
-        line: 1,
-        content: String::new(),
-        details: "unexpected empty parse error list".to_string(),
-        diagnostics: None,
-    })
+    errors
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| AamlError::ParseError {
+            line: 1,
+            content: String::new(),
+            details: "unexpected empty parse error list".to_string(),
+            diagnostics: None,
+        })
 }
 
 // ── PySchemaField class ──────────────────────────────────────────────────────
@@ -65,14 +68,14 @@ pub struct PyAamBuilder {
 #[pymethods]
 impl PyAamBuilder {
     #[new]
-    fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             inner: AAMBuilder::new(),
         }
     }
 
     #[staticmethod]
-    fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
             inner: AAMBuilder::with_capacity(capacity),
         }
@@ -153,16 +156,16 @@ impl PyAam {
     fn parse(content: &str) -> PyResult<Self> {
         AAM::parse(content)
             .map_err(first_error)
-            .map(|inner| PyAam { inner: Some(inner) })
-            .map_err(to_py)
+            .map(|inner| Self { inner: Some(inner) })
+            .map_err(|e| to_py(&e))
     }
 
     #[staticmethod]
     fn load(path: &str) -> PyResult<Self> {
         AAM::load(path)
             .map_err(first_error)
-            .map(|inner| PyAam { inner: Some(inner) })
-            .map_err(to_py)
+            .map(|inner| Self { inner: Some(inner) })
+            .map_err(|e| to_py(&e))
     }
 
     #[staticmethod]
@@ -181,7 +184,9 @@ impl PyAam {
 
     fn format(&self, content: &str) -> PyResult<String> {
         let rules = FormatterRules::default();
-        self.inner_ref()?.format(content, &rules).map_err(to_py)
+        self.inner_ref()?
+            .format(content, &rules)
+            .map_err(|e| to_py(&e))
     }
 
     fn format_range(&self, content: &str, start_line: usize, end_line: usize) -> PyResult<String> {
@@ -192,7 +197,7 @@ impl PyAam {
         };
         self.inner_ref()?
             .format_range(content, range, &rules)
-            .map_err(to_py)
+            .map_err(|e| to_py(&e))
     }
 
     fn get(&self, key: &str) -> Option<String> {
@@ -204,7 +209,13 @@ impl PyAam {
     fn keys(&self) -> Vec<String> {
         self.inner_ref().map_or_else(
             |_| Vec::new(),
-            |inner| inner.keys().iter().map(|s| s.to_string()).collect(),
+            |inner| {
+                inner
+                    .keys()
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect()
+            },
         )
     }
 
@@ -246,7 +257,7 @@ impl PyAam {
                 inner
                     .reverse_search(target_value)
                     .into_iter()
-                    .map(ToString::to_string)
+                    .map(std::string::ToString::to_string)
                     .collect()
             },
         )
@@ -256,7 +267,12 @@ impl PyAam {
         self.inner_ref()
             .ok()
             .and_then(|inner| inner.schemas())
-            .map(|schemas| schemas.keys().map(|k| k.to_string()).collect())
+            .map(|schemas| {
+                schemas
+                    .keys()
+                    .map(std::string::ToString::to_string)
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -264,7 +280,7 @@ impl PyAam {
         self.inner_ref()
             .ok()
             .and_then(|inner| inner.types())
-            .map(|types| types.keys().map(|k| k.to_string()).collect())
+            .map(|types| types.keys().map(std::string::ToString::to_string).collect())
             .unwrap_or_default()
     }
 
@@ -272,17 +288,17 @@ impl PyAam {
         self.inner = None;
     }
 
-    fn is_closed(&self) -> bool {
+    const fn is_closed(&self) -> bool {
         self.inner.is_none()
     }
 
     // ── Python Dunder Methods ─────────────────────────────────────────────────
 
     fn __repr__(&self) -> String {
-        match self.inner_ref() {
-            Ok(inner) => format!("AAM({} keys)", inner.keys().len()),
-            Err(_) => "AAM(closed)".to_string(),
-        }
+        self.inner_ref().map_or_else(
+            |_| "AAM(closed)".to_string(),
+            |inner| format!("AAM({} keys)", inner.keys().len()),
+        )
     }
 
     fn __len__(&self) -> usize {
@@ -290,9 +306,7 @@ impl PyAam {
     }
 
     fn __contains__(&self, key: &str) -> bool {
-        self.inner_ref()
-            .map(|i| i.get(key).is_some())
-            .unwrap_or(false)
+        self.inner_ref().is_ok_and(|i| i.get(key).is_some())
     }
 
     fn __getitem__(&self, key: &str) -> PyResult<String> {
@@ -316,7 +330,7 @@ impl PyTOMLTranslator {
     fn toml_to_aam(toml_source: &str) -> PyResult<Vec<String>> {
         TOMLTranslator::toml_to_aam(toml_source)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
-            .map(|builders| builders.into_iter().map(|b| b.build()).collect())
+            .map(|builders| builders.into_iter().map(AAMBuilder::build).collect())
     }
 }
 
@@ -330,7 +344,7 @@ pub struct PyInlineObject {
 #[pymethods]
 impl PyInlineObject {
     #[new]
-    fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             inner: InlineObject::new(),
         }
@@ -357,6 +371,11 @@ fn py_parse_inline_to_map(content: &str) -> PyResult<HashMap<String, String>> {
 
 // ── Module registration ──────────────────────────────────────────────────────
 
+/// Registers all AAM classes and functions in the Python module.
+///
+/// # Errors
+///
+/// Returns a `PyErr` if registration fails.
 pub fn register(m: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
     m.add_class::<PyAam>()?;
     m.add_class::<PyAamBuilder>()?;

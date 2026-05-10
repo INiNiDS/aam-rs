@@ -61,12 +61,14 @@ impl AAML {
         }
 
         // 3. Built-in types
-        match resolve_builtin(type_name) {
-            Ok(type_def) => type_def
-                .validate(value, self)
-                .map_err(|e| make_err(e.to_string())),
-            Err(_) => Err(make_err(format!("Unknown type '{type_name}'"))),
-        }
+        resolve_builtin(type_name).map_or_else(
+            |_| Err(make_err(format!("Unknown type '{type_name}'"))),
+            |type_def| {
+                type_def
+                    .validate(value, self)
+                    .map_err(|e| make_err(e.to_string()))
+            },
+        )
     }
 
     /// Validates an inline object literal `{ key = val, ... }` against the

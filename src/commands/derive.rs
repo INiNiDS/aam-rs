@@ -37,19 +37,14 @@ pub struct DeriveCommand;
 fn parse_derive_arg(raw: &str) -> (&str, Vec<&str>) {
     let (path_raw, rest) = if raw.starts_with('"') || raw.starts_with('\'') {
         let q = raw.chars().next().unwrap();
-        match raw[1..].find(q) {
-            Some(end) => {
-                let path = &raw[1..=end];
-                let after = raw[end + 2..].trim_start_matches(':').trim();
-                (path, after)
-            }
-            None => (raw, ""),
-        }
+        raw[1..].find(q).map_or((raw, ""), |end| {
+            let path = &raw[1..=end];
+            let after = raw[end + 2..].trim_start_matches(':').trim();
+            (path, after)
+        })
     } else {
-        match raw.find("::") {
-            Some(pos) => (&raw[..pos], &raw[pos + 2..]),
-            None => (raw, ""),
-        }
+        raw.find("::")
+            .map_or((raw, ""), |pos| (&raw[..pos], &raw[pos + 2..]))
     };
 
     let selectors = rest

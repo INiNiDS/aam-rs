@@ -247,14 +247,13 @@ impl DefaultExecuter {
         ) {
             Ok(out) => out,
             Err(errors) => {
-                return Err(errors
-                    .into_iter()
-                    .next()
-                    .unwrap_or(AamlError::DirectiveError {
+                return Err(errors.into_iter().next().unwrap_or_else(|| {
+                    AamlError::DirectiveError {
                         directive: "import".to_string(),
                         message: "Unknown error in imported file".to_string(),
                         diagnostics: None,
-                    }));
+                    }
+                }));
             }
         };
 

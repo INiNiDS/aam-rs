@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_lines)]
+
 use crate::aaml::AAML;
 use crate::error::AamlError;
 use crate::types::Type;

@@ -1,3 +1,5 @@
+#![allow(clippy::struct_excessive_bools)]
+
 //! Formatter trait for LSP integration.
 //!
 //! The Formatter provides an API for formatting AAML documents without requiring

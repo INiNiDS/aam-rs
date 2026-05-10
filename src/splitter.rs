@@ -20,6 +20,7 @@ use std::collections::HashMap;
 /// assert_eq!(map["kvantum.aam"].as_string(), "a = b\nx = d");
 /// assert_eq!(map["another.aam"].as_string(), "c = d\ng = f");
 /// ```
+#[must_use]
 pub fn split_aam(input: &str) -> HashMap<String, AAMBuilder> {
     let mut result = HashMap::new();
     let mut current_name: Option<String> = None;
@@ -58,7 +59,10 @@ pub fn split_aam(input: &str) -> HashMap<String, AAMBuilder> {
 fn parse_section_header(s: &str) -> Option<&str> {
     if let Some(without_hash) = s.strip_prefix('#') {
         let rest = without_hash.trim();
-        if rest.ends_with(".aam") {
+        if std::path::Path::new(rest)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("aam"))
+        {
             return Some(rest);
         }
     }
@@ -69,7 +73,7 @@ fn parse_section_header(s: &str) -> Option<&str> {
 fn parse_assignment(s: &str) -> Option<(&str, &str)> {
     let mut parts = s.splitn(2, '=');
     let key = parts.next()?.trim();
-    let value = parts.next().map(|v| v.trim())?;
+    let value = parts.next().map(str::trim)?;
     if key.is_empty() {
         return None;
     }

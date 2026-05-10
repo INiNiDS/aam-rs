@@ -7,6 +7,8 @@
 //! 4. **Executer** - executes directives and populates final map
 //! 5. **Output** - final key-value map, schemas, types
 
+#![allow(clippy::missing_errors_doc)]
+
 pub mod execution_descriptor;
 pub mod formatter;
 pub mod lexer;
@@ -175,20 +177,12 @@ pub struct Pipeline {
 
 impl Pipeline {
     /// Processes AAML content using the 5-stage arena-based pipeline.
-    ///
-    /// # Errors
-    ///
-    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process(&self, content: &str) -> Result<PipelineOutput, Vec<AamlError>> {
         let arena = Bump::new();
         self.process_with_arena(content, &arena)
     }
 
     /// Processes AAML content with a source directory for relative path resolution.
-    ///
-    /// # Errors
-    ///
-    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_source_dir(
         &self,
         content: &str,
@@ -296,7 +290,7 @@ impl Pipeline {
 
     fn run_validation_tasks<'a>(
         &self,
-        ast: &[AstNode<'a>],
+        ast: &'a [AstNode<'a>],
         descriptor: &mut ExecutionDescriptor<'a>,
         all_errors: &mut ErrorAccumulator,
     ) {
@@ -579,11 +573,6 @@ impl Pipeline {
         })
     }
 
-    /// Processes AAML content with an arena allocator provided by the caller.
-    ///
-    /// # Errors
-    ///
-    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_arena<'a>(
         &self,
         content: &'a str,
@@ -592,11 +581,6 @@ impl Pipeline {
         self.process_with_tasks(content, arena, None)
     }
 
-    /// Processes AAML content with an arena allocator and explicit source directory.
-    ///
-    /// # Errors
-    ///
-    /// Returns parsing, validation, directive, or execution errors collected from any pipeline stage.
     pub fn process_with_arena_and_source_dir<'a>(
         &self,
         content: &'a str,
@@ -606,11 +590,6 @@ impl Pipeline {
         self.process_with_tasks(content, arena, source_dir)
     }
 
-    /// Formats a parsed document using the configured formatter.
-    ///
-    /// # Errors
-    ///
-    /// Returns formatting errors if the formatter rejects the AST or options.
     pub fn format(
         &self,
         nodes: &[AstNode],
@@ -619,11 +598,6 @@ impl Pipeline {
         self.formatter.format_document(nodes, options)
     }
 
-    /// Formats only a selected range of parsed nodes.
-    ///
-    /// # Errors
-    ///
-    /// Returns formatting errors if the formatter rejects the AST, range, or options.
     pub fn format_range(
         &self,
         nodes: &[AstNode],

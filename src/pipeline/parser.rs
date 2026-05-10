@@ -56,8 +56,7 @@ impl AstNode<'_> {
     #[must_use]
     pub const fn line(&self) -> usize {
         match self {
-            AstNode::Assignment { line, .. } => *line,
-            AstNode::Directive { line, .. } => *line,
+            AstNode::Assignment { line, .. } | AstNode::Directive { line, .. } => *line,
         }
     }
 }
@@ -523,21 +522,21 @@ impl DefaultParser {
 
     fn emit_assignment_parse_tasks<'a>(
         tasks: &mut Vec<ParseTask<'a>>,
-        key: std::borrow::Cow<'a, str>,
+        key: &str,
         value: &ValueNode<'a>,
         line: usize,
     ) {
         tasks.push(ParseTask::ProcessVariable {
-            variable_name: key.clone(),
+            variable_name: key.to_string().into(),
             value: value.to_string().into(),
-            scope: Self::scope_from_key(&key).into_owned().into(),
+            scope: Self::scope_from_key(key).into_owned().into(),
             line,
         });
 
         if let ValueNode::Object(pairs) = value {
             for (field, child_value) in pairs.iter() {
                 let child_key = format!("{key}.{field}");
-                Self::emit_assignment_parse_tasks(tasks, child_key.into(), child_value, line);
+                Self::emit_assignment_parse_tasks(tasks, &child_key, child_value, line);
             }
         }
     }
@@ -620,7 +619,7 @@ impl Parser for DefaultParser {
                 .errors
                 .into_iter()
                 .next()
-                .unwrap_or(AamlError::ParseError {
+                .unwrap_or_else(|| AamlError::ParseError {
                     line: 1,
                     content: "parse failed".to_string(),
                     details: "Unknown parser failure".to_string(),
@@ -676,7 +675,7 @@ impl Parser for DefaultParser {
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
-                    Self::emit_assignment_parse_tasks(&mut tasks, key.clone(), value, *line);
+                    Self::emit_assignment_parse_tasks(&mut tasks, key, value, *line);
                 }
                 AstNode::Directive {
                     name, args, line, ..

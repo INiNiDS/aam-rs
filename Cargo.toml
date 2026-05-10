@@ -12,6 +12,7 @@ categories = [
     "parsing",
     "config",
 ]
+keywords = ["aam", "alias", "mapping", "config", "parser"]
 authors = ["Nikita Goncharov <ininids@ininids.in.rs>"]
 include = [
     "src/**/*",

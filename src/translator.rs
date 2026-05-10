@@ -4,11 +4,18 @@ use std::error::Error;
 pub struct TOMLTranslator;
 
 impl TOMLTranslator {
-    /// Translate TOML source string into a vector of AAMBuilder modules.
+    /// Translate TOML source string into a vector of `AAMBuilder` modules.
     /// Each module is a new .aam-file
-    // High Complexity
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TOML source is invalid.
+    ///
+    /// # Panics
+    ///
+    /// This function should not panic, but it was previously using `expect`.
     pub fn toml_to_aam(toml_source: &str) -> Result<Vec<AAMBuilder>, Box<dyn Error>> {
-        let root: toml::Value = toml::from_str(toml_source.trim()).expect("Failed to parse TOML");
+        let root: toml::Value = toml::from_str(toml_source.trim())?;
 
         let mut modules: Vec<AAMBuilder> = Vec::new();
 
@@ -22,35 +29,31 @@ impl TOMLTranslator {
             for key in keys {
                 let value = &table[key];
 
-                match value {
-                    toml::Value::Table(inner) => {
-                        let module_name = format!("{key}.aam");
-                        root_builder.import(&module_name);
+                if let toml::Value::Table(inner) = value {
+                    let module_name = format!("{key}.aam");
+                    root_builder.import(&module_name);
 
-                        let mut mod_builder = AAMBuilder::new();
-                        mod_builder.comment(&format!("Module generated from TOML table [{key}]"));
+                    let mut mod_builder = AAMBuilder::new();
+                    mod_builder.comment(&format!("Module generated from TOML table [{key}]"));
 
-                        let mut fields = Vec::new();
-                        for (field_key, field_value) in inner {
-                            let type_name = Self::toml_type_to_aam_type(field_value);
-                            fields.push(SchemaField::required(field_key, type_name));
-                        }
-                        if !fields.is_empty() {
-                            mod_builder.schema(key, fields);
-                        }
-
-                        for (field_key, field_value) in inner {
-                            let serialized = Self::toml_value_to_aam_string(field_value);
-                            mod_builder.add_line(field_key, &serialized);
-                        }
-
-                        modules.push(mod_builder);
+                    let mut fields = Vec::new();
+                    for (field_key, field_value) in inner {
+                        let type_name = Self::toml_type_to_aam_type(field_value);
+                        fields.push(SchemaField::required(field_key, type_name));
+                    }
+                    if !fields.is_empty() {
+                        mod_builder.schema(key, fields);
                     }
 
-                    _ => {
-                        let serialized = Self::toml_value_to_aam_string(value);
-                        root_builder.add_line(key, &serialized);
+                    for (field_key, field_value) in inner {
+                        let serialized = Self::toml_value_to_aam_string(field_value);
+                        mod_builder.add_line(field_key, &serialized);
                     }
+
+                    modules.push(mod_builder);
+                } else {
+                    let serialized = Self::toml_value_to_aam_string(value);
+                    root_builder.add_line(key, &serialized);
                 }
             }
         }
@@ -62,7 +65,7 @@ impl TOMLTranslator {
 
     fn toml_type_to_aam_type(value: &toml::Value) -> &str {
         match value {
-            toml::Value::String(_) => "string",
+            toml::Value::String(_) | toml::Value::Datetime(_) => "string",
             toml::Value::Integer(_) => "i32",
             toml::Value::Float(_) => "f64",
             toml::Value::Boolean(_) => "bool",
@@ -74,7 +77,6 @@ impl TOMLTranslator {
                 }
             }
             toml::Value::Table(_) => "object",
-            _ => "string",
         }
     }
 

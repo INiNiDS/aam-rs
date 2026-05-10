@@ -3,6 +3,7 @@
 use aam_rs::aaml::AAML;
 use aam_rs::aaml::parsing::{parse_inline_object, strip_comment};
 use aam_rs::builder::{AAMBuilder, SchemaField};
+use std::fmt::Write;
 use std::fs;
 
 // ============================================================================
@@ -425,7 +426,7 @@ fn test_find_deep_chain() {
 fn test_find_deep_long_chain() {
     let mut content = String::new();
     for i in 0..50 {
-        content.push_str(&format!("k{} = k{}\n", i, i + 1));
+        let _ = writeln!(content, "k{} = k{}", i, i + 1);
     }
     content.push_str("k50 = terminus");
     let doc = AAML::parse(&content).unwrap();
@@ -1577,7 +1578,7 @@ fn test_load_large_file() {
     let file = "test_large.aam";
     let mut content = String::new();
     for i in 0..1000 {
-        content.push_str(&format!("key_{} = value_{}\n", i, i));
+        let _ = writeln!(content, "key_{} = value_{}", i, i);
     }
     fs::write(file, content).unwrap();
     let doc = AAML::load(file).unwrap();

@@ -129,6 +129,7 @@ impl Default for DefaultLexer {
 }
 
 impl Lexer for DefaultLexer {
+    #[allow(clippy::too_many_lines)]
     fn tokenize<'a>(&self, content: &'a str) -> Result<Vec<Token<'a>>, AamlError> {
         let mut tokens = Vec::new();
         let mut line = 1;
@@ -138,7 +139,7 @@ impl Lexer for DefaultLexer {
         while let Some(&ch) = chars.peek() {
             match ch {
                 '\n' => {
-                    self.handle_newline(&mut tokens, &mut chars, &mut line, &mut column);
+                    Self::handle_newline(&mut tokens, &mut chars, &mut line, &mut column);
                 }
                 c if Self::is_whitespace(c) => {
                     chars.next();
@@ -146,12 +147,12 @@ impl Lexer for DefaultLexer {
                 }
                 '#' => {
                     if Self::is_comment_start(&chars) {
-                        self.handle_comment(&mut tokens, &mut chars, line, &mut column);
+                        Self::handle_comment(&mut tokens, &mut chars, line, &mut column);
                     } else {
-                        self.handle_identifier(&mut tokens, &mut chars, line, &mut column);
+                        Self::handle_identifier(&mut tokens, &mut chars, line, &mut column);
                     }
                 }
-                '=' => self.push_single_token(
+                '=' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::Assign,
                     line,
@@ -160,7 +161,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                '{' => self.push_single_token(
+                '{' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::LeftBrace,
                     line,
@@ -169,7 +170,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                '}' => self.push_single_token(
+                '}' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::RightBrace,
                     line,
@@ -178,7 +179,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                '[' => self.push_single_token(
+                '[' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::LeftBracket,
                     line,
@@ -187,7 +188,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                ']' => self.push_single_token(
+                ']' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::RightBracket,
                     line,
@@ -196,7 +197,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                ',' => self.push_single_token(
+                ',' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::Comma,
                     line,
@@ -205,7 +206,7 @@ impl Lexer for DefaultLexer {
                     &mut chars,
                     &mut column,
                 ),
-                '@' => self.push_single_token(
+                '@' => Self::push_single_token(
                     &mut tokens,
                     TokenKind::At,
                     line,
@@ -215,15 +216,15 @@ impl Lexer for DefaultLexer {
                     &mut column,
                 ),
                 '"' | '\'' => {
-                    self.handle_string(&mut tokens, &mut chars, ch, line, &mut column, &mut line)?;
+                    Self::handle_string(&mut tokens, &mut chars, ch, line, &mut column, &mut line);
                 }
                 _ if Self::is_digit(ch)
                     || (ch == '-' && chars.clone().nth(1).is_some_and(Self::is_digit)) =>
                 {
-                    self.handle_number(&mut tokens, &mut chars, ch, line, &mut column);
+                    Self::handle_number(&mut tokens, &mut chars, ch, line, &mut column);
                 }
                 _ if Self::is_id_start(ch) => {
-                    self.handle_identifier(&mut tokens, &mut chars, line, &mut column);
+                    Self::handle_identifier(&mut tokens, &mut chars, line, &mut column);
                 }
                 _ => {
                     return Err(AamlError::LexError {
@@ -256,7 +257,6 @@ impl Lexer for DefaultLexer {
 
 impl DefaultLexer {
     fn handle_newline(
-        &self,
         tokens: &mut Vec<Token>,
         chars: &mut std::iter::Peekable<std::str::Chars>,
         line: &mut usize,
@@ -274,7 +274,6 @@ impl DefaultLexer {
     }
 
     fn handle_comment(
-        &self,
         tokens: &mut Vec<Token>,
         chars: &mut std::iter::Peekable<std::str::Chars>,
         line: usize,
@@ -293,8 +292,8 @@ impl DefaultLexer {
         tokens.push(Token::new(TokenKind::Comment, line, col, text));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn push_single_token(
-        &self,
         tokens: &mut Vec<Token>,
         kind: TokenKind,
         line: usize,
@@ -337,14 +336,13 @@ impl DefaultLexer {
     }
 
     fn handle_string(
-        &self,
         tokens: &mut Vec<Token>,
         chars: &mut std::iter::Peekable<std::str::Chars>,
         quote: char,
         mut line: usize,
         column: &mut usize,
         line_ref: &mut usize,
-    ) -> Result<(), AamlError> {
+    ) {
         let col = *column;
         chars.next();
         *column += 1;
@@ -363,11 +361,9 @@ impl DefaultLexer {
 
         tokens.push(Token::new(TokenKind::String, line, col, text));
         *line_ref = line;
-        Ok(())
     }
 
     fn handle_number(
-        &self,
         tokens: &mut Vec<Token>,
         chars: &mut std::iter::Peekable<std::str::Chars>,
         first_ch: char,
@@ -403,7 +399,6 @@ impl DefaultLexer {
     }
 
     fn handle_identifier(
-        &self,
         tokens: &mut Vec<Token>,
         chars: &mut std::iter::Peekable<std::str::Chars>,
         line: usize,

@@ -74,6 +74,11 @@ impl ScopeManager {
     ///
     /// Returns `Ok(())` if the block nesting is balanced, or `Err(())` if
     /// we're trying to exit without having entered.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ScopeError::UnbalancedExit)` when an exit is attempted
+    /// while the nesting depth is already zero.
     pub fn exit_block(&mut self) -> Result<(), ScopeError> {
         if self.nesting_depth <= 0 {
             return Err(ScopeError::UnbalancedExit);

@@ -63,6 +63,9 @@ impl std::fmt::Debug for AAML {
         f.debug_struct("AAML")
             .field("map", &self.map)
             .field("commands_count", &self.commands.len())
+            .field("types_count", &self.types.len())
+            .field("schemas", &self.schemas)
+            .field("source_dir", &self.source_dir)
             .finish()
     }
 }
@@ -437,20 +440,21 @@ impl AAML {
             });
         }
 
-        let command = self.commands.get(command_name).cloned();
-        match command {
-            Some(cmd) => cmd.execute(self, args),
-            None => Err(AamlError::ParseError {
-                line: line_num,
-                content: content.to_string(),
-                details: format!("Unknown directive: @{command_name}"),
-                diagnostics: Some(Box::new(ErrorDiagnostics::new(
-                    "Unknown directive",
-                    format!("Directive '@{command_name}' is not recognized"),
-                    "Known directives: @import, @derive, @schema, @type",
-                ))),
-            }),
-        }
+        self.commands.get(command_name).cloned().map_or_else(
+            || {
+                Err(AamlError::ParseError {
+                    line: line_num,
+                    content: content.to_string(),
+                    details: format!("Unknown directive: @{command_name}"),
+                    diagnostics: Some(Box::new(ErrorDiagnostics::new(
+                        "Unknown directive",
+                        format!("Directive '@{command_name}' is not recognized"),
+                        "Known directives: @import, @derive, @schema, @type",
+                    ))),
+                })
+            },
+            |cmd| cmd.execute(self, args),
+        )
     }
 }
 

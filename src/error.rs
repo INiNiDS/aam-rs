@@ -1,3 +1,5 @@
+#![allow(clippy::format_push_string, clippy::too_many_lines)]
+
 //! Error types for the AAML parser and validation pipeline with beautiful colored output.
 
 use colored::Colorize;
@@ -333,15 +335,18 @@ impl AamlError {
         }
     }
 
+    // High Complexity
     fn render_compiler_style(&self) -> String {
+        use std::fmt::Write;
         let ctx = get_error_render_context();
         let mut out = String::new();
-        out.push_str(&format!(
-            "{}[{}]: {}\n",
+        let _ = writeln!(
+            out,
+            "{}[{}]: {}",
             "error".red().bold(),
             self.code().red().bold(),
             self.title().bold()
-        ));
+        );
 
         match self {
             Self::CircularDependency { path, .. } => {
@@ -365,26 +370,28 @@ impl AamlError {
                 let first_loc = type_alias_line_info(&ctx.source, &first_alias);
 
                 if let Some((line, _, col)) = first_loc {
-                    out.push_str(&format!(
-                        " {} {}:{}:{}\n",
+                    let _ = writeln!(
+                        out,
+                        " {} {}:{}:{}",
                         "-->".blue().bold(),
                         ctx.path,
                         line,
                         col
-                    ));
+                    );
                 } else {
-                    out.push_str(&format!(" {} {}:?:?\n", "-->".blue().bold(), ctx.path));
+                    let _ = writeln!(out, " {} {}:?:?", "-->".blue().bold(), ctx.path);
                 }
-                out.push_str(&format!(" {}\n", "|".blue().bold()));
+                let _ = writeln!(out, " {}", "|".blue().bold());
 
                 for (idx, alias) in nodes.iter().enumerate() {
                     if let Some((line, src, col)) = type_alias_line_info(&ctx.source, alias) {
-                        out.push_str(&format!(
-                            " {} {} {}\n",
+                        let _ = writeln!(
+                            out,
+                            " {} {} {}",
                             line.to_string().blue().bold(),
                             "|".blue().bold(),
                             src
-                        ));
+                        );
                         let marker = if idx == 0 {
                             "cycle starts here"
                         } else if idx == nodes.len().saturating_sub(1) {
@@ -392,28 +399,20 @@ impl AamlError {
                         } else {
                             "part of cycle"
                         };
-                        out.push_str(&format!(
-                            " {} {}{} {}\n",
+                        let _ = writeln!(
+                            out,
+                            " {} {}{} {}",
                             "|".blue().bold(),
                             " ".repeat(col.saturating_sub(1)),
                             "^".red().bold(),
                             marker
-                        ));
+                        );
                     }
                 }
 
-                out.push_str(&format!(" {}\n", "|".blue().bold()));
-                out.push_str(&format!(
-                    " {} {} {}\n",
-                    "=".blue().bold(),
-                    "cycle:".bold(),
-                    chain
-                ));
-                out.push_str(&format!(
-                    " {} returns to '{}'\n",
-                    "=".blue().bold(),
-                    cycle_start
-                ));
+                let _ = writeln!(out, " {}", "|".blue().bold());
+                let _ = writeln!(out, " {} {} {}", "=".blue().bold(), "cycle:".bold(), chain);
+                let _ = writeln!(out, " {} returns to '{}'", "=".blue().bold(), cycle_start);
             }
             Self::ParseError {
                 line,
@@ -421,34 +420,31 @@ impl AamlError {
                 details,
                 ..
             } => {
-                out.push_str(&format!(
-                    " {} {}:{}:{}\n",
-                    "-->".blue().bold(),
-                    ctx.path,
-                    line,
-                    1
-                ));
-                out.push_str(&format!(" {}\n", "|".blue().bold()));
+                let _ = writeln!(out, " {} {}:{}:{}", "-->".blue().bold(), ctx.path, line, 1);
+                let _ = writeln!(out, " {}", "|".blue().bold());
                 let display_line = source_line(&ctx.source, *line).unwrap_or(content.as_str());
                 let caret_col = display_line.find(content.trim()).map_or(1, |v| v + 1);
-                out.push_str(&format!(
-                    " {} {} {}\n",
+                let _ = writeln!(
+                    out,
+                    " {} {} {}",
                     line.to_string().blue().bold(),
                     "|".blue().bold(),
                     display_line
-                ));
-                out.push_str(&format!(
-                    " {} {} {}\n",
+                );
+                let _ = writeln!(
+                    out,
+                    " {} {} {}",
                     "|".blue().bold(),
                     "^".red().bold(),
                     details
-                ));
-                out.push_str(&format!(
-                    " {} {}{}\n",
+                );
+                let _ = writeln!(
+                    out,
+                    " {} {}{}",
                     "|".blue().bold(),
                     " ".repeat(caret_col.saturating_sub(1)),
                     "^-- here".red().bold()
-                ));
+                );
             }
             Self::LexError {
                 line,
@@ -456,55 +452,50 @@ impl AamlError {
                 character,
                 ..
             } => {
-                out.push_str(&format!(
-                    " {} {}:{}:{}\n",
+                let _ = writeln!(
+                    out,
+                    " {} {}:{}:{}",
                     "-->".blue().bold(),
                     ctx.path,
                     line,
                     column
-                ));
+                );
                 if let Some(src) = source_line(&ctx.source, *line) {
-                    out.push_str(&format!(
-                        " {} {} {}\n",
+                    let _ = writeln!(
+                        out,
+                        " {} {} {}",
                         line.to_string().blue().bold(),
                         "|".blue().bold(),
                         src
-                    ));
-                    out.push_str(&format!(
-                        " {} {}{} invalid character '{}'\n",
+                    );
+                    let _ = writeln!(
+                        out,
+                        " {} {}{} invalid character '{}'",
                         "|".blue().bold(),
                         " ".repeat(column.saturating_sub(1)),
                         "^--".red().bold(),
                         character
-                    ));
+                    );
                 } else {
-                    out.push_str(&format!(
-                        " {} invalid character '{}'\n",
+                    let _ = writeln!(
+                        out,
+                        " {} invalid character '{}'",
                         "|".blue().bold(),
                         character
-                    ));
+                    );
                 }
             }
             _ => {
-                out.push_str(&format!(" {} {}:?:?\n", "-->".blue().bold(), ctx.path));
-                out.push_str(&format!(
-                    " {} {}\n",
-                    "|".blue().bold(),
-                    self.short_message()
-                ));
+                let _ = writeln!(out, " {} {}:?:?", "-->".blue().bold(), ctx.path);
+                let _ = writeln!(out, " {} {}", "|".blue().bold(), self.short_message());
             }
         }
 
+        let _ = writeln!(out, " {}", "|".blue().bold());
         if let Some(diag) = self.diagnostics() {
-            out.push_str(&format!(" {}\n", "|".blue().bold()));
-            out.push_str(&format!(" {} {}\n", "help:".green().bold(), diag.fix));
+            let _ = writeln!(out, " {} {}", "help:".green().bold(), diag.fix);
         } else {
-            out.push_str(&format!(" {}\n", "|".blue().bold()));
-            out.push_str(&format!(
-                " {} {}\n",
-                "help:".green().bold(),
-                self.default_help()
-            ));
+            let _ = writeln!(out, " {} {}", "help:".green().bold(), self.default_help());
         }
 
         out

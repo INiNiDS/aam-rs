@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_lines)]
+
 use crate::error::AamlError;
 use crate::pipeline::ExecutionContext;
 use crate::types_aam::TypeAAM;

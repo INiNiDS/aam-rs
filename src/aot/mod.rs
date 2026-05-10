@@ -299,13 +299,16 @@ impl SoaBuilder {
         let mask = (capacity - 1) as u64;
 
         for entry in self.symbols {
+            #[allow(clippy::cast_possible_truncation)]
             let mut idx = (entry.hash & mask) as usize;
             loop {
                 if hash_table[idx].node_index == INVALID_INDEX {
                     hash_table[idx] = entry;
                     break;
                 }
-                idx = (idx + 1) & (mask as usize);
+                #[allow(clippy::cast_possible_truncation)]
+                let m_idx = mask as usize;
+                idx = (idx + 1) & m_idx;
             }
         }
 
@@ -320,7 +323,7 @@ impl SoaBuilder {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn hash64(bytes: &[u8]) -> u64 {
     let mut hasher = FxHasher::default();
     hasher.write(bytes);
@@ -608,6 +611,7 @@ impl MappedAam {
         let hash = hash64(key_bytes);
 
         let mask = table.len() - 1;
+        #[allow(clippy::cast_possible_truncation)]
         let mut idx = (hash as usize) & mask;
 
         loop {

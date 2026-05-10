@@ -3,6 +3,7 @@
 //! These executors consume declarative tasks and perform the actual execution,
 //! completely decoupled from AAML struct manipulation.
 
+#![allow(clippy::unused_self)]
 use crate::error::{AamlError, ErrorDiagnostics};
 use crate::pipeline::PipelineHashMap;
 use crate::pipeline::execution_descriptor::ExecutionContext;
@@ -79,10 +80,13 @@ pub trait ValidateExecutor: Send + Sync {
         TaskExecutionResult {
             success: errors.is_empty(),
             errors,
-            stats: Default::default(),
+            stats: ExecutionStats::default(),
         }
     }
 }
+
+// Re-export ExecutionStats from tasks module
+pub use crate::pipeline::tasks::ExecutionStats;
 
 /// Trait for executing parsing tasks.
 ///
@@ -138,7 +142,7 @@ pub trait ParserExecutor: Send + Sync {
         TaskExecutionResult {
             success: errors.is_empty(),
             errors,
-            stats: Default::default(),
+            stats: ExecutionStats::default(),
         }
     }
 }
@@ -157,7 +161,7 @@ impl DefaultValidateExecutor {
     }
 
     /// Checks if a type exists in the context's type registry.
-    fn type_exists(&self, context: &ExecutionContext, type_name: &str) -> bool {
+    fn type_exists(context: &ExecutionContext, type_name: &str) -> bool {
         context.types.contains_key(type_name) || Self::is_builtin_type(type_name)
     }
 
@@ -178,12 +182,12 @@ impl DefaultValidateExecutor {
 
     fn validate_type_match(
         &self,
-        key: &std::borrow::Cow<'_, str>,
-        value: &std::borrow::Cow<'_, str>,
-        type_name: &std::borrow::Cow<'_, str>,
+        key: &str,
+        value: &str,
+        type_name: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
-        if !self.type_exists(context, type_name) {
+        if !Self::type_exists(context, type_name) {
             return Err(AamlError::InvalidType {
                 type_name: type_name.to_string(),
                 details: format!("Type not found in registry for key '{key}'"),
@@ -213,11 +217,10 @@ impl DefaultValidateExecutor {
     }
 
     fn verify_schema_exists(
-        &self,
-        schema_name: &std::borrow::Cow<'_, str>,
+        schema_name: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
-        if context.schemas.contains_key(schema_name.as_ref()) {
+        if context.schemas.contains_key(schema_name) {
             return Ok(true);
         }
 
@@ -232,8 +235,8 @@ impl DefaultValidateExecutor {
         })
     }
 
-    fn verify_file_exists(&self, path: &std::borrow::Cow<'_, str>) -> Result<bool, AamlError> {
-        if std::path::Path::new(path.as_ref()).exists() {
+    fn verify_file_exists(path: &str) -> Result<bool, AamlError> {
+        if std::path::Path::new(path).exists() {
             return Ok(true);
         }
 
@@ -249,7 +252,7 @@ impl DefaultValidateExecutor {
 
     fn check_no_circular_reference(
         &self,
-        key: &std::borrow::Cow<'_, str>,
+        key: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
         let mut current_key: &str = key;
@@ -292,7 +295,6 @@ impl DefaultValidateExecutor {
     }
 
     fn ensure_derived_schema_complete(
-        &self,
         schema_name: &str,
         current_key: &str,
         context: &ExecutionContext,
@@ -340,8 +342,8 @@ impl DefaultValidateExecutor {
 
     fn check_derive_completeness(
         &self,
-        derive_path: &std::borrow::Cow<'_, str>,
-        current_key: &std::borrow::Cow<'_, str>,
+        derive_path: &str,
+        current_key: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
         if !derive_path.contains("::") {
@@ -349,7 +351,7 @@ impl DefaultValidateExecutor {
         }
 
         for schema_name in Self::derive_schema_names(derive_path) {
-            self.ensure_derived_schema_complete(schema_name, current_key, context)?;
+            Self::ensure_derived_schema_complete(schema_name, current_key, context)?;
         }
 
         Ok(true)
@@ -357,20 +359,22 @@ impl DefaultValidateExecutor {
 
     fn validate_against_schema(
         &self,
-        schema_name: &std::borrow::Cow<'_, str>,
-        key: &std::borrow::Cow<'_, str>,
-        value: &std::borrow::Cow<'_, str>,
+        schema_name: &str,
+        key: &str,
+        value: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
-        let schema_info = context.schemas.get(schema_name.as_ref()).ok_or_else(|| {
-            AamlError::SchemaValidationError {
-                schema: schema_name.to_string(),
-                field: key.to_string(),
-                type_name: "schema".to_string(),
-                details: format!("Schema '{schema_name}' not found"),
-                diagnostics: None,
-            }
-        })?;
+        let schema_info =
+            context
+                .schemas
+                .get(schema_name)
+                .ok_or_else(|| AamlError::SchemaValidationError {
+                    schema: schema_name.to_string(),
+                    field: key.to_string(),
+                    type_name: "schema".to_string(),
+                    details: format!("Schema '{schema_name}' not found"),
+                    diagnostics: None,
+                })?;
 
         if let Err(e) = crate::pipeline::utils::validate_inline_object_against_schema(
             value,
@@ -390,8 +394,7 @@ impl DefaultValidateExecutor {
     }
 
     fn check_schema_completeness(
-        &self,
-        schema_name: &std::borrow::Cow<'_, str>,
+        schema_name: &str,
         missing_fields: &[std::borrow::Cow<'_, str>],
     ) -> Result<bool, AamlError> {
         if missing_fields.is_empty() {
@@ -413,21 +416,21 @@ impl DefaultValidateExecutor {
     }
 
     fn validate_list_elements(
-        &self,
-        key: &std::borrow::Cow<'_, str>,
+        key: &str,
         items: &[crate::pipeline::parser::ValueNode<'_>],
-        element_type: &std::borrow::Cow<'_, str>,
+        element_type: &str,
         context: &ExecutionContext,
     ) -> Result<bool, AamlError> {
-        if element_type.as_ref() == "any"
-            || element_type.as_ref() == "list"
-            || element_type.as_ref() == "object"
-        {
+        if element_type == "any" || element_type == "list" || element_type == "object" {
             return Ok(true);
         }
 
         for item in items {
-            if let Err(e) = self.validate_type_value(&item.to_string(), element_type, context) {
+            if let Err(e) = crate::pipeline::utils::validate_type_value(
+                &item.to_string(),
+                element_type,
+                context,
+            ) {
                 return Err(AamlError::InvalidType {
                     type_name: element_type.to_string(),
                     details: format!("List element invalid in '{key}'"),
@@ -445,8 +448,7 @@ impl DefaultValidateExecutor {
     }
 
     fn validate_object_structure(
-        &self,
-        key: &std::borrow::Cow<'_, str>,
+        key: &str,
         pairs: &[(
             std::borrow::Cow<'_, str>,
             crate::pipeline::parser::ValueNode<'_>,
@@ -486,8 +488,8 @@ impl ValidateExecutor for DefaultValidateExecutor {
             ValidationTask::VerifySchemaExists {
                 schema_name,
                 line: _,
-            } => self.verify_schema_exists(schema_name, context),
-            ValidationTask::VerifyFileExists { path, line: _ } => self.verify_file_exists(path),
+            } => Self::verify_schema_exists(schema_name, context),
+            ValidationTask::VerifyFileExists { path, line: _ } => Self::verify_file_exists(path),
             ValidationTask::CheckNoCircularReference { key, line: _ } => {
                 self.check_no_circular_reference(key, context)
             }
@@ -506,18 +508,18 @@ impl ValidateExecutor for DefaultValidateExecutor {
                 schema_name,
                 missing_fields,
                 line: _,
-            } => self.check_schema_completeness(schema_name, missing_fields),
+            } => Self::check_schema_completeness(schema_name, missing_fields),
             ValidationTask::ValidateListElements {
                 key,
                 items,
                 element_type,
                 line: _,
-            } => self.validate_list_elements(key, items, element_type, context),
+            } => Self::validate_list_elements(key, items, element_type, context),
             ValidationTask::ValidateObjectStructure {
                 key,
                 pairs,
                 line: _,
-            } => self.validate_object_structure(key, pairs),
+            } => Self::validate_object_structure(key, pairs),
         }
     }
 }
@@ -537,35 +539,28 @@ impl DefaultParserExecutor {
     }
 
     fn process_variable(
-        &self,
-        variable_name: &std::borrow::Cow<'_, str>,
-        value: &std::borrow::Cow<'_, str>,
+        variable_name: &str,
+        value: &str,
         line: usize,
         context: &mut ExecutionContext<'_>,
     ) {
-        context.set_value(variable_name.as_ref(), value.as_ref(), line);
+        context.set_value(variable_name, value, line);
     }
 
-    fn manage_scope(
-        &self,
-        scope: &std::borrow::Cow<'_, str>,
-        is_entry: bool,
-        context: &mut ExecutionContext<'_>,
-    ) {
+    fn manage_scope(scope: &str, is_entry: bool, context: &mut ExecutionContext<'_>) {
         if is_entry {
-            context.push_scope(scope.as_ref().to_string());
+            context.push_scope(scope.to_string());
         } else {
             context.pop_scope();
         }
     }
 
     fn execute_directive(
-        &self,
-        directive_name: &std::borrow::Cow<'_, str>,
-        arguments: &std::borrow::Cow<'_, str>,
+        directive_name: &str,
+        arguments: &str,
         line: usize,
     ) -> Result<(), AamlError> {
-        match directive_name.as_ref() {
+        match directive_name {
             "import" | "derive" => Ok(()),
             _ => Err(AamlError::ParseError {
                 line,
@@ -581,9 +576,8 @@ impl DefaultParserExecutor {
     }
 
     fn register_type(
-        &self,
-        type_name: &std::borrow::Cow<'_, str>,
-        type_spec: &std::borrow::Cow<'_, str>,
+        type_name: &str,
+        type_spec: &str,
         line: usize,
         context: &mut ExecutionContext<'_>,
     ) {
@@ -594,8 +588,8 @@ impl DefaultParserExecutor {
         };
 
         context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
-            name: type_name.as_ref().into(),
-            spec: type_spec.as_ref().into(),
+            name: type_name.into(),
+            spec: type_spec.into(),
             validator: None,
             default_value: inferred_default.map(Into::into),
             metadata: new_pipeline_hash_map(),
@@ -603,7 +597,7 @@ impl DefaultParserExecutor {
         });
     }
 
-    fn parse_schema_fields(&self, fields: &str) -> PipelineHashMap<SmolStr, (SmolStr, bool)> {
+    fn parse_schema_fields(fields: &str) -> PipelineHashMap<SmolStr, (SmolStr, bool)> {
         let mut schema_fields = new_pipeline_hash_map();
 
         for field_def in fields.split(',') {
@@ -628,7 +622,6 @@ impl DefaultParserExecutor {
     }
 
     fn auto_register_list_types(
-        &self,
         schema_fields: &PipelineHashMap<SmolStr, (SmolStr, bool)>,
         line: usize,
         context: &mut ExecutionContext<'_>,
@@ -655,23 +648,22 @@ impl DefaultParserExecutor {
     }
 
     fn register_schema(
-        &self,
-        schema_name: &std::borrow::Cow<'_, str>,
+        schema_name: &str,
         fields: &str,
         line: usize,
         context: &mut ExecutionContext<'_>,
     ) {
-        let schema_fields = self.parse_schema_fields(fields);
-        self.auto_register_list_types(&schema_fields, line, context);
+        let schema_fields = Self::parse_schema_fields(fields);
+        Self::auto_register_list_types(&schema_fields, line, context);
 
         context.register_schema(crate::pipeline::execution_descriptor::SchemaInfo {
-            name: schema_name.as_ref().into(),
+            name: schema_name.into(),
             fields: schema_fields,
             line,
         });
 
         context.register_type(crate::pipeline::execution_descriptor::TypeInfo {
-            name: schema_name.as_ref().into(),
+            name: schema_name.into(),
             spec: "schema".into(),
             validator: None,
             default_value: Some("{}".into()),
@@ -682,7 +674,7 @@ impl DefaultParserExecutor {
 
     fn resolve_derive_import<'a>(
         &self,
-        derive_path: &std::borrow::Cow<'_, str>,
+        derive_path: &str,
         arena: &'a Bump,
         context: &mut ExecutionContext<'a>,
     ) -> Result<(), AamlError> {
@@ -743,13 +735,12 @@ impl DefaultParserExecutor {
     }
 
     fn resolve_module_reference(
-        &self,
-        module_name: &std::borrow::Cow<'_, str>,
-        scope: &std::borrow::Cow<'_, str>,
+        module_name: &str,
+        scope: &str,
         context: &ExecutionContext<'_>,
     ) -> Result<(), AamlError> {
         if !context.imported_files.contains(module_name)
-            && !context.schemas.contains_key(module_name.as_ref())
+            && !context.schemas.contains_key(module_name)
         {
             return Err(AamlError::NotFound {
                 key: module_name.to_string(),
@@ -786,7 +777,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 scope: _,
                 line,
             } => {
-                self.process_variable(variable_name, value, *line, context);
+                Self::process_variable(variable_name, value, *line, context);
                 Ok(())
             }
 
@@ -795,7 +786,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 is_entry,
                 line: _,
             } => {
-                self.manage_scope(scope, *is_entry, context);
+                Self::manage_scope(scope, *is_entry, context);
                 Ok(())
             }
 
@@ -803,14 +794,14 @@ impl ParserExecutor for DefaultParserExecutor {
                 directive_name,
                 arguments,
                 line,
-            } => self.execute_directive(directive_name, arguments, *line),
+            } => Self::execute_directive(directive_name, arguments, *line),
 
             ParseTask::RegisterType {
                 type_name,
                 type_spec,
                 line,
             } => {
-                self.register_type(type_name, type_spec, *line, context);
+                Self::register_type(type_name, type_spec, *line, context);
                 Ok(())
             }
 
@@ -819,7 +810,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 fields,
                 line,
             } => {
-                self.register_schema(schema_name, fields, *line, context);
+                Self::register_schema(schema_name, fields, *line, context);
                 Ok(())
             }
 
@@ -832,7 +823,7 @@ impl ParserExecutor for DefaultParserExecutor {
                 module_name,
                 scope,
                 line: _,
-            } => self.resolve_module_reference(module_name, scope, context),
+            } => Self::resolve_module_reference(module_name, scope, context),
         }
     }
 }

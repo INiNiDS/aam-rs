@@ -25,19 +25,11 @@ pub trait Validator: Send + Sync {
     /// # Returns
     /// - `Ok(Vec<ValidationTask>)` containing all validation tasks to be executed
     /// - `Err(AamlError)` if AST analysis itself fails (e.g., syntax errors)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if AST analysis fails or the validator cannot produce tasks.
-    fn validate<'a>(&self, ast: &[AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError>;
+    fn validate<'a>(&self, ast: &'a [AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError>;
 
     /// Performs quick syntactic checks that don't require deferred validation.
     ///
     /// This is called immediately during parsing to catch obvious issues early.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the AST contains malformed assignments or directives.
     fn check_syntax(&self, ast: &[AstNode<'_>]) -> Result<(), AamlError>;
 }
 
@@ -94,8 +86,8 @@ impl DefaultValidator {
 
     fn build_value_tasks<'a>(
         tasks: &mut Vec<ValidationTask<'a>>,
-        key: &std::borrow::Cow<'a, str>,
-        value: &ValueNode<'a>,
+        key: &str,
+        value: &'a ValueNode<'a>,
         line: usize,
     ) {
         match value {
@@ -123,12 +115,12 @@ impl DefaultValidator {
 
     /// Generates validation tasks for an assignment node.
     fn generate_assignment_tasks<'a>(
-        key: std::borrow::Cow<'a, str>,
-        value: &ValueNode<'a>,
+        key: &std::borrow::Cow<'a, str>,
+        value: &'a ValueNode<'a>,
         line: usize,
     ) -> Vec<ValidationTask<'a>> {
         let mut tasks = Vec::new();
-        Self::build_value_tasks(&mut tasks, &key, value, line);
+        Self::build_value_tasks(&mut tasks, key, value, line);
 
         // Check for circular references
         tasks.push(ValidationTask::CheckNoCircularReference {
@@ -141,35 +133,21 @@ impl DefaultValidator {
 
     /// Generates validation tasks for a directive node.
     fn generate_directive_tasks<'a>(
-        name: std::borrow::Cow<'a, str>,
+        name: &std::borrow::Cow<'a, str>,
         args: std::borrow::Cow<'a, str>,
         line: usize,
     ) -> Vec<ValidationTask<'a>> {
-        let mut tasks = Vec::new();
-
-        match name.as_ref() {
-            "import" if !args.is_empty() => {
-                tasks.push(ValidationTask::VerifyFileExists {
-                    path: args.to_string().into(),
-                    line,
-                });
-            }
-            "derive" => {
-                tasks.push(ValidationTask::CheckDeriveCompleteness {
-                    derive_path: args.to_string().into(),
-                    current_key: std::borrow::Cow::Borrowed(""), // AAM v2 check aam.ininids.in.rs
-                    line,
-                });
-            }
-            "schema" | "type" => {
-                // Nothing need to validate
-            }
-            _ => {
-                // Unknown directive - execution stage will handle it
-            }
+        if name.as_ref() == "derive" {
+            return vec![ValidationTask::CheckDeriveCompleteness {
+                derive_path: args,
+                current_key: std::borrow::Cow::Borrowed(""),
+                line,
+            }];
         }
 
-        tasks
+        // Directives are validated and executed in the execution phase.
+        // The validator stage only needs to add extra checks for derive.
+        Vec::new()
     }
 }
 
@@ -180,7 +158,7 @@ impl Default for DefaultValidator {
 }
 
 impl Validator for DefaultValidator {
-    fn validate<'a>(&self, ast: &[AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError> {
+    fn validate<'a>(&self, ast: &'a [AstNode<'a>]) -> Result<Vec<ValidationTask<'a>>, AamlError> {
         // First, perform syntactic checks
         self.check_syntax(ast)?;
 
@@ -190,7 +168,7 @@ impl Validator for DefaultValidator {
         for node in ast {
             match node {
                 AstNode::Assignment { key, value, line } => {
-                    let node_tasks = Self::generate_assignment_tasks(key.clone(), value, *line);
+                    let node_tasks = Self::generate_assignment_tasks(key, value, *line);
                     tasks.extend(node_tasks);
                 }
                 AstNode::Directive {
@@ -199,8 +177,7 @@ impl Validator for DefaultValidator {
                     line,
                     body: _,
                 } => {
-                    let node_tasks =
-                        Self::generate_directive_tasks(name.clone(), args.clone(), *line);
+                    let node_tasks = Self::generate_directive_tasks(name, args.clone(), *line);
                     tasks.extend(node_tasks);
                 }
             }
@@ -226,12 +203,7 @@ impl Validator for DefaultValidator {
                         });
                     }
                 }
-                AstNode::Directive {
-                    name,
-                    args: _,
-                    line,
-                    body: _,
-                } => {
+                AstNode::Directive { name, line, .. } => {
                     if name.is_empty() {
                         return Err(AamlError::ParseError {
                             line: *line,
@@ -260,7 +232,8 @@ mod tests {
             line: 1,
         };
         let validator = DefaultValidator::new();
-        let tasks = validator.validate(&[node]).unwrap();
+        let nodes = [node];
+        let tasks = validator.validate(&nodes).unwrap();
         assert!(!tasks.is_empty()); // Should generate validation tasks
     }
 
@@ -289,7 +262,8 @@ mod tests {
             line: 1,
         };
         let validator = DefaultValidator::new();
-        let tasks = validator.validate(&[node]).unwrap();
+        let nodes = [node];
+        let tasks = validator.validate(&nodes).unwrap();
 
         // Should have generated ValidateListElements task among others
         let has_list_task = tasks
@@ -312,7 +286,8 @@ mod tests {
             line: 1,
         };
         let validator = DefaultValidator::new();
-        let tasks = validator.validate(&[node]).unwrap();
+        let nodes = [node];
+        let tasks = validator.validate(&nodes).unwrap();
 
         // Should have generated ValidateObjectStructure task among others
         let has_object_task = tasks
