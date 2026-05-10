@@ -1,6 +1,6 @@
 [package]
 name = "aam-rs"
-version = "2.5.1"
+version = "2.6.0"
 description = "A Rust implementation of the Abstract Alias Mapping (AAM) framework for aliasing and maping aam files."
 license = "MIT OR Apache-2.0"
 repository = "https://gitlab.com/aam-rs/aam-rs"
