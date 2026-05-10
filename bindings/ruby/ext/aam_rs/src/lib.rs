@@ -6,11 +6,13 @@ use magnus::{Error, Module, Object, RArray, Ruby, TryConvert, function, method};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+// Helper to convert internal errors to Ruby RuntimeErrors
 fn ruby_runtime_error(message: String) -> Error {
     let ruby = Ruby::get().expect("Ruby VM must be initialized");
     Error::new(ruby.exception_runtime_error(), message)
 }
 
+// Helper to extract the first error message from a vector
 fn first_error(errors: Vec<AamlError>) -> AamlError {
     errors
         .into_iter()
@@ -127,6 +129,29 @@ impl RubySchemaField {
     }
 }
 
+// --- RubyInlineObject ---
+#[magnus::wrap(class = "AamRb::InlineObject", free_immediately, size)]
+pub struct RubyInlineObject {
+    // Wrapped in RefCell to allow interior mutability for Ruby methods
+    pub(crate) inner: RefCell<InlineObject>,
+}
+
+impl RubyInlineObject {
+    pub fn new() -> Self {
+        Self {
+            inner: RefCell::new(InlineObject::new()),
+        }
+    }
+
+    pub fn add(&self, key: String, value: String) {
+        self.inner.borrow_mut().add_field(&key, &value);
+    }
+
+    pub fn to_s(&self) -> String {
+        self.inner.borrow().to_string()
+    }
+}
+
 // --- RubyAamBuilder ---
 #[magnus::wrap(class = "AamRb::AAMBuilder", free_immediately, size)]
 pub struct RubyAamBuilder {
@@ -158,7 +183,6 @@ impl RubyAamBuilder {
         let fields_raw: Vec<SchemaField> = fields
             .into_iter()
             .map(|item| {
-                // Вызываем try_convert у целевого типа, передавая Value
                 let f = <&RubySchemaField>::try_convert(item)?;
                 Ok(f.inner.clone())
             })
@@ -172,7 +196,6 @@ impl RubyAamBuilder {
         let fields_raw: Vec<SchemaField> = fields
             .into_iter()
             .map(|item| {
-                // Аналогично для schema_multiline
                 let f = <&RubySchemaField>::try_convert(item)?;
                 Ok(f.inner.clone())
             })
@@ -195,9 +218,9 @@ impl RubyAamBuilder {
     }
 
     pub fn add_inline(&self, key: String, obj: &RubyInlineObject) {
-        self.inner
-            .borrow_mut()
-            .add_line(&key, &obj.inner.to_string());
+        // Access the RefCell inner value of the inline object
+        let val = obj.inner.borrow().to_string();
+        self.inner.borrow_mut().add_line(&key, &val);
     }
 
     pub fn as_string(&self) -> String {
@@ -205,29 +228,7 @@ impl RubyAamBuilder {
     }
 }
 
-// --- RubyInlineObject ---
-#[magnus::wrap(class = "AamRb::InlineObject", free_immediately, size)]
-pub struct RubyInlineObject {
-    inner: InlineObject,
-}
-
-impl RubyInlineObject {
-    pub fn new() -> Self {
-        Self {
-            inner: InlineObject::new(),
-        }
-    }
-
-    pub fn add(&mut self, key: String, value: String) {
-        self.inner.add_field(&key, &value);
-    }
-
-    pub fn to_s(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-/// Parse an inline object string into a Ruby Hash.
+/// Parse an inline object string into a Ruby Hash (BTreeMap in Rust).
 fn ruby_parse_inline_to_map(content: String) -> Result<BTreeMap<String, String>, Error> {
     aam_rs::builder::parse_inline_to_map(&content)
         .map(|m| m.into_iter().collect())
@@ -239,6 +240,7 @@ fn ruby_parse_inline_to_map(content: String) -> Result<BTreeMap<String, String>,
 fn init(ruby: &Ruby) -> Result<(), Error> {
     let module = ruby.define_module("AamRb")?;
 
+    // AAM
     let aam_class = module.define_class("AAM", ruby.class_object())?;
     aam_class.define_singleton_method("new", function!(RubyAam::new, 0))?;
     aam_class.define_singleton_method("parse", function!(RubyAam::parse, 1))?;
@@ -253,12 +255,14 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     aam_class.define_method("schema_names", method!(RubyAam::schema_names, 0))?;
     aam_class.define_method("type_names", method!(RubyAam::type_names, 0))?;
 
+    // SchemaField
     let schema_field_class = module.define_class("SchemaField", ruby.class_object())?;
     schema_field_class
         .define_singleton_method("required", function!(RubySchemaField::required, 2))?;
     schema_field_class
         .define_singleton_method("optional", function!(RubySchemaField::optional, 2))?;
 
+    // AAMBuilder
     let builder_class = module.define_class("AAMBuilder", ruby.class_object())?;
     builder_class.define_singleton_method("new", function!(RubyAamBuilder::new, 0))?;
     builder_class
@@ -276,11 +280,13 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     builder_class.define_method("add_inline", method!(RubyAamBuilder::add_inline, 2))?;
     builder_class.define_method("as_string", method!(RubyAamBuilder::as_string, 0))?;
 
+    // InlineObject
     let inline_class = module.define_class("InlineObject", ruby.class_object())?;
     inline_class.define_singleton_method("new", function!(RubyInlineObject::new, 0))?;
     inline_class.define_method("add", method!(RubyInlineObject::add, 2))?;
     inline_class.define_method("to_s", method!(RubyInlineObject::to_s, 0))?;
 
+    // Module functions
     module.define_module_function(
         "parse_inline_to_map",
         function!(ruby_parse_inline_to_map, 1),
