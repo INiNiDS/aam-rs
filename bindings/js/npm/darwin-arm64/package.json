@@ -1,6 +1,6 @@
 {
   "name": "aam-nodejs-darwin-arm64",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "license": "MIT OR Apache-2.0",
   "os": [
     "darwin"

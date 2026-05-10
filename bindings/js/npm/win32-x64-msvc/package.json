@@ -1,6 +1,6 @@
 {
   "name": "aam-nodejs-win32-x64-msvc",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "license": "MIT OR Apache-2.0",
   "os": [
     "win32"
