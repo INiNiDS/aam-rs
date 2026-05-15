@@ -2,6 +2,8 @@
 mod tests {
     use aam_rs::aam::AAM;
     use aam_rs::builder::{AAMBuilder, SchemaField};
+    use aam_rs::found_value::FoundValue;
+    use std::fs;
 
     #[test]
     fn color_not_treated_as_comment() {
@@ -246,5 +248,119 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_multiline() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let base_path = dir.path();
+
+        let file_path = base_path.join("multiline.aam");
+        let child_path = base_path.join("multiline_child.aam");
+
+        let mut b = AAMBuilder::new();
+        b.schema_multiline(
+            "Multiline",
+            vec![
+                SchemaField::required("id", "i32"),
+                SchemaField::required("name", "string"),
+                SchemaField::required("deps", "list<string>"),
+            ],
+        )
+        .schema_multiline(
+            "Base",
+            vec![SchemaField::required("multiline", "Multiline")],
+        )
+        .to_file(&file_path)
+        .expect("Failed to write AAM file");
+        let content = r#"
+        multiline = {
+            id = 32,
+            name = Usein,
+            deps = [
+                "a",
+                "b",
+                "c"
+            ]
+        }
+        "#;
+        fs::write(&child_path, content).expect("Failed to write child AAM file");
+        let doc = AAM::load(child_path).expect("Should succeed");
+        let parsed_doc = FoundValue::new(doc.get("multiline").expect("multiline key should exist"))
+            .as_object()
+            .expect("multiline value should be an object");
+        let parsed_deps =
+            FoundValue::new(parsed_doc.get("deps").expect("Multiline deps should exist"))
+                .parse_list::<String>()
+                .expect("deps should be a list")
+                .expect("deps should be parsed successfully");
+        assert_eq!(parsed_deps, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn quoted_list_items_with_commas_inside() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let base_path = dir.path();
+
+        let file_path = base_path.join("quoted_list.aam");
+        let child_path = base_path.join("quoted_list_child.aam");
+
+        let mut b = AAMBuilder::new();
+        b.schema_multiline(
+            "Post",
+            vec![
+                SchemaField::required("id", "i32"),
+                SchemaField::required("tags", "list<string>"),
+            ],
+        )
+        .to_file(&file_path)
+        .expect("Failed to write AAM file");
+
+        let content = r#"
+        id = 1
+        tags = ["hello, world", "rust, aam", plain]
+        "#;
+        fs::write(&child_path, content).expect("Failed to write child AAM file");
+        let doc = AAM::load(child_path).expect("Should succeed");
+        let tags = FoundValue::new(doc.get("tags").expect("tags should exist"))
+            .parse_list::<String>()
+            .expect("tags should be a list")
+            .expect("tags should be parsed successfully");
+        assert_eq!(tags, vec!["hello, world", "rust, aam", "plain"]);
+    }
+
+    #[test]
+    fn quoted_list_items_single_quotes() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let base_path = dir.path();
+
+        let file_path = base_path.join("single_quote_list.aam");
+        let child_path = base_path.join("single_quote_list_child.aam");
+
+        let mut b = AAMBuilder::new();
+        b.schema_multiline("Data", vec![SchemaField::required("items", "list<string>")])
+            .to_file(&file_path)
+            .expect("Failed to write AAM file");
+
+        let content = r#"
+        items = ['a, b', 'c, d', plain]
+        "#;
+        fs::write(&child_path, content).expect("Failed to write child AAM file");
+        let doc = AAM::load(child_path).expect("Should succeed");
+        let items = FoundValue::new(doc.get("items").expect("items should exist"))
+            .parse_list::<String>()
+            .expect("items should be a list")
+            .expect("items should be parsed successfully");
+        assert_eq!(items, vec!["a, b", "c, d", "plain"]);
+    }
+
+    #[test]
+    fn quoted_list_items_no_schema() {
+        let content = r#"tags = ["rust, aam", "cli, tool", simple]"#;
+        let doc = AAM::parse(content).expect("parse should succeed");
+        assert_eq!(
+            doc.get("tags"),
+            Some("[\"rust, aam\", \"cli, tool\", simple]")
+        );
     }
 }

@@ -348,8 +348,47 @@ fn split_assignment(line: &str) -> Option<(&str, &str)> {
 }
 
 fn should_use_pipeline_compile(text: &str) -> bool {
-    text.lines()
+    if text
+        .lines()
         .any(|line| strip_comment(line).trim_start().starts_with('@'))
+    {
+        return true;
+    }
+    has_multiline_block(text)
+}
+
+fn has_multiline_block(text: &str) -> bool {
+    let mut depth: i32 = 0;
+    for line in text.lines() {
+        let line = strip_comment(line);
+        let mut in_string = false;
+        let mut string_char = '"';
+        for ch in line.chars() {
+            if in_string {
+                if ch == string_char {
+                    in_string = false;
+                }
+                continue;
+            }
+            match ch {
+                '"' | '\'' => {
+                    in_string = true;
+                    string_char = ch;
+                }
+                '{' | '[' => depth += 1,
+                '}' | ']' => {
+                    if depth > 0 {
+                        depth -= 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth > 0 {
+            return true;
+        }
+    }
+    false
 }
 
 fn parse_assignment_line(

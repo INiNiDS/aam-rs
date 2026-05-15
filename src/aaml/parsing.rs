@@ -258,17 +258,23 @@ pub fn parse_inline_object(value: &str) -> Result<Vec<(String, String)>, AamlErr
         .collect()
 }
 
-/// Splits `s` on commas that are not inside `{}` or `[]` nesting.
+/// Splits `s` on commas that are not inside `{}`, `[]`, or quotes.
 fn split_top_level_fields(s: &str) -> Vec<&str> {
     let mut items = Vec::new();
     let mut depth: i32 = 0;
     let mut start = 0;
+    let mut in_quote: Option<char> = None;
 
     for (i, ch) in s.char_indices() {
         match ch {
-            '{' | '[' => depth += 1,
-            '}' | ']' => depth -= 1,
-            ',' if depth == 0 => {
+            '"' | '\'' => match in_quote {
+                Some(q) if q == ch => in_quote = None,
+                None => in_quote = Some(ch),
+                _ => {}
+            },
+            '{' | '[' if in_quote.is_none() => depth += 1,
+            '}' | ']' if in_quote.is_none() => depth -= 1,
+            ',' if depth == 0 && in_quote.is_none() => {
                 items.push(&s[start..i]);
                 start = i + 1;
             }

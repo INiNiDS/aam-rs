@@ -16,6 +16,7 @@
 //! ```
 
 use crate::aaml::AAML;
+use crate::aaml::parsing::unwrap_quotes;
 use crate::error::AamlError;
 use crate::types::Type;
 use crate::types::primitive_type::PrimitiveType;
@@ -59,21 +60,30 @@ pub fn split_top_level(s: &str) -> Vec<String> {
     let mut items = Vec::new();
     let mut depth: i32 = 0;
     let mut cur = String::new();
+    let mut in_quote: Option<char> = None;
 
     for ch in s.chars() {
         match ch {
-            '{' | '[' => {
+            '"' | '\'' => {
+                match in_quote {
+                    Some(q) if q == ch => in_quote = None,
+                    None => in_quote = Some(ch),
+                    _ => {}
+                }
+                cur.push(ch);
+            }
+            '{' | '[' if in_quote.is_none() => {
                 depth += 1;
                 cur.push(ch);
             }
-            '}' | ']' => {
+            '}' | ']' if in_quote.is_none() => {
                 depth -= 1;
                 cur.push(ch);
             }
-            ',' if depth == 0 => {
+            ',' if depth == 0 && in_quote.is_none() => {
                 let t = cur.trim().to_string();
                 if !t.is_empty() {
-                    items.push(t);
+                    items.push(unwrap_quotes(&t).to_string());
                 }
                 cur.clear();
             }
@@ -84,7 +94,7 @@ pub fn split_top_level(s: &str) -> Vec<String> {
     }
     let t = cur.trim().to_string();
     if !t.is_empty() {
-        items.push(t);
+        items.push(unwrap_quotes(&t).to_string());
     }
     items
 }
