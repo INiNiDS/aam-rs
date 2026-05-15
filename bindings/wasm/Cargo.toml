@@ -2,7 +2,7 @@
 name = "aam-wasm"
 description = "Wasm bindings for the AAM framework implemented in Rust."
 repository = "https://github.com/ininids/aam-rs/tree/main/wasm"
-version = "2.6.0"
+version = "2.7.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
