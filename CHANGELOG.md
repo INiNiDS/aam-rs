@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.7.0](https://github.com/INiNiDS/aam-rs/compare/2.6.0...2.7.0) - 2026-05-15
+
+### Added
+
+- enhance parsing logic to handle quoted strings and improve field splitting (AAM v1.1)
+
+### Other
+
+- update version to 2.7.0 across multiple project files
+- Update origin story in README.md for AAM
+
 ## [2.6.0](https://github.com/INiNiDS/aam-rs/compare/2.5.1...2.6.0) - 2026-05-10
 
 ### Added
