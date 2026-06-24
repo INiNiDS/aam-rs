@@ -297,7 +297,7 @@ impl AAM {
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&str> {
         match &self.backend {
-            AamBackend::Dynamic(output) => output.map.get(key).map(std::convert::AsRef::as_ref),
+            AamBackend::Dynamic(output) => output.map.get(key).map(AsRef::as_ref),
             #[cfg(feature = "aot")]
             AamBackend::Mapped(mapped) => mapped.get(key),
         }
