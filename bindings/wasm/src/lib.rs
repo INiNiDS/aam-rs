@@ -67,7 +67,8 @@ fn parse_assignment(line: &str) -> Option<(&str, &str)> {
     Some((key, line[idx + 1..].trim()))
 }
 
-#[wasm_bindgen]
+// Fixed: Added js_class = AAMBuilder to match js_name = AAMBuilder on the struct
+#[wasm_bindgen(js_class = AAMBuilder)]
 impl WasmAamBuilder {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmAamBuilder {
@@ -135,7 +136,8 @@ impl Default for WasmInlineObject {
     }
 }
 
-#[wasm_bindgen]
+// Fixed: Added js_class = InlineObject to match js_name = InlineObject on the struct
+#[wasm_bindgen(js_class = InlineObject)]
 impl WasmInlineObject {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmInlineObject {
@@ -288,7 +290,7 @@ impl AamDocument {
     }
 }
 
-#[wasm_bindgen(js_name = splitAam)]
+#[wasm_bindgen]
 pub fn split_aam(content: &str) -> js_sys::Object {
     let result = js_sys::Object::new();
     let mut current_name: Option<String> = None;
@@ -336,7 +338,7 @@ pub fn split_aam(content: &str) -> js_sys::Object {
 #[wasm_bindgen(js_name = TOMLTranslator)]
 pub struct WasmTOMLTranslator;
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = TOMLTranslator)]
 impl WasmTOMLTranslator {
     #[wasm_bindgen(js_name = tomlToAAM)]
     pub fn toml_to_aam(toml_source: &str) -> Result<js_sys::Array, JsValue> {
