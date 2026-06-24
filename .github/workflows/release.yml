@@ -47,6 +47,8 @@ jobs:
           components: rustfmt
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Install cargo-binstall
         run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
       - name: Install cargo-msrv via binstall
@@ -75,6 +77,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Build Rust library with FFI
         run: cargo build --release --features ffi
       - name: Set up Go
@@ -98,6 +102,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -122,6 +128,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Build Rust library with FFI
         run: cargo build --release --features ffi,csharp
       - name: Setup .NET
@@ -296,6 +304,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -823,6 +833,8 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
       - name: Build release library for FFI
         run: cargo build --release --features ffi --target ${{ matrix.target }}
       - name: Upload C# native artifact

@@ -1,4 +1,4 @@
-use aam_rs::aam::{AAM, AamLspAssist};
+use aam_rs::aam::{AamDocument as CoreAamDocument, AamLspAssist};
 use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
@@ -15,9 +15,9 @@ fn first_js_error(errors: Vec<AamlError>) -> JsValue {
     JsValue::from_str(&err.to_string())
 }
 
-#[wasm_bindgen(js_name = AAM)]
+#[wasm_bindgen]
 pub struct AamDocument {
-    inner: AAM,
+    inner: CoreAamDocument,
 }
 
 #[wasm_bindgen(js_name = AAMBuilder)]
@@ -171,7 +171,7 @@ pub fn wasm_parse_inline_to_map(content: &str) -> Result<js_sys::Object, JsValue
 impl AamDocument {
     #[wasm_bindgen(constructor)]
     pub fn new(content: &str) -> Result<AamDocument, JsValue> {
-        let inner = AAM::parse(content).map_err(first_js_error)?;
+        let inner = CoreAamDocument::parse(content).map_err(first_js_error)?;
         Ok(Self { inner })
     }
 
@@ -271,7 +271,7 @@ impl AamDocument {
     #[wasm_bindgen(js_name = lspAssist)]
     pub fn lsp_assist(content: &str) -> JsValue {
         let rules = FormatterRules::default();
-        let assist: AamLspAssist = AAM::lsp_assist(content, &rules);
+        let assist: AamLspAssist = CoreAamDocument::lsp_assist(content, &rules);
 
         let obj = js_sys::Object::new();
         let diagnostics = js_sys::Array::new();

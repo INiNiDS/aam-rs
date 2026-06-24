@@ -4,12 +4,12 @@ Source of truth: `wasm/src/lib.rs`.
 
 ## Exported Class
 
-- `AAM` (JS name for `AamDocument`)
+- `AamDocument`
 - `AAMBuilder` (JS name for `WasmAamBuilder`)
 
 ## Construction
 
-- `new AAM(content: string)`
+- `new AamDocument(content: string)`
 
 ## Instance Methods
 
@@ -26,7 +26,7 @@ Source of truth: `wasm/src/lib.rs`.
 
 ## Static Helper
 
-- `AAM.lspAssist(content: string): { diagnostics: string[]; formatted: string | null }`
+- `AamDocument.lspAssist(content: string): { diagnostics: string[]; formatted: string | null }`
 - `splitAam(content: string): Record<string, string>`
 
 ## Builder Methods

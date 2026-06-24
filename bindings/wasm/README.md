@@ -21,7 +21,7 @@ wasm-pack test --node wasm
 ```javascript
 const wasm = require('./pkg/aam_wasm.js')
 
-const doc = new wasm.AAM('host = localhost\nport = 8080')
+const doc = new wasm.AamDocument('host = localhost\nport = 8080')
 console.log(doc.get('host'))
 ```
 
@@ -30,7 +30,7 @@ console.log(doc.get('host'))
 ```javascript
 const wasm = require('./pkg/aam_wasm.js')
 
-const doc = new wasm.AAM('root_path = srv_app\nactive_path = root_path\nmode = active')
+const doc = new wasm.AamDocument('root_path = srv_app\nactive_path = root_path\nmode = active')
 console.log(doc.deepSearch('path'))
 console.log(doc.reverseSearch('active'))
 ```
