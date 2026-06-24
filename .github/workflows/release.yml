@@ -16,6 +16,9 @@ permissions:
   attestations: write
   packages: write
 
+env:
+  CARGO_HTTP_MULTIPLEXING: "false"
+
 jobs:
   generate-credits:
     name: Generate Licenses (CREDITS)
