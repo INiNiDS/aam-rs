@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.7.1](https://github.com/INiNiDS/aam-rs/compare/2.7.0...2.7.1) - 2026-06-24
+
+### Other
+
+- Merge pull request #33 from INiNiDS/dependabot/npm_and_yarn/bindings/js/js-yaml-4.2.0
+- *(ci)* update release workflow to use `GITHUB_TOKEN` instead of `TAG_TOKEN`
+- *(wasm)* add `js_class` annotations for consistency across bindings
+- *(wasm)* simplify `AamDocument` struct by replacing `CoreAamDocument` with `AAM`
+- *(wasm)* rename `AAM` to `AamDocument` for consistency across bindings and documentation
+- bumped PyO3 version to 0.29.0
+
 ## [2.7.0](https://github.com/INiNiDS/aam-rs/compare/2.6.0...2.7.0) - 2026-05-15
 
 ### Added
