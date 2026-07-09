@@ -2,15 +2,21 @@
 
 ## Project overview
 
-`aam-rs` is a Rust library that parses `.aam` (AAM) configuration files: a line-based `key = value` format with
+`aam-rs` is a Rust workspace that parses `.aam` (AAM) configuration files: a line-based `key = value` format with
 directives (`@import`, `@derive`, `@schema`, `@type`), schema-based type validation, bidirectional lookup, and deep
-reference resolution. The crate now exposes both the legacy `AAML` API and a newer pipeline-backed `AAM` API with
-optional AOT (`.aam.bin`) loading.
+reference resolution. The workspace contains:
+
+- `aam-core` — parser, type system, pipeline, AOT cache, and language-binding entry points.
+- `aam-derive` — procedural macros (`#[derive(FromAam)]`, `schema_to_struct!`).
+- `aam-rs` — thin facade crate that re-exports `aam-core` and `aam-derive`.
+
+The crates expose both the legacy `AAML` API and a newer pipeline-backed `AAM` API with optional AOT (`.aam.bin`)
+loading.
 
 ## Architecture
 
 ```
-src/
+aam-core/src/
   lib.rs               — public re-exports
   aaml/                — legacy/core AAML struct (split across several impl files)
     mod.rs             — struct definition, AAML::new/parse/load, register_default_commands
@@ -38,8 +44,16 @@ src/
   types_aam/           — pipeline (`AAM`) type validation system (TypeAAM + resolve_builtin)
   found_value.rs       — FoundValue wrapper (as_str, as_list, as_object, Deref<str>)
   builder.rs           — AAMBuilder fluent API for programmatic .aam generation
+  reconstructer.rs     — schema reconstruction from AAM instances (infers @schema definitions)
   error.rs             — AamlError enum (typed errors)
   ffi.rs/python.rs/jni.rs — optional language binding entry points (feature-gated)
+  from_aam.rs          — `FromAam` trait used by the derive macro
+  de.rs                — serde deserializer for `.aam` content (feature-gated)
+  macros.rs            — `define_aam_loader!` and related macros
+aam-derive/src/
+  lib.rs               — `#[derive(FromAam)]` and `schema_to_struct!` proc-macro implementations
+aam-rs/src/
+  lib.rs               — facade re-exports from `aam-core` and `aam-derive`
 ```
 
 **AAML methods are split across impl blocks in separate files** — `mod.rs`, `lookup.rs`, and `validation.rs` all `impl AAML`. Check all three when tracing a method.
@@ -47,13 +61,13 @@ src/
 ## Developer workflows
 
 ```sh
-cargo test                          # run all unit + integration tests
-cargo run --example standard        # run an individual example
+cargo test --workspace              # run all unit + integration tests
+cargo run --example standard        # run an individual example (facade crate)
 cargo run --example advanced        # schema/derive/list demo
 cargo run --example standard_stress # stress demo / larger input path
-cargo test --features serde         # test with serde feature
-cargo test --features aot           # explicitly include AOT cache/load tests
-cargo test --features perf-hash     # test with ahash hasher
+cargo test --workspace --features serde         # test with serde feature
+cargo test --workspace --features aot           # explicitly include AOT cache/load tests (also enabled by default)
+cargo test --workspace --features perf-hash     # test with ahash hasher
 ```
 
 Examples that need `.aam` files call `std::env::set_current_dir` to `examples/` — keep paired `.aam` files there (e.g. `advanced_base.aam` / `advanced_child.aam`).
@@ -84,25 +98,50 @@ All lookup methods return `Option<FoundValue>`. It implements `Deref<Target = st
 | `hash-std`                                                  | Default pipeline hasher (`std::collections::hash_map::RandomState`)                |
 | `hash-fx` / `hash-ahash` / `hash-rapidhash` / `hash-ripemd` | Alternate pipeline hashers (mutually exclusive)                                    |
 | `perf-hash`                                                 | Swaps `HashMap` hasher to `ahash::RandomState` for better throughput               |
-| `aot`                                                       | Enables `src/aot/` cooked binary cache and `AAM::load` fast-path                   |
-| `ffi` / `python` / `jni` / `csharp`                         | Enables language binding surfaces                                                  |
+| `aot`                                                       | Enables `src/aot/` cooked binary cache and `AAM::load` fast-path (default)         |
+| `legacy`                                                    | Enables the deprecated `AAML` API, `commands`, and `src/types/` validators         |
+| `ffi` / `python` / `jni` / `csharp`                         | Enables language binding surfaces (`csharp` only affects the facade build script)  |
 | `parallel`                                                  | Enables parallel parse-task pre-validation in pipeline                             |
 | `serde`                                                     | Derives `Serialize`/`Deserialize` on `FoundValue`, `SchemaDef`, `AAMBuilder`, etc. |
+| `reconstructer`                                             | Enables `src/reconstructer.rs` — schema reconstruction from AAM instances          |
+| `rust-only`                                                 | Marker feature for Rust-only builds. Used in CI/CD to gate Rust-exclusive APIs.    |
+
+## CI/CD workflows
+
+| Workflow file                    | Trigger                  | Purpose                                                        |
+|----------------------------------|--------------------------|----------------------------------------------------------------|
+| `.github/workflows/build.yml`    | `workflow_dispatch`      | Manual build with per-target publish toggles + `rust_only` flag |
+| `.github/workflows/release.yml`  | `push: main`             | Full release: validates all bindings, publishes all packages    |
+| `.github/workflows/release-rust-only.yml` | `workflow_dispatch` | Rust-only release: only runs `cargo test` + `release-plz` (crates.io). Skips all binding validation and publishing. |
+
+### Rust-only mode
+
+Use `--features rust-only` or the `rust_only` CI input to skip everything non-Rust:
+
+```sh
+cargo build --features rust-only       # compile with rust-only marker
+cargo test --features rust-only        # test with rust-only marker
+```
+
+In CI/CD:
+- Set `rust_only: true` in **build.yml** `workflow_dispatch` to skip all binding build & publish jobs.
+- Use **release-rust-only.yml** `workflow_dispatch` for a release that only publishes the Rust crate to crates.io.
+- Add `rust-only` label to a release-plz PR before merging — `release.yml` detects the label and runs in rust-only mode automatically.
 
 ## Integration tests layout
 
-| File                                   | Covers                                                                         |
-|----------------------------------------|--------------------------------------------------------------------------------|
-| `tests/test_core.rs`                   | `find_obj`, `find_deep`, loop detection, merge (`+=`)                          |
-| `tests/test_derive.rs`                 | `@derive` inheritance, schema completeness checks                              |
-| `tests/test_imports.rs`                | `@import` file loading                                                         |
-| `tests/test_parsing.rs`                | `parse_assignment`, `strip_comment`, quote handling                            |
-| `tests/test_serde.rs`                  | serde round-trips (requires `--features serde`)                                |
-| `tests/test_aot.rs`                    | AOT cook/load cache behavior (`AamCompiler`, `AamLoader`, `AAM::load`)         |
-| `tests/test_comprehensive_errors.rs`   | large error/diagnostic matrix for parser, directives, and type/schema failures |
-| `tests/test_comprehensive_coverage.rs` | broad behavior coverage across parsing, lookups, directives, builder paths     |
-| `tests/test_massive_coverage.rs`       | high-volume matrix tests for parser/comment/deep-lookup stability              |
-| `tests/type_validation_tests.rs`       | built-in type validators                                                       |
+| File                                              | Covers                                                                         |
+|---------------------------------------------------|--------------------------------------------------------------------------------|
+| `aam-core/tests/test_core.rs`                     | `find_obj`, `find_deep`, loop detection, merge (`+=`)                          |
+| `aam-core/tests/test_derive.rs`                   | `@derive` inheritance, schema completeness checks                              |
+| `aam-core/tests/test_imports.rs`                  | `@import` file loading                                                         |
+| `aam-core/tests/test_parsing.rs`                  | `parse_assignment`, `strip_comment`, quote handling                            |
+| `aam-core/tests/test_serde.rs`                    | serde round-trips (requires `--features serde`)                                |
+| `aam-core/tests/test_aot.rs`                      | AOT cook/load cache behavior (`AamCompiler`, `AamLoader`, `AAM::load`)         |
+| `aam-core/tests/test_comprehensive_errors.rs`     | large error/diagnostic matrix for parser, directives, and type/schema failures |
+| `aam-core/tests/test_comprehensive_coverage.rs`   | broad behavior coverage across parsing, lookups, directives, builder paths     |
+| `aam-core/tests/test_massive_coverage.rs`         | high-volume matrix tests for parser/comment/deep-lookup stability              |
+| `aam-core/tests/type_validation_tests.rs`         | built-in type validators                                                       |
 
 ## Public API docs (multi-language)
 
@@ -110,7 +149,7 @@ Keep these files updated when behavior or signatures change:
 
 | Language / Surface | Public API doc path     | Primary source of truth                       |
 |--------------------|-------------------------|-----------------------------------------------|
-| Rust core          | `PUBLIC_API.md`         | `src/lib.rs`, `src/aaml/`, `src/aam.rs`       |
+| Rust core          | `PUBLIC_API.md`         | `aam-core/src/lib.rs`, `aam-core/src/aaml/`, `aam-core/src/aam.rs` |
 | C FFI              | `include/PUBLIC_API.md` | `include/aam.h`, `src/ffi.rs`                 |
 | C#                 | `csharp/PUBLIC_API.md`  | `csharp/src/AamDocument.cs`                   |
 | Go                 | `go/PUBLIC_API.md`      | `go/aam/aam.go`                               |
