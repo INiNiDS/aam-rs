@@ -1,7 +1,6 @@
 use crate::aam::AAM;
 use std::collections::{HashMap, HashSet};
 
-/// Представление типов данных стандарта AAM.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AamType {
     String,
@@ -11,17 +10,15 @@ pub enum AamType {
     Color,
     List(Box<AamType>),
     Object(AamSchema),
-    Custom(String), // Ссылка на другую именованную схему (например, "Info")
+    Custom(String), 
     Unknown,
 }
 
-/// Спецификация схемы AAM.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AamSchema {
     pub fields: HashMap<String, SchemaField>,
 }
 
-/// Поле схемы AAM.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SchemaField {
     pub name: String,
@@ -29,7 +26,6 @@ pub struct SchemaField {
     pub optional: bool,
 }
 
-/// Внутреннее представление распарсенного значения для построения дерева.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Scalar(String),
@@ -37,7 +33,6 @@ pub enum Value {
     List(Vec<Value>),
 }
 
-/// Вспомогательная функция очистки кавычек.
 fn clean_quotes(val: &str) -> &str {
     let trimmed = val.trim();
     if (trimmed.starts_with('"') && trimmed.ends_with('"'))
@@ -53,7 +48,6 @@ fn clean_quotes(val: &str) -> &str {
     }
 }
 
-/// Преобразование snake_case / kebab-case имени поля в PascalCase для названий схем.
 fn to_pascal_case(s: &str) -> String {
     let mut result = String::new();
     let mut capitalize_next = true;
@@ -70,7 +64,6 @@ fn to_pascal_case(s: &str) -> String {
     result
 }
 
-/// Разделение строки по запятым на верхнем уровне вложенности (игнорируя внутренние {} и []).
 fn split_by_comma(input: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut current = String::new();
