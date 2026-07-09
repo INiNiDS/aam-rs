@@ -154,6 +154,31 @@ func (a *AAM) TypeNames() []string {
 	return parseCList(C.aam_type_names(a.ptr))
 }
 
+// ReconstructSchema reconstructs a @schema directive from a list of AAM content strings.
+func (a *AAM) ReconstructSchema(name string, contents []string) (string, error) {
+	if a.ptr == nil {
+		return "", errors.New("aam: operation on closed handle")
+	}
+	C.aam_reconstruct_clear(a.ptr)
+	for _, content := range contents {
+		cContent := C.CString(content)
+		rc := C.aam_reconstruct_push(a.ptr, cContent)
+		C.free(unsafe.Pointer(cContent))
+		if rc != 0 {
+			return "", fmt.Errorf("aam: reconstructSchema: push failed: %s", a.LastError())
+		}
+	}
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+	result := C.aam_reconstruct_schema(a.ptr, cName)
+	if result == nil {
+		return "", fmt.Errorf("aam: reconstructSchema: %s", a.LastError())
+	}
+	val := C.GoString(result)
+	C.aam_string_free(result)
+	return val, nil
+}
+
 func (a *AAM) LastError() string {
 	if a.ptr == nil {
 		return ""

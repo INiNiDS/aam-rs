@@ -2,6 +2,8 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+#[cfg(feature = "reconstructer")]
+use aam_rs::reconstructer;
 use aam_rs::translator::TOMLTranslator;
 use wasm_bindgen::prelude::*;
 
@@ -268,6 +270,14 @@ impl AamDocument {
             }
         }
         arr
+    }
+
+    #[cfg(feature = "reconstructer")]
+    #[wasm_bindgen(js_name = reconstructSchema)]
+    pub fn reconstruct_schema(name: &str, contents: Vec<String>) -> Result<String, JsValue> {
+        let refs: Vec<&str> = contents.iter().map(String::as_str).collect();
+        reconstructer::reconstruct_schema(name, &refs)
+            .map_err(|e| JsValue::from_str(&e))
     }
 
     #[wasm_bindgen(js_name = lspAssist)]

@@ -9,6 +9,9 @@ aam-rs = { path = "../..", features = ["translator"] }
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 
+[features]
+reconstructer = ["aam-rs/reconstructer"]
+
 [build-dependencies]
 napi-build = "2"
 

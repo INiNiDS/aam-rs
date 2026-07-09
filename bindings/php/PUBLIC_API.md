@@ -24,6 +24,7 @@ Source of truth: `php/src/AamPhp.php`.
 - `reverseSearch(string $value): array`
 - `schemaNames(): array`
 - `typeNames(): array`
+- `reconstructSchema(string $name, array $contents): string`
 
 ## Builder API
 

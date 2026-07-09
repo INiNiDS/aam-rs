@@ -103,6 +103,29 @@ internal static unsafe partial class AamNative
         return aam_last_error((AamHandle*)handle.DangerousGetHandle());
     }
 
+    internal static int aam_reconstruct_push(SafeAamHandle handle, string content)
+    {
+        var utf8 = ToNullTerminatedUtf8(content);
+        fixed (byte* ptr = utf8)
+        {
+            return aam_reconstruct_push((AamHandle*)handle.DangerousGetHandle(), ptr);
+        }
+    }
+
+    internal static byte* aam_reconstruct_schema(SafeAamHandle handle, string schemaName)
+    {
+        var utf8 = ToNullTerminatedUtf8(schemaName);
+        fixed (byte* ptr = utf8)
+        {
+            return aam_reconstruct_schema((AamHandle*)handle.DangerousGetHandle(), ptr);
+        }
+    }
+
+    internal static void aam_reconstruct_clear(SafeAamHandle handle)
+    {
+        aam_reconstruct_clear((AamHandle*)handle.DangerousGetHandle());
+    }
+
 
     internal static string? BorrowUtf8String(byte* ptr)
     {

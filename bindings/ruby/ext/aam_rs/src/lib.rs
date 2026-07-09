@@ -2,6 +2,8 @@ use aam_rs::aam::AAM;
 use aam_rs::builder::{AAMBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::FormattingOptions as FormatterRules;
+#[cfg(feature = "reconstructer")]
+use aam_rs::reconstructer;
 use magnus::{Error, Module, Object, RArray, Ruby, TryConvert, function, method};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -106,6 +108,13 @@ impl RubyAam {
             .types()
             .map(|types| types.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
+    }
+
+    #[cfg(feature = "reconstructer")]
+    pub fn reconstruct_schema(name: String, contents: Vec<String>) -> Result<String, Error> {
+        let refs: Vec<&str> = contents.iter().map(String::as_str).collect();
+        reconstructer::reconstruct_schema(&name, &refs)
+            .map_err(|e| ruby_runtime_error(e))
     }
 }
 
@@ -254,6 +263,13 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     aam_class.define_method("reverse_search", method!(RubyAam::reverse_search, 1))?;
     aam_class.define_method("schema_names", method!(RubyAam::schema_names, 0))?;
     aam_class.define_method("type_names", method!(RubyAam::type_names, 0))?;
+    #[cfg(feature = "reconstructer")]
+    {
+        aam_class.define_singleton_method(
+            "reconstruct_schema",
+            function!(RubyAam::reconstruct_schema, 2),
+        )?;
+    }
 
     // SchemaField
     let schema_field_class = module.define_class("SchemaField", ruby.class_object())?;

@@ -8,6 +8,7 @@ Source of truth: `js/index.d.ts`.
 - `load(path: string): AAM`
 - `format(content: string): string`
 - `lspAssist(content: string): JsLspResult`
+- `reconstructSchema(name: string, contents: string[]): string`
 - `splitAam(content: string): Record<string, AAMBuilder>`
 - `version(): string`
 
