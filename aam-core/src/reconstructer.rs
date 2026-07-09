@@ -174,7 +174,7 @@ fn insert_hierarchical_rec(fields: &mut HashMap<String, Value>, segments: &[&str
     let current = segments[0].to_string();
     let entry = fields.entry(current).or_insert_with(|| Value::Object(HashMap::new()));
 
-    if let Value::Object(ref mut sub_map) = entry {
+    if let Value::Object(sub_map) = entry {
         insert_hierarchical_rec(sub_map, &segments[1..], value);
     } else {
         let mut sub_map = HashMap::new();
@@ -262,7 +262,7 @@ fn reconstruct_schema_from_values(instances_fields: &[&HashMap<String, Value>]) 
         let ty = if is_object {
             let mut sub_maps = Vec::new();
             for val in &present_values {
-                if let Value::Object(ref map) = val {
+                if let Value::Object(map) = val {
                     sub_maps.push(map);
                 }
             }
@@ -335,23 +335,24 @@ pub fn reconstruct_from_aam_instances(instances: &[AAM]) -> AamSchema {
 }
 
 pub fn extract_sub_schemas(
-    parent_name: &str,
+    _parent_name: &str,
     schema: &mut AamSchema,
     extracted: &mut HashMap<String, AamSchema>,
 ) {
     for (field_name, field) in schema.fields.iter_mut() {
-        match &mut field.ty {
-            AamType::Object(ref mut sub_schema) => {
+        let field_ty = &mut field.ty;
+        match field_ty {
+            AamType::Object(sub_schema) => {
                 let sub_schema_name = to_pascal_case(field_name);
 
                 extract_sub_schemas(&sub_schema_name, sub_schema, extracted);
 
                 extracted.insert(sub_schema_name.clone(), sub_schema.clone());
 
-                field.ty = AamType::Custom(sub_schema_name);
+                *field_ty = AamType::Custom(sub_schema_name);
             }
-            AamType::List(ref mut inner_ty) => {
-                if let AamType::Object(ref mut sub_schema) = **inner_ty {
+            AamType::List(inner_ty) => {
+                if let AamType::Object(sub_schema) = &mut **inner_ty {
                     let sub_schema_name = to_pascal_case(field_name);
                     extract_sub_schemas(&sub_schema_name, sub_schema, extracted);
                     extracted.insert(sub_schema_name.clone(), sub_schema.clone());

@@ -33,7 +33,6 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 pub struct AamHandle {
     inner: AAM,
     last_error: Option<CString>,
-    #[cfg(feature = "reconstructer")]
     reconstruct_instances: Vec<AAM>,
 }
 
@@ -55,7 +54,6 @@ pub extern "C" fn aam_new() -> *mut AamHandle {
     Box::into_raw(Box::new(AamHandle {
         inner: AAM::new(),
         last_error: None,
-        #[cfg(feature = "reconstructer")]
         reconstruct_instances: Vec::new(),
     }))
 }
@@ -210,7 +208,6 @@ pub unsafe extern "C" fn aam_reverse_search(
 
 // ── Schema Reconstruction ────────────────────────────────────────────────────
 
-#[cfg(feature = "reconstructer")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aam_reconstruct_push(handle: *mut AamHandle, content: *const c_char) -> i32 {
     if handle.is_null() || content.is_null() {
@@ -236,7 +233,6 @@ pub unsafe extern "C" fn aam_reconstruct_push(handle: *mut AamHandle, content: *
     }
 }
 
-#[cfg(feature = "reconstructer")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aam_reconstruct_schema(
     handle: *const AamHandle,
@@ -255,12 +251,20 @@ pub unsafe extern "C" fn aam_reconstruct_schema(
         return std::ptr::null_mut();
     }
 
-    let schema = reconstructer::reconstruct_from_aam_instances(&handle.reconstruct_instances);
-    let formatted = reconstructer::format_schema(schema_name, &schema);
-    to_c_string(&formatted)
+    #[cfg(feature = "reconstructer")]
+    {
+        let schema = reconstructer::reconstruct_from_aam_instances(&handle.reconstruct_instances);
+        let formatted = reconstructer::format_schema(schema_name, &schema);
+        return to_c_string(&formatted);
+    }
+
+    #[cfg(not(feature = "reconstructer"))]
+    {
+        let _ = schema_name;
+        std::ptr::null_mut()
+    }
 }
 
-#[cfg(feature = "reconstructer")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aam_reconstruct_clear(handle: *mut AamHandle) {
     if !handle.is_null() {
