@@ -2,7 +2,7 @@
 
 All notable changes to aam-derive will be documented in this file.
 
-## [2.8.0] - 2026-07-09
+## [2.8.1] - 2026-07-09
 
 ### Added
 

@@ -1,6 +1,6 @@
 [package]
 name = "aam-core"
-version = "2.8.0"
+version = "2.8.1"
 edition.workspace = true
 rust-version = "1.89.0"
 license.workspace = true

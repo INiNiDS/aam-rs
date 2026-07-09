@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.8.0](https://github.com/INiNiDS/aam-rs/compare/2.7.0...2.8.0) - 2026-06-24
+## [2.8.1](https://github.com/INiNiDS/aam-rs/compare/2.7.0...2.8.1) - 2026-06-24
 
 ### Other
 
