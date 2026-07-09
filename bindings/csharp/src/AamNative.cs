@@ -72,6 +72,15 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_parse_inline_to_map", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_parse_inline_to_map(byte* content);
 
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_push", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int aam_reconstruct_push(AamHandle* handle, byte* content);
+
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_schema", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_reconstruct_schema(AamHandle* handle, byte* schema_name);
+
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_clear", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern void aam_reconstruct_clear(AamHandle* handle);
+
 
     }
 

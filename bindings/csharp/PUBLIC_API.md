@@ -22,6 +22,7 @@ Source of truth: `csharp/src/AamDocument.cs`, `csharp/src/AamBuilder.cs`.
 - `string[] ReverseSearch(string value)`
 - `string[] SchemaNames()`
 - `string[] TypeNames()`
+- `string ReconstructSchema(string name, params string[] contents)`
 
 ## Builder API
 

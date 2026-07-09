@@ -11,6 +11,7 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 
 - `AamDocument.parse(String content)`
 - `AamDocument.load(String path)`
+- `AamDocument.reconstructSchema(String name, String[] contents)`
 - `AamDocument.splitAam(String content)`
 
 ## Instance Methods
@@ -21,6 +22,7 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 - `List<String> reverseSearch(String value)`
 - `List<String> schemaNames()`
 - `List<String> typeNames()`
+- `String reconstructSchema(String name, String[] contents)`
 - `void close()`
 
 ## Runtime Notes

@@ -4,6 +4,8 @@ use ::aam_rs::aam::AAM;
 use ::aam_rs::builder::{AAMBuilder, SchemaField};
 use ::aam_rs::error::AamlError;
 use ::aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+#[cfg(feature = "reconstructer")]
+use ::aam_rs::reconstructer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -263,6 +265,14 @@ impl PyAam {
             .and_then(|inner| inner.types())
             .map(|types| types.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
+    }
+
+    #[cfg(feature = "reconstructer")]
+    #[staticmethod]
+    fn reconstruct_schema(schema_name: &str, contents: Vec<String>) -> PyResult<String> {
+        let refs: Vec<&str> = contents.iter().map(String::as_str).collect();
+        reconstructer::reconstruct_schema(schema_name, &refs)
+            .map_err(|e| PyRuntimeError::new_err(e))
     }
 
     fn close(&mut self) {

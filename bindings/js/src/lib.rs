@@ -2,6 +2,8 @@ use aam_rs::aam::{AAM, AamLspAssist};
 use aam_rs::builder::{AAMBuilder as CoreAamBuilder, InlineObject, SchemaField};
 use aam_rs::error::AamlError;
 use aam_rs::pipeline::formatter::{FormatRange, FormattingOptions as FormatterRules};
+#[cfg(feature = "reconstructer")]
+use aam_rs::reconstructer;
 use aam_rs::translator::TOMLTranslator;
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -275,6 +277,13 @@ pub fn load(path: String) -> Result<JsAam> {
     AAM::load(path)
         .map(|inner| JsAam { inner: Some(inner) })
         .map_err(first_napi_error)
+}
+
+#[cfg(feature = "reconstructer")]
+#[napi(js_name = "reconstructSchema")]
+pub fn reconstruct_schema(name: String, contents: Vec<String>) -> Result<String> {
+    let refs: Vec<&str> = contents.iter().map(String::as_str).collect();
+    reconstructer::reconstruct_schema(&name, &refs).map_err(|e| Error::new(Status::GenericFailure, e))
 }
 
 #[napi]

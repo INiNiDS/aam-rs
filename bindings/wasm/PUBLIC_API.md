@@ -27,6 +27,7 @@ Source of truth: `wasm/src/lib.rs`.
 ## Static Helper
 
 - `AamDocument.lspAssist(content: string): { diagnostics: string[]; formatted: string | null }`
+- `AamDocument.reconstructSchema(name: string, contents: string[]): string`
 - `splitAam(content: string): Record<string, string>`
 
 ## Builder Methods

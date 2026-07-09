@@ -34,6 +34,12 @@ char *aam_reverse_search(const AamHandle *handle, const char *value);
 char *aam_schema_names(const AamHandle *handle);
 char *aam_type_names(const AamHandle *handle);
 
+/* Schema reconstruction — push individual AAM content strings,
+ * then reconstruct a @schema from all accumulated instances. */
+int aam_reconstruct_push(AamHandle *handle, const char *content);
+char *aam_reconstruct_schema(const AamHandle *handle, const char *schema_name);
+void aam_reconstruct_clear(AamHandle *handle);
+
 void aam_string_free(char *s);
 const char *aam_last_error(const AamHandle *handle);
 

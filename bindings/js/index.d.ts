@@ -74,6 +74,8 @@ export declare function lspAssist(content: string): JsLspResult
 
 export declare function parse(content: string): AAM
 
+export declare function reconstructSchema(name: string, contents: Array<string>): string
+
 export declare function splitAam(content: string): Record<string, AAMBuilder>
 
 export declare function version(): string

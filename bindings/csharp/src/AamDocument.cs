@@ -195,6 +195,37 @@ public sealed unsafe class AamDocument : IDisposable
         return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
+    /// <summary>
+    /// Reconstructs a @schema directive from a list of AAM content strings.
+    /// </summary>
+    /// <param name="name">Schema name.</param>
+    /// <param name="contents">Individual AAM configuration content strings to analyze.</param>
+    /// <returns>A formatted @schema string.</returns>
+    /// <exception cref="AamException">Thrown when reconstruction fails.</exception>
+    public string ReconstructSchema(string name, params string[] contents)
+    {
+        AamNative.aam_reconstruct_clear(Handle);
+        foreach (var content in contents)
+        {
+            var rc = AamNative.aam_reconstruct_push(Handle, content);
+            if (rc != 0)
+            {
+                var errPtr = AamNative.aam_last_error(Handle);
+                var message = AamNative.BorrowUtf8String(errPtr) ?? "Native push failed";
+                throw new AamException(message);
+            }
+        }
+
+        var ptr = AamNative.aam_reconstruct_schema(Handle, name);
+        if (ptr == null)
+        {
+            var errPtr = AamNative.aam_last_error(Handle);
+            var message = AamNative.BorrowUtf8String(errPtr) ?? "Native schema reconstruction failed";
+            throw new AamException(message);
+        }
+        return AamNative.TakeOwnedUtf8String(ptr)!;
+    }
+
 
     /// <summary>
     /// Releases native resources associated with this document.

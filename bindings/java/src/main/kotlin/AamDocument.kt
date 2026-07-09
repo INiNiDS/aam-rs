@@ -82,6 +82,12 @@ class AamDocument private constructor(private var nativePtr: Long) : AutoCloseab
         }
 
         @JvmStatic
+        fun reconstructSchema(name: String, contents: Array<String>): String {
+            return AAM.reconstructSchema(name, contents)
+                ?: throw IllegalStateException("Failed to reconstruct schema")
+        }
+
+        @JvmStatic
         fun splitAam(content: String): Map<String, AamBuilder> {
             val result = linkedMapOf<String, AamBuilder>()
             var currentName: String? = null
@@ -156,6 +162,11 @@ class AamDocument private constructor(private var nativePtr: Long) : AutoCloseab
         return AAM.typeNames(checkPtr())?.toList() ?: emptyList()
     }
 
+    fun reconstructSchema(name: String, contents: Array<String>): String {
+        return AAM.reconstructSchema(name, contents)
+            ?: throw IllegalStateException("Failed to reconstruct schema")
+    }
+
     override fun close() {
         if (nativePtr != 0L) {
             cleanable.clean()
@@ -185,4 +196,6 @@ private object AAM {
 
     @JvmStatic external fun schemaNames(ptr: Long): Array<String>?
     @JvmStatic external fun typeNames(ptr: Long): Array<String>?
+
+    @JvmStatic external fun reconstructSchema(name: String, contents: Array<String>): String?
 }

@@ -27,6 +27,7 @@ Source of truth: `go/aam/aam.go`.
 - `ReverseSearch(value string) []string`
 - `SchemaNames() []string`
 - `TypeNames() []string`
+- `ReconstructSchema(name string, contents []string) (string, error)`
 - `LastError() string`
 - `Close()`
 

@@ -41,6 +41,10 @@ final class AamDocument
             char* aam_schema_names(AamHandle* handle);
             char* aam_type_names(AamHandle* handle);
 
+            int aam_reconstruct_push(AamHandle* handle, const char* content);
+            char* aam_reconstruct_schema(const AamHandle* handle, const char* schema_name);
+            void aam_reconstruct_clear(AamHandle* handle);
+
             void aam_string_free(char* s);
             const char* aam_last_error(AamHandle* handle);
 
@@ -179,6 +183,32 @@ final class AamDocument
     {
         $ptr = $this->ffi->aam_type_names($this->handle);
         return $this->parseCList($ptr);
+    }
+
+    /**
+     * Reconstruct a @schema directive from a list of AAM content strings.
+     * @return string Formatted @schema definition.
+     */
+    public function reconstructSchema(string $name, array $contents): string
+    {
+        $this->ffi->aam_reconstruct_clear($this->handle);
+        foreach ($contents as $content) {
+            $rc = $this->ffi->aam_reconstruct_push($this->handle, $content);
+            if ($rc !== 0) {
+                $this->throwLastError('Native push failed');
+            }
+        }
+
+        $ptr = $this->ffi->aam_reconstruct_schema($this->handle, $name);
+        if ($ptr === null) {
+            $this->throwLastError('Native schema reconstruction failed');
+        }
+
+        try {
+            return FFI::string($ptr);
+        } finally {
+            $this->ffi->aam_string_free($ptr);
+        }
     }
 
     private function throwLastError(string $defaultMsg): void
