@@ -12,5 +12,5 @@ repository = "https://gitlab.com/aam-rs/aam-rs"
 authors = ["Nikita Goncharov <ininids@ininids.in.rs>"]
 
 [workspace.dependencies]
-aam-core = { path = "aam-core", version = "2.7.1" }
-aam-derive = { path = "aam-derive", version = "2.7.1" }
+aam-core = { path = "aam-core", version = "2.8.0" }
+aam-derive = { path = "aam-derive", version = "2.8.0" }
