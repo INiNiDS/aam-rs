@@ -10,7 +10,7 @@ pub enum AamType {
     Color,
     List(Box<AamType>),
     Object(AamSchema),
-    Custom(String), 
+    Custom(String),
     Unknown,
 }
 
