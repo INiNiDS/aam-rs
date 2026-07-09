@@ -82,11 +82,7 @@ fn aam_delete_impl(ptr: jlong) {
 }
 
 #[cfg(feature = "reconstructer")]
-fn aam_reconstruct_schema_impl(
-    mut env: Env,
-    name: JString,
-    contents: JObjectArray,
-) -> jstring {
+fn aam_reconstruct_schema_impl(mut env: Env, name: JString, contents: JObjectArray) -> jstring {
     let name_str = match java_string_to_rust(&mut env, &name) {
         Ok(v) => v,
         Err(e) => {
@@ -99,7 +95,9 @@ fn aam_reconstruct_schema_impl(
     let mut sources = Vec::with_capacity(len);
 
     for i in 0..len {
-        let elem = env.get_object_array_element(&contents, i).unwrap_or(JObject::null());
+        let elem = env
+            .get_object_array_element(&contents, i)
+            .unwrap_or(JObject::null());
         if elem.is_null() {
             continue;
         }

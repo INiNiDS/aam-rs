@@ -172,7 +172,9 @@ fn insert_hierarchical_rec(fields: &mut HashMap<String, Value>, segments: &[&str
     }
 
     let current = segments[0].to_string();
-    let entry = fields.entry(current).or_insert_with(|| Value::Object(HashMap::new()));
+    let entry = fields
+        .entry(current)
+        .or_insert_with(|| Value::Object(HashMap::new()));
 
     if let Value::Object(sub_map) = entry {
         insert_hierarchical_rec(sub_map, &segments[1..], value);
@@ -386,7 +388,10 @@ pub fn format_type(ty: &AamType, indent: usize) -> String {
                 let field = &schema.fields[key];
                 let opt_sign = if field.optional { "*" } else { "" };
                 let field_ty = format_type(&field.ty, indent + 4);
-                fields_str.push(format!("{}{}{}: {}", spaces, field.name, opt_sign, field_ty));
+                fields_str.push(format!(
+                    "{}{}{}: {}",
+                    spaces, field.name, opt_sign, field_ty
+                ));
             }
 
             format!("{{\n{}\n{}}}", fields_str.join("\n"), closing_spaces)
@@ -430,13 +435,11 @@ pub fn format_all_schemas(main_name: &str, main_schema: &AamSchema) -> String {
     output_parts.join("\n\n")
 }
 
-
 pub fn reconstruct_schema(schema_name: &str, file_sources: &[&str]) -> Result<String, String> {
     let mut instances = Vec::new();
 
     for src in file_sources {
-        let aam = AAM::parse(src)
-            .map_err(|e| format!("Failed to parse configuration: {:?}", e))?;
+        let aam = AAM::parse(src).map_err(|e| format!("Failed to parse configuration: {:?}", e))?;
         instances.push(aam);
     }
 

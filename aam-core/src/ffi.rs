@@ -209,7 +209,10 @@ pub unsafe extern "C" fn aam_reverse_search(
 // ── Schema Reconstruction ────────────────────────────────────────────────────
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn aam_reconstruct_push(handle: *mut AamHandle, content: *const c_char) -> i32 {
+pub unsafe extern "C" fn aam_reconstruct_push(
+    handle: *mut AamHandle,
+    content: *const c_char,
+) -> i32 {
     if handle.is_null() || content.is_null() {
         return -1;
     }
