@@ -106,7 +106,7 @@ jobs:
           cargo test --all-targets --features serde
           cargo test --all-targets --features aot
       - name: Verify MSRV
-        run: cargo msrv verify -- cargo check --all-targets
+        run: cargo msrv verify --manifest-path aam-rs/Cargo.toml -- cargo check --all-targets
       - name: Security audit (cargo-deny)
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
