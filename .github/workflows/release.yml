@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      rust_only:
+        description: "Rust-only release (skip all binding validation and publishing)"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,8 +25,43 @@ permissions:
 
 env:
   CARGO_HTTP_MULTIPLEXING: "false"
+  DEPLOY: "1"
 
 jobs:
+  detect-mode:
+    name: Detect release mode
+    runs-on: ubuntu-latest
+    outputs:
+      rust_only: ${{ steps.mode.outputs.rust_only }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: mode
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUST_ONLY="false"
+
+          # Manual workflow_dispatch override
+          if [[ "${{ github.event.inputs.rust_only }}" == "true" ]]; then
+            RUST_ONLY="true"
+          fi
+
+          # Detect rust-only label from the merged PR
+          if [[ "$RUST_ONLY" == "false" ]]; then
+            PR_NUMBER=$(gh pr list --state merged --search "${{ github.sha }}" --json number --jq '.[0].number // ""' 2>/dev/null || echo "")
+            if [[ -n "$PR_NUMBER" ]]; then
+              LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+              if echo "$LABELS" | grep -q "rust-only"; then
+                RUST_ONLY="true"
+                echo "Detected 'rust-only' label on PR #$PR_NUMBER"
+              fi
+            fi
+          fi
+
+          echo "rust_only=$RUST_ONLY" >> "$GITHUB_OUTPUT"
+          echo "Running in $([[ "$RUST_ONLY" == "true" ]] && echo 'RUST-ONLY' || echo 'FULL') mode"
+
   generate-credits:
     name: Generate Licenses (CREDITS)
     runs-on: ubuntu-latest
@@ -73,6 +115,7 @@ jobs:
   validate-go:
     name: Go Bindings — Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -98,6 +141,7 @@ jobs:
   validate-js:
     name: Node.js Bindings — Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -124,6 +168,7 @@ jobs:
   validate-csharp:
     name: C# Bindings — Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -154,6 +199,7 @@ jobs:
   validate-wasm:
     name: WASM Bindings - Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -175,6 +221,7 @@ jobs:
   validate-ruby:
     name: Ruby Bindings - Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -202,6 +249,7 @@ jobs:
   validate-php:
     name: PHP Bindings - Build & Test
     runs-on: ubuntu-latest
+    if: ${{ needs.detect-mode.outputs.rust_only != 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -224,6 +272,7 @@ jobs:
     needs:
       [
         validate,
+        detect-mode,
         validate-go,
         validate-js,
         validate-csharp,
@@ -281,7 +330,7 @@ jobs:
   build-node-bindings:
     name: Build Node.js Native Addons
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     strategy:
       matrix:
         include:
@@ -336,7 +385,7 @@ jobs:
   upload-node-to-release:
     name: Upload Node.js Addons to Release
     needs: [ release-plz, build-node-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Node.js addon artifacts
@@ -354,7 +403,7 @@ jobs:
   build-wasm-bindings:
     name: Build & Test WASM Bindings
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -395,7 +444,7 @@ jobs:
   upload-wasm-to-release:
     name: Upload WASM Package to Release
     needs: [ release-plz, build-wasm-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download WASM package
@@ -416,7 +465,7 @@ jobs:
   build-ruby-bindings:
     name: Build & Test Ruby Bindings
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -460,7 +509,7 @@ jobs:
   upload-ruby-to-release:
     name: Upload Ruby Gem to Release
     needs: [ release-plz, build-ruby-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Ruby artifact
@@ -477,7 +526,7 @@ jobs:
   publish-ruby:
     name: Publish Ruby Gem (RubyGems + GitHub Packages)
     needs: [ release-plz, build-ruby-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Ruby artifact
@@ -499,7 +548,7 @@ jobs:
   build-php-bindings:
     name: Build & Test PHP Bindings
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -558,7 +607,7 @@ jobs:
   upload-php-to-release:
     name: Upload PHP Package to Release
     needs: [ release-plz, build-php-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download PHP package
@@ -575,7 +624,7 @@ jobs:
   publish-php-mirror:
     name: Publish PHP Package to Mirror Repo (Packagist)
     needs: [ release-plz, build-php-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download PHP package artifact
@@ -606,7 +655,7 @@ jobs:
   publish-npm:
     name: Publish to npm
     needs: [ release-plz, build-node-bindings, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -684,7 +733,7 @@ jobs:
   publish-npm-github:
     name: Publish Node package to GitHub Packages
     needs: [ release-plz, build-node-bindings, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -717,7 +766,7 @@ jobs:
   publish-wasm-npm:
     name: Publish WASM package to npm
     needs: [ release-plz, build-wasm-bindings ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download WASM package artifact
@@ -736,7 +785,7 @@ jobs:
 
   build-c-libs:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     strategy:
       matrix:
         include:
@@ -807,7 +856,7 @@ jobs:
   build-csharp-libs:
     name: Build C# Native Libraries
     needs: release-plz
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     strategy:
       matrix:
         include:
@@ -849,7 +898,7 @@ jobs:
 
   linux:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -898,7 +947,7 @@ jobs:
 
   musllinux:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -943,7 +992,7 @@ jobs:
 
   windows:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -992,7 +1041,7 @@ jobs:
 
   macos:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -1031,7 +1080,7 @@ jobs:
 
   sdist:
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1054,7 +1103,7 @@ jobs:
   upload-wheels-to-release:
     name: Upload Python Wheels to Release
     needs: [ release-plz, linux, musllinux, windows, macos, sdist ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all wheels
@@ -1072,7 +1121,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: [ release-plz, linux, musllinux, windows, macos, sdist ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
@@ -1094,7 +1143,7 @@ jobs:
   build-jni-libs:
     name: Build JNI Native Libraries
     needs: release-plz
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     strategy:
       matrix:
         include:
@@ -1133,7 +1182,7 @@ jobs:
   upload-jni-to-release:
     name: Upload JNI to GitHub Release
     needs: [ release-plz, build-jni-libs ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -1154,7 +1203,7 @@ jobs:
   build-go-libs:
     name: Build Go Native Libs
     needs: [ release-plz, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     strategy:
       matrix:
         include:
@@ -1227,7 +1276,7 @@ jobs:
   publish-java:
     name: Publish Fat JAR & Upload to Release
     needs: [ release-plz, build-jni-libs, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1304,7 +1353,7 @@ jobs:
   publish-csharp:
     name: Publish C# Package to NuGet
     needs: [ release-plz, build-csharp-libs, generate-credits ]
-    if: ${{ needs.release-plz.outputs.release_created == 'true' }}
+    if: ${{ needs.release-plz.outputs.release_created == 'true' && needs.detect-mode.outputs.rust_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
