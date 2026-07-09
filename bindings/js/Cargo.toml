@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-aam-rs = { path = "../..", features = ["translator"] }
+aam-rs = { path = "../../aam-rs", features = ["translator"] }
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 

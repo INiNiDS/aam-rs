@@ -50,6 +50,13 @@ pub mod from_aam;
 
 pub mod macros;
 
+#[cfg(feature = "jni")]
+pub mod jni;
+#[cfg(feature = "splitter")]
+pub mod splitter;
+#[cfg(feature = "translator")]
+pub mod translator;
+
 #[cfg(feature = "reconstructer")]
 pub mod reconstructer;
 

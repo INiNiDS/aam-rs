@@ -1,5 +1,6 @@
 [workspace]
 members = ["aam-core", "aam-derive", "aam-rs"]
+exclude = ["bindings"]
 resolver = "2"
 
 [workspace.package]
