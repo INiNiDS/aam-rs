@@ -162,11 +162,6 @@ class AamDocument private constructor(private var nativePtr: Long) : AutoCloseab
         return AAM.typeNames(checkPtr())?.toList() ?: emptyList()
     }
 
-    fun reconstructSchema(name: String, contents: Array<String>): String {
-        return AAM.reconstructSchema(name, contents)
-            ?: throw IllegalStateException("Failed to reconstruct schema")
-    }
-
     override fun close() {
         if (nativePtr != 0L) {
             cleanable.clean()

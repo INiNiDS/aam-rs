@@ -722,13 +722,32 @@ jobs:
       - name: Publish platform packages
         working-directory: ./bindings/js
         run: |
-          npm publish ./npm/linux-x64-gnu --access public --provenance
-          npm publish ./npm/darwin-x64 --access public --provenance
-          npm publish ./npm/darwin-arm64 --access public --provenance
-          npm publish ./npm/win32-x64-msvc --access public --provenance
+          publish_if_missing() {
+            local package_dir="$1"
+            local package_name package_version
+            package_name=$(node -p "require('$package_dir/package.json').name")
+            package_version=$(node -p "require('$package_dir/package.json').version")
+            if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+              echo "$package_name@$package_version already exists; skipping"
+            else
+              npm publish "$package_dir" --access public --provenance
+            fi
+          }
+
+          publish_if_missing ./npm/linux-x64-gnu
+          publish_if_missing ./npm/darwin-x64
+          publish_if_missing ./npm/darwin-arm64
+          publish_if_missing ./npm/win32-x64-msvc
       - name: Publish main package
         working-directory: ./bindings/js
-        run: npm publish --access public --provenance
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already exists; skipping"
+          else
+            npm publish --access public --provenance
+          fi
 
   publish-npm-github:
     name: Publish Node package to GitHub Packages
@@ -760,8 +779,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          npm pkg set name="@${OWNER}/aam-nodejs"
-          npm publish
+          PACKAGE_NAME="@${OWNER}/aam-nodejs"
+          npm pkg set name="$PACKAGE_NAME"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already exists; skipping"
+          else
+            npm publish --registry=https://npm.pkg.github.com
+          fi
 
   publish-wasm-npm:
     name: Publish WASM package to npm
@@ -781,7 +806,14 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Publish WASM package to npm
         working-directory: ./wasm-pkg
-        run: npm publish --access public --provenance
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already exists; skipping"
+          else
+            npm publish --access public --provenance
+          fi
 
   build-c-libs:
     needs: [ release-plz, generate-credits ]
@@ -815,7 +847,7 @@ jobs:
       - name: Prepare C/C++ Package Structure
         run: |
           mkdir -p package/include package/lib/cmake/aam-c package/bin package/examples
-          cbindgen --config cbindgen.toml --output package/include/aam-c.h
+          cbindgen --config aam-rs/cbindgen.toml aam-rs --output package/include/aam-c.h
           cp LICENSE package/ 2>/dev/null || true
           cp bindings/c/examples/*.c package/examples/ 2>/dev/null || true
           cp bindings/c/examples/*.aam package/examples/ 2>/dev/null || true
@@ -1198,7 +1230,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release-plz.outputs.tag_name }}
         run: |
-          gh release upload "$TAG_NAME" jni-artifacts/*
+          gh release upload "$TAG_NAME" --clobber jni-artifacts/*
 
   build-go-libs:
     name: Build Go Native Libs

@@ -22,7 +22,6 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 - `List<String> reverseSearch(String value)`
 - `List<String> schemaNames()`
 - `List<String> typeNames()`
-- `String reconstructSchema(String name, String[] contents)`
 - `void close()`
 
 ## Runtime Notes
@@ -43,4 +42,3 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 - `typeAlias(alias: String, typeName: String): AamBuilder`
 - `build(): String`
 - `toFile(path: String)`
-
