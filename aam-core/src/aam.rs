@@ -26,6 +26,7 @@ pub enum AamBackend {
 #[derive(Debug)]
 pub struct AAM {
     backend: AamBackend,
+    source_path: Option<std::path::PathBuf>,
 }
 
 /// LSP-oriented helper payload that returns diagnostics plus optional formatting output.
@@ -60,6 +61,7 @@ impl AAM {
 
         Ok(Self {
             backend: AamBackend::Dynamic(output),
+            source_path: None,
         })
     }
 
@@ -68,6 +70,7 @@ impl AAM {
     pub fn new() -> Self {
         Self {
             backend: AamBackend::Dynamic(PipelineOutput::new()),
+            source_path: None,
         }
     }
 
@@ -87,9 +90,12 @@ impl AAM {
             let output = pipeline.process_with_source_dir(&content, source_dir)?;
             Ok(Self {
                 backend: AamBackend::Dynamic(output),
+                source_path: Some(Path::new(text).to_path_buf()),
             })
         } else {
-            Self::parse_with_source_name("raw_string", text)
+            let mut parsed = Self::parse_with_source_name("raw_string", text)?;
+            parsed.source_path = None;
+            Ok(parsed)
         }
     }
 
@@ -108,12 +114,14 @@ impl AAM {
             let output = pipeline.process_with_source_dir(&content, source_dir)?;
             Ok(Self {
                 backend: AamBackend::Dynamic(output),
+                source_path: Some(Path::new(text).to_path_buf()),
             })
         } else {
             set_error_render_context("raw_string", text);
             let output = pipeline.process(text)?;
             Ok(Self {
                 backend: AamBackend::Dynamic(output),
+                source_path: None,
             })
         }
     }
@@ -129,17 +137,19 @@ impl AAM {
     /// Returns errors if the file cannot be read, the cache cannot be memory-mapped,
     /// or the content fails to parse/validate.
     pub fn load(path: impl AsRef<Path>) -> Result<Self, Vec<AamlError>> {
+        let path_buf = path.as_ref().to_path_buf();
         #[cfg(feature = "aot")]
         {
-            let mapped = AamLoader::load_fast(path)?;
+            let mapped = AamLoader::load_fast(&path_buf)?;
             Ok(Self {
                 backend: AamBackend::Mapped(mapped),
+                source_path: Some(path_buf),
             })
         }
 
         #[cfg(not(feature = "aot"))]
         {
-            let path = path.as_ref();
+            let path = path_buf.as_path();
             let content = std::fs::read_to_string(path).map_err(|e| {
                 vec![AamlError::IoError {
                     details: format!("failed to read '{}': {e}", path.display()),
@@ -155,6 +165,7 @@ impl AAM {
 
             Ok(Self {
                 backend: AamBackend::Dynamic(output),
+                source_path: Some(path_buf),
             })
         }
     }
@@ -374,6 +385,41 @@ impl AAM {
     #[must_use]
     pub fn get_type(&self, name: &str) -> Option<&TypeInfo> {
         self.types().and_then(|types| types.get(name))
+    }
+
+    /// Reloads the configuration from its original source file on disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if this instance was not originally loaded from a file,
+    /// or if there are any reading, parsing, or validation issues during reload.
+    pub fn update(&mut self) -> Result<(), Vec<AamlError>> {
+        if let Some(ref path) = self.source_path {
+            let reloaded = Self::load(path)?;
+            self.backend = reloaded.backend;
+            Ok(())
+        } else {
+            Err(vec![AamlError::IoError {
+                details: "Cannot update: this AAM instance was not loaded from a file path."
+                    .to_string(),
+                diagnostics: None,
+            }])
+        }
+    }
+
+    /// Replaces the configuration entirely by parsing the provided raw text.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if parsing or validation of the new content fails.
+    pub fn update_from_text(&mut self, text: &str) -> Result<(), Vec<AamlError>> {
+        set_error_render_context("raw_string", text);
+        let pipeline = Pipeline::new();
+        let output = pipeline.process(text)?;
+
+        self.backend = AamBackend::Dynamic(output);
+        self.source_path = None;
+        Ok(())
     }
 }
 

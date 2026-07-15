@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `AAM::update()` reloads the configuration from its original on-disk source file (the path captured at `AAM::load`/`AAM::from_file_with_source_*` time). Returning a typed `Err` when the instance was not loaded from a file path.
+- `AAM::update_from_text(text)` replaces the entire backing pipeline output by re-parsing raw text, clearing any stored source path.
+
 ## [2.8.1](https://github.com/INiNiDS/aam-rs/compare/2.7.0...2.8.1) - 2026-06-24
 
 ### Other
