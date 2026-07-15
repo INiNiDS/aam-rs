@@ -42,6 +42,7 @@ Feature-gated modules:
 - `from_aam::get_aam` / `from_aam::get_opt_aam`: extract typed values from an `AAM` instance.
 - `from_aam::parse_object_fields` / `from_aam::parse_list_items`: low-level helpers.
 - `schema_to_struct!`: proc macro that generates a Rust struct + `FromAam` impl from an AAM `@schema` definition.
+- `anyhow`: re-exported (`aam_core::anyhow` / `aam_rs::anyhow`) so `define_aam_loader!` generated code works without callers having to add `anyhow` to their own `Cargo.toml`.
 
 ## Stable Lookup Model
 

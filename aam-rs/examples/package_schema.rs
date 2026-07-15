@@ -28,7 +28,7 @@ schema_to_struct!(
 }"
 );
 
-fn main() -> anyhow::Result<()> {
+fn main() -> aam_rs::anyhow::Result<()> {
     let content = "
         id = cairo
         name = cairo

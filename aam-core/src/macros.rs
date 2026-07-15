@@ -58,14 +58,18 @@
 ///
 /// // The struct Deps is generated with:
 /// // - Deps::new()
-/// // - deps.load_dir("path/") -> anyhow::Result<()>
+/// // - deps.load_dir("path/") -> aam_core::anyhow::Result<()>  (anyhow is re-exported; no extra dep needed)
 /// // - deps.get_dep("id") -> Option<Arc<AAM>>
 /// // - deps.get_all_ids() -> Vec<String>
-/// // - deps.build_deps("id") -> anyhow::Result<Vec<String>>
-/// // - deps.tags("id") -> anyhow::Result<Vec<String>>
-/// // - deps.updating_time("id") -> anyhow::Result<Option<u64>>
-/// // - deps.description("id") -> anyhow::Result<String>
+/// // - deps.build_deps("id") -> aam_core::anyhow::Result<Vec<String>>
+/// // - deps.tags("id") -> aam_core::anyhow::Result<Vec<String>>
+/// // - deps.updating_time("id") -> aam_core::anyhow::Result<Option<u64>>
+/// // - deps.description("id") -> aam_core::anyhow::Result<String>
 /// ```
+///
+/// The returned `Result` is `aam_core::anyhow::Result` (a re-export of
+/// `anyhow::Result`). You do **not** need to add `anyhow` to your own
+/// `Cargo.toml` — `aam-core` / `aam-rs` re-exports it for you.
 #[macro_export]
 macro_rules! define_aam_loader {
     // ── Entry: full form with all sections ──
@@ -219,8 +223,8 @@ macro_rules! define_aam_loader {
                 }
             }
 
-            pub fn load_dir<P: AsRef<::std::path::Path>>(&mut self, path: P) -> ::anyhow::Result<()> {
-                let files: Vec<_> = ::anyhow::Context::with_context(
+            pub fn load_dir<P: AsRef<::std::path::Path>>(&mut self, path: P) -> $crate::anyhow::Result<()> {
+                let files: Vec<_> = $crate::anyhow::Context::with_context(
                     ::std::fs::read_dir(&path),
                     || format!("Failed to read dir: {}", path.as_ref().display())
                 )?
@@ -240,13 +244,13 @@ macro_rules! define_aam_loader {
                 Ok(())
             }
 
-            pub fn load_aam<P: AsRef<::std::path::Path>>(&mut self, path: P) -> ::anyhow::Result<()> {
+            pub fn load_aam<P: AsRef<::std::path::Path>>(&mut self, path: P) -> $crate::anyhow::Result<()> {
                 let model = $crate::aam::AAM::load(&path)
-                    .map_err(|e| ::anyhow::anyhow!("Failed to load {}: {:?}", path.as_ref().display(), e))?;
+                    .map_err(|e| $crate::anyhow::anyhow!("Failed to load {}: {:?}", path.as_ref().display(), e))?;
 
                 let id = model
                     .get("id")
-                    .ok_or_else(|| ::anyhow::anyhow!("No 'id' in {}", path.as_ref().display()))?
+                    .ok_or_else(|| $crate::anyhow::anyhow!("No 'id' in {}", path.as_ref().display()))?
                     .to_string();
 
                 self.deps.insert(id, ::std::sync::Arc::new(model));
@@ -263,11 +267,11 @@ macro_rules! define_aam_loader {
 
             // ── List field getters (empty vec when missing) ──
             $(
-                pub fn $list_field(&self, id: &str) -> ::anyhow::Result<Vec<$list_ty>> {
+                pub fn $list_field(&self, id: &str) -> $crate::anyhow::Result<Vec<$list_ty>> {
                     let target = self
                         .deps
                         .get(id)
-                        .ok_or_else(|| ::anyhow::anyhow!("Package '{}' not found", id))?;
+                        .ok_or_else(|| $crate::anyhow::anyhow!("Package '{}' not found", id))?;
 
                     let Some(raw) = target.get(stringify!($list_field)) else {
                         return Ok(::std::vec::Vec::new());
@@ -277,11 +281,11 @@ macro_rules! define_aam_loader {
                         .parse_list::<$list_ty>();
                     match parsed {
                         Some(Ok(v)) => Ok(v),
-                        Some(Err(_)) => Err(::anyhow::anyhow!(
+                        Some(Err(_)) => Err($crate::anyhow::anyhow!(
                             "Failed to parse list '{}' in package '{}'. Raw: {:?}",
                             stringify!($list_field), id, raw
                         )),
-                        None => Err(::anyhow::anyhow!(
+                        None => Err($crate::anyhow::anyhow!(
                             "Expected list format for '{}' in package '{}'. Raw: {:?}",
                             stringify!($list_field), id, raw
                         )),
@@ -291,18 +295,18 @@ macro_rules! define_aam_loader {
 
             // ── Optional scalar getters (None when missing) ──
             $(
-                pub fn $opt_field(&self, id: &str) -> ::anyhow::Result<Option<$opt_ty>> {
+                pub fn $opt_field(&self, id: &str) -> $crate::anyhow::Result<Option<$opt_ty>> {
                     let target = self
                         .deps
                         .get(id)
-                        .ok_or_else(|| ::anyhow::anyhow!("Package '{}' not found", id))?;
+                        .ok_or_else(|| $crate::anyhow::anyhow!("Package '{}' not found", id))?;
 
                     let Some(raw) = target.get(stringify!($opt_field)) else {
                         return Ok(None);
                     };
 
                     let parsed = raw.parse::<$opt_ty>().map(Some);
-                    ::anyhow::Context::with_context(parsed, || {
+                    $crate::anyhow::Context::with_context(parsed, || {
                             format!(
                                 "Failed to parse '{}' as {} for package '{}'. Raw: {:?}",
                                 stringify!($opt_field), stringify!($opt_ty), id, raw
@@ -313,21 +317,21 @@ macro_rules! define_aam_loader {
 
             // ── Required scalar getters (error when missing) ──
             $(
-                pub fn $req_field(&self, id: &str) -> ::anyhow::Result<$req_ty> {
+                pub fn $req_field(&self, id: &str) -> $crate::anyhow::Result<$req_ty> {
                     let target = self
                         .deps
                         .get(id)
-                        .ok_or_else(|| ::anyhow::anyhow!("Package '{}' not found", id))?;
+                        .ok_or_else(|| $crate::anyhow::anyhow!("Package '{}' not found", id))?;
 
                     let raw = target
                         .get(stringify!($req_field))
-                        .ok_or_else(|| ::anyhow::anyhow!(
+                        .ok_or_else(|| $crate::anyhow::anyhow!(
                             "Required field '{}' not found in package '{}'",
                             stringify!($req_field), id
                         ))?;
 
                     let parsed = raw.parse::<$req_ty>();
-                    ::anyhow::Context::with_context(parsed, || {
+                    $crate::anyhow::Context::with_context(parsed, || {
                             format!(
                                 "Failed to parse '{}' as {} for package '{}'. Raw: {:?}",
                                 stringify!($req_field), stringify!($req_ty), id, raw

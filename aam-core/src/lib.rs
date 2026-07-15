@@ -50,6 +50,11 @@ pub mod from_aam;
 
 pub mod macros;
 
+/// Re-export so that `define_aam_loader!` generated code can reference
+/// `anyhow` types without forcing downstream crates to depend on `anyhow` directly.
+#[doc(hidden)]
+pub use anyhow;
+
 #[cfg(feature = "jni")]
 pub mod jni;
 #[cfg(feature = "splitter")]
