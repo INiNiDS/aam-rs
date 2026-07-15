@@ -45,6 +45,15 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_reverse_search", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_reverse_search(AamHandle* handle, byte* value);
 
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_push", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int aam_reconstruct_push(AamHandle* handle, byte* content);
+
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_schema", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern byte* aam_reconstruct_schema(AamHandle* handle, byte* schema_name);
+
+        [DllImport(__DllName, EntryPoint = "aam_reconstruct_clear", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern void aam_reconstruct_clear(AamHandle* handle);
+
         [DllImport(__DllName, EntryPoint = "aam_schema_names", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_schema_names(AamHandle* handle);
 
@@ -71,15 +80,6 @@ namespace AamCsharp
 
         [DllImport(__DllName, EntryPoint = "aam_parse_inline_to_map", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_parse_inline_to_map(byte* content);
-
-        [DllImport(__DllName, EntryPoint = "aam_reconstruct_push", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern int aam_reconstruct_push(AamHandle* handle, byte* content);
-
-        [DllImport(__DllName, EntryPoint = "aam_reconstruct_schema", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern byte* aam_reconstruct_schema(AamHandle* handle, byte* schema_name);
-
-        [DllImport(__DllName, EntryPoint = "aam_reconstruct_clear", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern void aam_reconstruct_clear(AamHandle* handle);
 
 
     }
