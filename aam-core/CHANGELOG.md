@@ -2,6 +2,18 @@
 
 All notable changes to aam-core will be documented in this file.
 
+## [2.9.0](https://github.com/INiNiDS/aam-rs/compare/2.8.1...2.9.0) - 2026-07-16
+
+### Added
+
+- *(bindings)* expose AAM::update reload API across all bindings
+- *(aam)* add AAM::update and update_from_text reload methods
+
+### Fixed
+
+- *(ci)* add C# SafeAamHandle helpers for aam_update/aam_reload and rustfmt
+- re-export anyhow from aam-core/aam-rs so define_aam_loader! works without downstream dep
+
 ## [2.8.1] - 2026-07-09
 
 ### Added
