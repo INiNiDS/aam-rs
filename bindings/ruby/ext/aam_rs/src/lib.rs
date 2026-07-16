@@ -30,23 +30,29 @@ fn first_error(errors: Vec<AamlError>) -> AamlError {
 // --- RubyAam ---
 #[magnus::wrap(class = "AamRb::AAM", free_immediately, size)]
 pub struct RubyAam {
-    inner: AAM,
+    inner: RefCell<AAM>,
 }
 
 impl RubyAam {
     pub fn new() -> Self {
-        Self { inner: AAM::new() }
+        Self {
+            inner: RefCell::new(AAM::new()),
+        }
     }
 
     pub fn parse(content: String) -> Result<Self, Error> {
         let doc =
             AAM::parse(&content).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
-        Ok(Self { inner: doc })
+        Ok(Self {
+            inner: RefCell::new(doc),
+        })
     }
 
     pub fn load(path: String) -> Result<Self, Error> {
         let doc = AAM::load(&path).map_err(|e| ruby_runtime_error(first_error(e).to_string()))?;
-        Ok(Self { inner: doc })
+        Ok(Self {
+            inner: RefCell::new(doc),
+        })
     }
 
     pub fn format(content: String) -> Result<String, Error> {
@@ -57,11 +63,12 @@ impl RubyAam {
     }
 
     pub fn get(&self, key: String) -> Option<String> {
-        self.inner.get(&key).map(|v| v.to_string())
+        self.inner.borrow().get(&key).map(|v| v.to_string())
     }
 
     pub fn keys(&self) -> Vec<String> {
         self.inner
+            .borrow()
             .keys()
             .into_iter()
             .map(|k| k.to_string())
@@ -69,11 +76,12 @@ impl RubyAam {
     }
 
     pub fn to_map(&self) -> BTreeMap<String, String> {
-        self.inner.to_map().into_iter().collect()
+        self.inner.borrow().to_map().into_iter().collect()
     }
 
     pub fn find(&self, query: String) -> Vec<(String, String)> {
         self.inner
+            .borrow()
             .find(&query)
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -82,6 +90,7 @@ impl RubyAam {
 
     pub fn deep_search(&self, pattern: String) -> Vec<(String, String)> {
         self.inner
+            .borrow()
             .deep_search(&pattern)
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -90,6 +99,7 @@ impl RubyAam {
 
     pub fn reverse_search(&self, value: String) -> Vec<String> {
         self.inner
+            .borrow()
             .reverse_search(&value)
             .into_iter()
             .map(|k| k.to_string())
@@ -98,6 +108,7 @@ impl RubyAam {
 
     pub fn schema_names(&self) -> Vec<String> {
         self.inner
+            .borrow()
             .schemas()
             .map(|schemas| schemas.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
@@ -105,6 +116,7 @@ impl RubyAam {
 
     pub fn type_names(&self) -> Vec<String> {
         self.inner
+            .borrow()
             .types()
             .map(|types| types.keys().map(|k| k.to_string()).collect())
             .unwrap_or_default()
@@ -113,16 +125,18 @@ impl RubyAam {
     /// Reload the document from its original on-disk source file (the path
     /// captured at `load` time). Raises `RuntimeError` if this instance was
     /// not loaded from a file path.
-    pub fn update(&mut self) -> Result<(), Error> {
+    pub fn update(&self) -> Result<(), Error> {
         self.inner
+            .borrow_mut()
             .update()
             .map_err(|e| ruby_runtime_error(first_error(e).to_string()))
     }
 
     /// Replace the entire backing configuration by re-parsing `content`.
     /// Clears any remembered on-disk source path.
-    pub fn update_from_text(&mut self, content: String) -> Result<(), Error> {
+    pub fn update_from_text(&self, content: String) -> Result<(), Error> {
         self.inner
+            .borrow_mut()
             .update_from_text(&content)
             .map_err(|e| ruby_runtime_error(first_error(e).to_string()))
     }
