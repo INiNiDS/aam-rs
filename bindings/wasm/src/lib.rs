@@ -272,6 +272,26 @@ impl AamDocument {
         arr
     }
 
+    /// Reload the document from its original on-disk source file (the path
+    /// captured at load time). In a WASM/browser context this usually fails
+    /// because there is no filesystem; prefer `updateFromText`.
+    pub fn update(&mut self) -> Result<(), JsValue> {
+        self.inner
+            .update()
+            .map_err(first_js_error)
+            .map(|_| ())
+    }
+
+    /// Replace the entire backing configuration by re-parsing `content`.
+    /// Clears any remembered on-disk source path.
+    #[wasm_bindgen(js_name = updateFromText)]
+    pub fn update_from_text(&mut self, content: &str) -> Result<(), JsValue> {
+        self.inner
+            .update_from_text(content)
+            .map_err(first_js_error)
+            .map(|_| ())
+    }
+
     #[cfg(feature = "reconstructer")]
     #[wasm_bindgen(js_name = reconstructSchema)]
     pub fn reconstruct_schema(name: &str, contents: Vec<String>) -> Result<String, JsValue> {

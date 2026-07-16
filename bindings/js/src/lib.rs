@@ -133,6 +133,10 @@ impl JsAam {
     fn inner_ref(&self) -> Result<&AAM> {
         self.inner.as_ref().ok_or_else(closed_error)
     }
+
+    fn inner_mut(&mut self) -> Result<&mut AAM> {
+        self.inner.as_mut().ok_or_else(closed_error)
+    }
 }
 
 impl Default for JsAam {
@@ -262,6 +266,21 @@ impl JsAam {
     #[napi(js_name = "isClosed")]
     pub fn is_closed(&self) -> bool {
         self.inner.is_none()
+    }
+
+    /// Reload the configuration from its original on-disk source file (the path
+    /// captured at `load`/`parse`-of-a-path time). Rejects if the instance was
+    /// not loaded from a file path.
+    #[napi]
+    pub fn update(&mut self) -> Result<()> {
+        self.inner_mut()?.update().map_err(first_napi_error)
+    }
+
+    /// Replace the entire backing configuration by re-parsing `content`.
+    /// Clears any remembered on-disk source path.
+    #[napi(js_name = "updateFromText")]
+    pub fn update_from_text(&mut self, content: String) -> Result<()> {
+        self.inner_mut()?.update_from_text(&content).map_err(first_napi_error)
     }
 }
 

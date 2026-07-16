@@ -27,6 +27,10 @@ export declare class AAM {
     close(): void
 
     isClosed(): boolean
+
+    update(): void
+
+    updateFromText(content: string): void
 }
 
 export type JsAam = AAM

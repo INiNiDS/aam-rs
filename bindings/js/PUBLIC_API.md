@@ -6,6 +6,11 @@ Source of truth: `js/index.d.ts`.
 
 - `parse(content: string): AAM`
 - `load(path: string): AAM`
+
+## AAM Instance Methods (reload)
+
+- `update(): void` — reload from the original on-disk source file (loaded via `load`); rejects if not loaded from a path.
+- `updateFromText(content: string): void` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `update` rejects.
 - `format(content: string): string`
 - `lspAssist(content: string): JsLspResult`
 - `reconstructSchema(name: string, contents: string[]): string`

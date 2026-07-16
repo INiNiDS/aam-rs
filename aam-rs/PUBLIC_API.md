@@ -32,7 +32,7 @@ Feature-gated modules:
 ## Core Types
 
 - `AAML` (legacy parser API): parse/load/merge, lookups, schema/type validation (`legacy` feature).
-- `AAM` (new API): parse/load, structured querying, formatter and pipeline utilities.
+- `AAM` (new API): parse/load, structured querying, formatter and pipeline utilities; supports `AAM::update()` (reload from the original on-disk source file) and `AAM::update_from_text(text)` (replace contents by re-parsing raw text).
 - `AAMBuilder`: fluent builder for generating `.aam` content.
 - `FoundValue`: lookup result wrapper (`as_str`, `as_list`, `as_object`).
 - `AamlError`: typed error enum used across parsing/validation/runtime paths.

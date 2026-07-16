@@ -30,6 +30,21 @@ namespace AamCsharp
         [DllImport(__DllName, EntryPoint = "aam_load", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern int aam_load(AamHandle* handle, byte* path);
 
+        /// <summary>
+        ///  Reloads the configuration from the on-disk source file that was originally
+        ///  passed to `aam_load` (or `aam_parse` with a file path). Fails if the
+        ///  instance was not loaded from a file path.
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "aam_update", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int aam_update(AamHandle* handle);
+
+        /// <summary>
+        ///  Replaces the configuration entirely by re-parsing the provided raw AAM text.
+        ///  Clears any remembered on-disk source path.
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "aam_reload", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int aam_reload(AamHandle* handle, byte* content);
+
         [DllImport(__DllName, EntryPoint = "aam_format", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern byte* aam_format(AamHandle* handle, byte* content);
 

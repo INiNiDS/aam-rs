@@ -15,6 +15,8 @@ Source of truth: `csharp/src/AamDocument.cs`, `csharp/src/AamBuilder.cs`.
 
 ## Core Methods
 
+- `void Update()` — reload from the original on-disk source file (loaded via `Load`); throws `AamException` if not loaded from a path.
+- `void UpdateFromText(string content)` — replace contents by reparsing raw text; clears the remembered source path.
 - `string Format(string content)`
 - `string? Get(string key)`
 - `Dictionary<string, string> Find(string query)`

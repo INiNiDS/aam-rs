@@ -137,8 +137,18 @@ class AamDocument private constructor(private var nativePtr: Long) : AutoCloseab
     }
 
     /**
+     * Reloads the document from its original on-disk source file (the path
+     * captured at [load] time). Throws [IllegalStateException] if this
+     * instance was not loaded from a file path.
+     */
+    fun update() {
+        AAM.update(checkPtr())
+    }
+
+    /**
      * Completely reloads the document state with new content.
-     * Overwrites all existing data in memory.
+     * Overwrites all existing data in memory and clears the remembered
+     * on-disk source path, so a subsequent [update] will fail.
      */
     fun reload(content: String) {
         AAM.reload(checkPtr(), content)
@@ -182,6 +192,7 @@ private object AAM {
     @JvmStatic external fun new(): Long
     @JvmStatic external fun parse(content: String): Long
     @JvmStatic external fun load(path: String): Long
+    @JvmStatic external fun update(ptr: Long)
     @JvmStatic external fun reload(ptr: Long, content: String)
     @JvmStatic external fun destroy(ptr: Long)
 

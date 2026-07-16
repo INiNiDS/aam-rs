@@ -23,6 +23,8 @@ Source of truth: `wasm/src/lib.rs`.
 - `reverseSearch(value: string): string[]`
 - `schemaNames(): string[]`
 - `typeNames(): string[]`
+- `update(): void` — reload from the original on-disk source file; usually fails in a WASM/browser context (no filesystem), prefer `updateFromText`.
+- `updateFromText(content: string): void` — replace contents by reparsing raw text; clears the remembered source path.
 
 ## Static Helper
 

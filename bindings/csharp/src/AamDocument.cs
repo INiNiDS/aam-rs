@@ -114,6 +114,29 @@ public sealed unsafe class AamDocument : IDisposable
     public bool IsClosed => _handle is null || _handle.IsClosed || _handle.IsInvalid;
 
     /// <summary>
+    /// Reloads the configuration from its original on-disk source file (the
+    /// path captured at <see cref="Load"/> time).
+    /// </summary>
+    /// <exception cref="AamException">Thrown when the instance was not loaded
+    /// from a file path, or when reloading fails.</exception>
+    public void Update()
+    {
+        CheckResult(AamNative.aam_update(Handle));
+    }
+
+    /// <summary>
+    /// Replaces the entire backing configuration by re-parsing
+    /// <paramref name="content"/>. Clears any remembered on-disk source path,
+    /// so a subsequent <see cref="Update"/> will fail.
+    /// </summary>
+    /// <param name="content">Raw AAM text to parse.</param>
+    /// <exception cref="AamException">Thrown when native reparsing fails.</exception>
+    public void UpdateFromText(string content)
+    {
+        CheckResult(AamNative.aam_reload(Handle, content));
+    }
+
+    /// <summary>
     /// Formats an AAM string using standardized rules.
     /// </summary>
     /// <param name="content">AAM text to format.</param>

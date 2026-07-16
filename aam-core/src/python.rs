@@ -144,6 +144,12 @@ impl PyAam {
             .as_ref()
             .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
     }
+
+    fn inner_mut(&mut self) -> PyResult<&mut AAM> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| PyRuntimeError::new_err("AAM instance is closed"))
+    }
 }
 
 #[pymethods]
@@ -297,6 +303,25 @@ impl PyAam {
 
     fn close(&mut self) {
         self.inner = None;
+    }
+
+    /// Reload the configuration from its original on-disk source file (the path
+    /// captured at `load`/`parse`-of-a-path time). Raises `RuntimeError` if
+    /// this instance was not loaded from a file path.
+    fn update(&mut self) -> PyResult<()> {
+        self.inner_mut()?
+            .update()
+            .map_err(first_error)
+            .map_err(|err: AamlError| to_py(&err))
+    }
+
+    /// Replace the entire backing configuration by re-parsing `content`.
+    /// Clears any remembered on-disk source path.
+    fn update_from_text(&mut self, content: &str) -> PyResult<()> {
+        self.inner_mut()?
+            .update_from_text(content)
+            .map_err(first_error)
+            .map_err(|err: AamlError| to_py(&err))
     }
 
     const fn is_closed(&self) -> bool {

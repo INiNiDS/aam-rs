@@ -110,6 +110,23 @@ impl RubyAam {
             .unwrap_or_default()
     }
 
+    /// Reload the document from its original on-disk source file (the path
+    /// captured at `load` time). Raises `RuntimeError` if this instance was
+    /// not loaded from a file path.
+    pub fn update(&mut self) -> Result<(), Error> {
+        self.inner
+            .update()
+            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))
+    }
+
+    /// Replace the entire backing configuration by re-parsing `content`.
+    /// Clears any remembered on-disk source path.
+    pub fn update_from_text(&mut self, content: String) -> Result<(), Error> {
+        self.inner
+            .update_from_text(&content)
+            .map_err(|e| ruby_runtime_error(first_error(e).to_string()))
+    }
+
     #[cfg(feature = "reconstructer")]
     pub fn reconstruct_schema(name: String, contents: Vec<String>) -> Result<String, Error> {
         let refs: Vec<&str> = contents.iter().map(String::as_str).collect();
@@ -263,6 +280,8 @@ fn init(ruby: &Ruby) -> Result<(), Error> {
     aam_class.define_method("reverse_search", method!(RubyAam::reverse_search, 1))?;
     aam_class.define_method("schema_names", method!(RubyAam::schema_names, 0))?;
     aam_class.define_method("type_names", method!(RubyAam::type_names, 0))?;
+    aam_class.define_method("update", method!(RubyAam::update, 0))?;
+    aam_class.define_method("update_from_text", method!(RubyAam::update_from_text, 1))?;
     #[cfg(feature = "reconstructer")]
     {
         aam_class.define_singleton_method(

@@ -16,7 +16,8 @@ Source of truth: `php/src/AamPhp.php`.
 
 ## AamDocument Methods
 
-- `reload(string $content): void`
+- `update(): void` — reload from the original on-disk source file (loaded via a file path); throws `RuntimeException` if not loaded from a path.
+- `reload(string $content): void` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `update()` fails.
 - `format(string $content): string`
 - `get(string $key): ?string`
 - `find(string $query): array`

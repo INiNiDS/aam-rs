@@ -13,6 +13,11 @@ Source of truth: `go/aam/aam.go`.
 - `New() (*AAM, error)`
 - `Parse(content string) (*AAM, error)`
 - `Load(path string) (*AAM, error)`
+
+### AAM reload
+
+- `(*AAM) Update() error` — reload from the original on-disk source file (loaded via `Load`); error if not loaded from a path.
+- `(*AAM) UpdateFromText(content string) error` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `Update` fails.
 - `SplitAam(content string) map[string]*AAMBuilder`
 - `NewBuilder() *AAMBuilder`
 - `RequiredField(name, typeName string) SchemaField`

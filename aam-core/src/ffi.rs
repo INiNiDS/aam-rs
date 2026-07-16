@@ -117,6 +117,54 @@ pub unsafe extern "C" fn aam_load(handle: *mut AamHandle, path: *const c_char) -
     }
 }
 
+/// Reloads the configuration from the on-disk source file that was originally
+/// passed to `aam_load` (or `aam_parse` with a file path). Fails if the
+/// instance was not loaded from a file path.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_update(handle: *mut AamHandle) -> i32 {
+    if handle.is_null() {
+        return -1;
+    }
+    let handle = unsafe { &mut *handle };
+
+    match handle.inner.update() {
+        Ok(()) => {
+            handle.clear_error();
+            0
+        }
+        Err(e) => {
+            handle.set_error(&first_error(e));
+            -1
+        }
+    }
+}
+
+/// Replaces the configuration entirely by re-parsing the provided raw AAM text.
+/// Clears any remembered on-disk source path.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aam_reload(handle: *mut AamHandle, content: *const c_char) -> i32 {
+    if handle.is_null() || content.is_null() {
+        return -1;
+    }
+    let handle = unsafe { &mut *handle };
+
+    let Ok(content) = (unsafe { CStr::from_ptr(content) }).to_str() else {
+        handle.set_error(&"invalid utf-8");
+        return -1;
+    };
+
+    match handle.inner.update_from_text(content) {
+        Ok(()) => {
+            handle.clear_error();
+            0
+        }
+        Err(e) => {
+            handle.set_error(&first_error(e));
+            -1
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn aam_format(handle: *mut AamHandle, content: *const c_char) -> *mut c_char {
     if handle.is_null() || content.is_null() {

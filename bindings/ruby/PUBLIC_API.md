@@ -13,6 +13,11 @@ Source of truth: `ruby/ext/aam_rs/src/lib.rs`.
 - `AamRb::AAM.new`
 - `AamRb::AAM.parse(content)`
 - `AamRb::AAM.load(path)`
+
+### Reload
+
+- `AamRb::AAM#update` — reload from the original on-disk source file (loaded via `load`); raises `RuntimeError` if not loaded from a path.
+- `AamRb::AAM#update_from_text(content)` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `update` fails.
 - `AamRb::AAM.reconstruct_schema(name, contents)`
 - `AamRb::AAM.format(content)`
 - `AamRb.split_aam(content)`

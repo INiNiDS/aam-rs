@@ -31,6 +31,8 @@ final class AamDocument
             void aam_free(AamHandle* handle);
             int aam_parse(AamHandle* handle, const char* content);
             int aam_load(AamHandle* handle, const char* path);
+            int aam_update(AamHandle* handle);
+            int aam_reload(AamHandle* handle, const char* content);
             char* aam_format(AamHandle* handle, const char* content);
 
             char* aam_get(AamHandle* handle, const char* key);
@@ -125,6 +127,19 @@ final class AamDocument
     public function reload(string $content): void
     {
         $this->ffi->aam_reload($this->handle, $content);
+    }
+
+    /**
+     * Reload the document from its original on-disk source file (the path
+     * captured at load time). Throws if this instance was not loaded from a
+     * file path.
+     */
+    public function update(): void
+    {
+        $rc = $this->ffi->aam_update($this->handle);
+        if ($rc !== 0) {
+            $this->throwLastError('Native update failed');
+        }
     }
 
     public function format(string $content): string

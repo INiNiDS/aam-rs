@@ -11,6 +11,8 @@ Source of truth: `include/aam.h`.
 
 - `int aam_parse(AamHandle *handle, const char *content)`
 - `int aam_load(AamHandle *handle, const char *path)`
+- `int aam_update(AamHandle *handle)` — reload from the original on-disk source file; fails if not loaded from a path.
+- `int aam_reload(AamHandle *handle, const char *content)` — replace contents by reparsing raw text.
 - `char *aam_format(AamHandle *handle, const char *content)`
 
 Return convention: `0` on success, non-zero on error.

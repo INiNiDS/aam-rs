@@ -72,6 +72,34 @@ func Load(path string) (*AAM, error) {
 	return a, nil
 }
 
+// Update reloads the configuration from its original on-disk source file
+// (the path captured at Load time). Returns an error if the instance was
+// not loaded from a file path.
+func (a *AAM) Update() error {
+	if a.ptr == nil {
+		return errors.New("aam: operation on closed handle")
+	}
+	if rc := C.aam_update(a.ptr); rc != 0 {
+		return fmt.Errorf("aam: update: %s", a.LastError())
+	}
+	return nil
+}
+
+// UpdateFromText replaces the entire backing configuration by re-parsing
+// content. Clears any remembered on-disk source path, so a subsequent
+// Update will fail.
+func (a *AAM) UpdateFromText(content string) error {
+	if a.ptr == nil {
+		return errors.New("aam: operation on closed handle")
+	}
+	cContent := C.CString(content)
+	defer C.free(unsafe.Pointer(cContent))
+	if rc := C.aam_reload(a.ptr, cContent); rc != 0 {
+		return fmt.Errorf("aam: updateFromText: %s", a.LastError())
+	}
+	return nil
+}
+
 // Format takes a raw AAM string and returns a standardized formatted version.
 func (a *AAM) Format(content string) (string, error) {
 	if a.ptr == nil {

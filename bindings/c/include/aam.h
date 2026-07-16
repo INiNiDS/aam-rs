@@ -24,6 +24,11 @@ void aam_free(AamHandle *handle);
 
 int aam_parse(AamHandle *handle, const char *content);
 int aam_load(AamHandle *handle, const char *path);
+/* Reload the document from its original on-disk source file. Fails if the
+ * instance was not loaded from a file path. */
+int aam_update(AamHandle *handle);
+/* Replace the document contents by re-parsing raw AAM text. */
+int aam_reload(AamHandle *handle, const char *content);
 char *aam_format(AamHandle *handle, const char *content);
 
 char *aam_get(const AamHandle *handle, const char *key);

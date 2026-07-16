@@ -14,6 +14,11 @@ Source of truth: `src/python.rs` (PyO3 class exported as `aam_py.AAM`).
 - `AAM.parse(content: str) -> AAM`
 - `AAM.load(path: str) -> AAM`
 
+## Reload
+
+- `AAM.update() -> None` — reload from the original on-disk source file (loaded via `load`); raises `RuntimeError` if not loaded from a path.
+- `AAM.update_from_text(content: str) -> None` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `update` raises.
+
 ## Utility Static Method
 
 - `AAM.lsp_assist(content: str) -> tuple[list[str], str | None]`

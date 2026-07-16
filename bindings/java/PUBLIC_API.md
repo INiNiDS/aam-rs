@@ -16,7 +16,8 @@ Source of truth: `java/src/main/kotlin/AamDocument.kt`, `java/src/main/kotlin/Aa
 
 ## Instance Methods
 
-- `void reload(String content)`
+- `void update()` — reload from the original on-disk source file (loaded via `load`); throws `IllegalStateException` if not loaded from a path.
+- `void reload(String content)` — replace contents by reparsing raw text; clears the remembered source path so a subsequent `update` fails.
 - `String? get(String key)`
 - `Map<String, String> deepSearch(String pattern)`
 - `List<String> reverseSearch(String value)`
