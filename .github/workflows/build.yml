@@ -484,8 +484,8 @@ jobs:
           cp bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/lib/aam_rs_ruby.so 2>/dev/null || true
           sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
           sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
-cd bindings/ruby
-gem build aam-ruby.gemspec --output ../../aam-ruby.gem
+          cd bindings/ruby
+          gem build aam-ruby.gemspec --output ../../aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
         with:
