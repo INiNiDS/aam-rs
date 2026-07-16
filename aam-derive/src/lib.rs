@@ -34,20 +34,19 @@ fn get_aam_default(field: &Field) -> Option<DefaultSpec> {
             .parse_args_with(Punctuated::parse_terminated)
             .unwrap_or_default();
         for meta in &parsed {
-            match meta {
-                // `#[aam(default)]`
-                Meta::Path(path) if path.is_ident("default") => {
-                    return Some(DefaultSpec::Standard);
-                }
-                // `#[aam(default = "expr")]`
-                Meta::NameValue(nv)
-                    if nv.path.is_ident("default")
-                        && let syn::Expr::Lit(lit) = &nv.value
-                        && let Lit::Str(s) = &lit.lit =>
-                {
-                    return Some(DefaultSpec::Expr(s.value()));
-                }
-                _ => {}
+            // `#[aam(default)]`
+            if let Meta::Path(path) = meta
+                && path.is_ident("default")
+            {
+                return Some(DefaultSpec::Standard);
+            }
+            // `#[aam(default = "expr")]`
+            if let Meta::NameValue(nv) = meta
+                && nv.path.is_ident("default")
+                && let syn::Expr::Lit(lit) = &nv.value
+                && let Lit::Str(s) = &lit.lit
+            {
+                return Some(DefaultSpec::Expr(s.value()));
             }
         }
     }
