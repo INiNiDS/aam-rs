@@ -2,9 +2,57 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::{
-    Data, DeriveInput, Field, Fields, Lit, LitStr, Meta, Token, Type, parse_macro_input,
+    Data, DeriveInput, Expr, Field, Fields, Lit, LitStr, Meta, Token, Type, parse_macro_input,
     punctuated::Punctuated,
 };
+
+// ── `#[aam(default = ...)]` handling ─────────────────────────────────────────
+//
+// Permitted forms:
+//   #[aam(default)]            — use `<T as Default>::default()`
+//   #[aam(default = "expr")]   — use the Rust expression parsed from the string
+//
+// When present, the field's "missing from input" branch yields the default
+// value instead of a `NotFound` error (required fields) or `None`/`Vec::new()`
+// (Option/Vec fields). The "present" branch still parses normally.
+enum DefaultSpec {
+    /// `#[aam(default)]` — `::<T as ::std::default::Default>::default()`.
+    Standard,
+    /// `#[aam(default = "src")]` — `src` parsed as a Rust expression.
+    Expr(String),
+}
+
+fn get_aam_default(field: &Field) -> Option<DefaultSpec> {
+    for attr in &field.attrs {
+        if !attr.path().is_ident("aam") {
+            continue;
+        }
+        let Meta::List(list) = &attr.meta else {
+            continue;
+        };
+        let parsed: Punctuated<Meta, Token![,]> = list
+            .parse_args_with(Punctuated::parse_terminated)
+            .unwrap_or_default();
+        for meta in &parsed {
+            match meta {
+                // `#[aam(default)]`
+                Meta::Path(path) if path.is_ident("default") => {
+                    return Some(DefaultSpec::Standard);
+                }
+                // `#[aam(default = "expr")]`
+                Meta::NameValue(nv)
+                    if nv.path.is_ident("default")
+                        && let syn::Expr::Lit(lit) = &nv.value
+                        && let Lit::Str(s) = &lit.lit =>
+                {
+                    return Some(DefaultSpec::Expr(s.value()));
+                }
+                _ => {}
+            }
+        }
+    }
+    None
+}
 
 /// Returns the path prefix for generated code (`::aam_rs` or `::aam_core`).
 ///
@@ -24,6 +72,56 @@ fn aam_root() -> proc_macro2::TokenStream {
     quote!(::#ident)
 }
 
+/// Derive `FromAam` for a struct, deserializing from an inline-object AAM
+/// string (`name = value`, `name = { ... }`, or `name = [ ... ]` separated by
+/// newlines or commas).
+///
+/// # Field attributes
+///
+/// - `#[aam(rename = "key")]` — read the value from the AAM key `key` instead
+///   of the field's Rust name (useful for keys that aren't valid Rust idents,
+///   e.g. `source.dir`).
+/// - `#[aam(default)]` — if the key is missing from the input, use
+///   `<FieldType as Default>::default()` instead of returning a `NotFound`
+///   error. Works for required, `Option`, and `Vec` fields.
+/// - `#[aam(default = "expr")]` — if the key is missing, evaluate the Rust
+///   expression `expr` (parsed from the string) instead of the type's
+///   `Default`. Useful for non-`Default` defaults, e.g.
+///   `#[aam(default = "42")]` for an `i32` field.
+///
+/// `Option<T>` fields default to `None` when missing; `Vec<T>` fields default
+/// to `Vec::new()` when missing — unless an explicit `#[aam(default)]` /
+/// `#[aam(default = "...")]` overrides it.
+///
+/// # Example
+///
+/// ```no_run
+/// use aam_core::from_aam::FromAam;
+/// use aam_derive::FromAam;
+///
+/// #[derive(FromAam, Default)]
+/// struct Cfg {
+///     // Required; `NotFound` if `host` is absent.
+///     host: String,
+///     // Optional; `None` when missing.
+///     port: Option<u16>,
+///     // Missing → `Default::default()` (i.e. 0).
+///     #[aam(default)]
+///     retries: u32,
+///     // Missing → the literal expression `30`.
+///     #[aam(default = "30")]
+///     timeout: u32,
+///     // Missing → empty `Vec`.
+///     tags: Vec<String>,
+/// }
+///
+/// let cfg = Cfg::from_aam_str("host = localhost\nport = 8080").unwrap();
+/// assert_eq!(cfg.host, "localhost");
+/// assert_eq!(cfg.port, Some(8080));
+/// assert_eq!(cfg.retries, 0);
+/// assert_eq!(cfg.timeout, 30);
+/// assert!(cfg.tags.is_empty());
+/// ```
 #[proc_macro_derive(FromAam, attributes(aam))]
 pub fn derive_from_aam(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -74,36 +172,59 @@ fn generate_field_parser(field: &Field) -> proc_macro2::TokenStream {
 
     let aam_name = get_aam_name(field);
     let is_optional = is_option_type(ty);
+    let default_spec = get_aam_default(field);
 
     let aam_name_lit = LitStr::new(&aam_name, field_ident.span());
 
-    if is_optional {
+    // Expression used when the field IS present in the input. Same for every
+    // branch; only the "missing" arm differs based on type / `default`.
+    let present_parse = if is_optional {
         let inner_ty = extract_option_inner(ty);
         quote! {
-            #field_ident: match fields.get(#aam_name_lit) {
-                Some(v) => Some(<#inner_ty as #root::from_aam::FromAam>::from_aam_str(v)?),
-                None => None,
-            },
+            Some(<#inner_ty as #root::from_aam::FromAam>::from_aam_str(v)?)
         }
     } else if is_vec_type(ty) {
         let inner_ty = extract_vec_inner(ty);
         quote! {
-            #field_ident: match fields.get(#aam_name_lit) {
-                Some(v) => <::std::vec::Vec<#inner_ty> as #root::from_aam::FromAam>::from_aam_str(v)?,
-                None => ::std::vec::Vec::new(),
-            },
+            <::std::vec::Vec<#inner_ty> as #root::from_aam::FromAam>::from_aam_str(v)?
         }
     } else {
         quote! {
-            #field_ident: match fields.get(#aam_name_lit) {
-                Some(v) => <#ty as #root::from_aam::FromAam>::from_aam_str(v)?,
-                None => return ::std::result::Result::Err(#root::error::AamlError::NotFound {
-                    key: #aam_name_lit.to_string(),
-                    context: "inline object fields".to_string(),
-                    diagnostics: None,
-                }),
+            <#ty as #root::from_aam::FromAam>::from_aam_str(v)?
+        }
+    };
+
+    // Expression used when the field is MISSING from the input.
+    let missing_expr = if let Some(spec) = default_spec {
+        match spec {
+            DefaultSpec::Standard => quote! { ::std::default::Default::default() },
+            DefaultSpec::Expr(src) => match syn::parse_str::<Expr>(&src) {
+                Ok(expr) => quote! { #expr },
+                Err(e) => {
+                    let msg = format!("invalid `#[aam(default = ...)]` expression: {e}");
+                    return syn::Error::new(field_ident.span(), msg).to_compile_error();
+                }
             },
         }
+    } else if is_optional {
+        quote! { None }
+    } else if is_vec_type(ty) {
+        quote! { ::std::vec::Vec::new() }
+    } else {
+        quote! {
+            return ::std::result::Result::Err(#root::error::AamlError::NotFound {
+                key: #aam_name_lit.to_string(),
+                context: "inline object fields".to_string(),
+                diagnostics: None,
+            })
+        }
+    };
+
+    quote! {
+        #field_ident: match fields.get(#aam_name_lit) {
+            Some(v) => #present_parse,
+            None => #missing_expr,
+        },
     }
 }
 
