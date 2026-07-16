@@ -94,7 +94,11 @@ fn aam_delete_impl(ptr: jlong) {
 
 fn aam_update_impl(mut env: Env, ptr: jlong) {
     let Some(aam) = (unsafe { get_aam_mut(ptr) }) else {
-        throw_java_exception(&mut env, "java/lang/IllegalStateException", "AAM instance is null");
+        throw_java_exception(
+            &mut env,
+            "java/lang/IllegalStateException",
+            "AAM instance is null",
+        );
         return;
     };
     if let Err(e) = aam.update() {
@@ -109,7 +113,11 @@ fn aam_update_impl(mut env: Env, ptr: jlong) {
 
 fn aam_reload_impl(mut env: Env, ptr: jlong, content: JString) {
     let Some(aam) = (unsafe { get_aam_mut(ptr) }) else {
-        throw_java_exception(&mut env, "java/lang/IllegalStateException", "AAM instance is null");
+        throw_java_exception(
+            &mut env,
+            "java/lang/IllegalStateException",
+            "AAM instance is null",
+        );
         return;
     };
     let content_str = match java_string_to_rust(&mut env, &content) {
