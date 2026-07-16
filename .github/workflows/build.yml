@@ -484,8 +484,8 @@ jobs:
           cp bindings/ruby/ext/aam_rs/target/release/libaam_rs_ruby.so bindings/ruby/lib/aam_rs_ruby.so 2>/dev/null || true
           sed -i 's/libaam_ruby/aam_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
           sed -i 's/libaam_rs_ruby/aam_rs_ruby/g' bindings/ruby/lib/aam_rb.rb 2>/dev/null || true
-          cd bindings/ruby
-          gem build aam-ruby.gemspec --output ../aam-ruby.gem
+cd bindings/ruby
+gem build aam-ruby.gemspec --output ../../aam-ruby.gem
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v7
         with:
@@ -656,14 +656,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -m bindings/python/pyproject.toml
+          args: --release --out dist -m bindings/python/Cargo.toml
           sccache: false
           manylinux: auto
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
+          args: --release --out dist -i python3.14t -m bindings/python/Cargo.toml
           sccache: false
           manylinux: auto
       - name: Upload wheels
@@ -701,14 +701,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -m bindings/python/pyproject.toml
+          args: --release --out dist -m bindings/python/Cargo.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
+          args: --release --out dist -i python3.14t -m bindings/python/Cargo.toml
           sccache: false
           manylinux: musllinux_1_2
       - name: Upload wheels
@@ -748,7 +748,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -m bindings/python/pyproject.toml
+          args: --release --out dist -m bindings/python/Cargo.toml
           sccache: false
       - uses: actions/setup-python@v6
         with:
@@ -758,7 +758,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
+          args: --release --out dist -i python3.14t -m bindings/python/Cargo.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -791,13 +791,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -m bindings/python/pyproject.toml
+          args: --release --out dist -m bindings/python/Cargo.toml
           sccache: false
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t -m bindings/python/pyproject.toml
+          args: --release --out dist -i python3.14t -m bindings/python/Cargo.toml
           sccache: false
       - name: Upload wheels
         uses: actions/upload-artifact@v7
@@ -820,7 +820,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist -m bindings/python/pyproject.toml
+          args: --out dist -m bindings/python/Cargo.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v7
         with:
